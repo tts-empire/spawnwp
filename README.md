@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<h1 align="center">spawnwp</h1>
+<h1 align="center">Spawnwp</h1>
 
 <p align="center">
   <strong>A self-hosted WordPress lab for disposable dev environments.</strong><br>

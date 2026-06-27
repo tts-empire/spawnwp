@@ -133,7 +133,7 @@ xdebug-off:
 
 mail:
 	@echo "Mailpit web UI: http://127.0.0.1:8025"
-	@echo "SSH forward:    ssh -L 8025:127.0.0.1:8025 root@devel.presenzaweb.net"
+	@echo "Mailpit is available from the cockpit's Mailpit button."
 
 logs-wp:
 	$(PHP) tail -f /var/www/html/wp-content/debug.log

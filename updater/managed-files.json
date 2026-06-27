@@ -1,6 +1,8 @@
 {
   "cockpit": [
     "app.py",
+    "auth.py",
+    "requirements.txt",
     "manage.html",
     "deploy.html",
     "updates.html",
@@ -11,6 +13,7 @@
     "Makefile",
     "compose.yaml",
     "env.example",
+    "gitignore.template",
     "blueprints/clean.json",
     "blueprints/demo.json",
     "blueprints/development.json",
@@ -20,8 +23,28 @@
     "docker/php/phpstan-wp.neon",
     "docker/php/xdebug.ini",
     "scripts/apply-blueprint.sh",
+    "scripts/bootstrap.sh",
     "scripts/blueprint.py",
+    "scripts/devkit.php",
     "scripts/destroy-project.sh",
-    "scripts/new-project.sh"
+    "scripts/new-project.sh",
+    "scripts/reset.sh",
+    "scripts/restore.sh",
+    "scripts/snapshot.sh",
+    "scripts/wait-for-wordpress.sh"
+  ],
+  "installer": [
+    "cockpit-reaper.service",
+    "cockpit-reaper.timer",
+    "docker-prune.service",
+    "docker-prune.timer",
+    "knock-session",
+    "nginx-http.conf.tpl",
+    "nginx.conf.tpl",
+    "spawnwp-proxy.conf",
+    "spawnwp-telemetry.service",
+    "spawnwp-telemetry.timer",
+    "telemetry.py",
+    "wp-cockpit.service"
   ]
 }

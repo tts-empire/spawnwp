@@ -1,0 +1,6 @@
+[Unit]
+Description=Prune unused SpawnWP Docker build cache
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker builder prune -af --filter until=168h

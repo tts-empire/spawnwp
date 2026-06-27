@@ -7,8 +7,8 @@ page describes the protection model and, just as importantly, its limits.
 
 | Surface | Protection |
 |---|---|
-| `COCKPIT_DOMAIN` (default/recommended) | **Port-knock** → **HTTP Basic Auth** → **HTTPS** |
-| `COCKPIT_DOMAIN` (knocking disabled) | **HTTP Basic Auth** → **HTTPS** |
+| `COCKPIT_DOMAIN` (default/recommended) | **Port-knock** → **HTTP Basic Auth** → **application login** → **HTTPS** |
+| `COCKPIT_DOMAIN` (knocking disabled) | **HTTP Basic Auth** → **application login** → **HTTPS** |
 | `DOMAIN` (WordPress sites) | **HTTP Basic Auth** → **HTTPS** |
 
 - **Port-knocking** keeps the admin surface dark: the cockpit returns `403` until your IP
@@ -16,6 +16,9 @@ page describes the protection model and, just as importantly, its limits.
   per install. Sessions slide for 30 minutes of inactivity, then a reaper revokes the IP.
   It is optional in the installer, strongly recommended, and enabled by default.
 - **HTTP Basic Auth** guards both hostnames with a username and a random password.
+- **Application login** is mandatory for cockpit and admin tools. A user-verifying
+  passkey is preferred; fallback requires an Argon2id password plus TOTP or a single-use
+  recovery code. Sessions have 30-minute idle and 12-hour absolute limits.
 - **HTTPS** everywhere via Let's Encrypt; HTTP is redirected to HTTPS.
 
 ## Container hardening

@@ -1,0 +1,11 @@
+[Unit]
+Description=Expire inactive SpawnWP knock sessions
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

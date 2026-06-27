@@ -1,0 +1,7 @@
+fastapi==0.138.1
+uvicorn[standard]==0.49.0
+webauthn==2.8.0
+argon2-cffi==25.1.0
+pyotp==2.10.0
+cryptography==49.0.0
+qrcode==8.2

@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly SpawnWP Docker build cache cleanup
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

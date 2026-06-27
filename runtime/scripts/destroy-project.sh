@@ -9,7 +9,7 @@ if [ -z "$NAME" ]; then
 fi
 
 PROJ_DIR="/srv/${NAME}"
-NGINX_CONF="/etc/nginx/sites-available/default"
+NGINX_CONF="/etc/nginx/sites-available/spawnwp"
 
 # ── Safety guards ────────────────────────────────────────────────────────────────
 # Never destroy the primary stack.

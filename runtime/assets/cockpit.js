@@ -1,9 +1,29 @@
 const BASE = '/api';
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const method = (init.method || 'GET').toUpperCase();
+  const url = typeof input === 'string' ? input : input.url;
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && new URL(url, location.href).origin === location.origin) {
+    const csrf = document.cookie.split('; ').find(item => item.startsWith('spawnwp_csrf='));
+    init.headers = new Headers(init.headers || {});
+    if (csrf) init.headers.set('X-CSRF-Token', decodeURIComponent(csrf.split('=').slice(1).join('=')));
+  }
+  return nativeFetch(input, init);
+};
 const dbCache = {};   // name -> {size_mb, tables}
 const projectSignatures = {}; // name -> last structural/status payload
 let BLUEPRINTS = [];
 let SYS_BUSY = false; // true when a build is running / high load (guardrail)
 let DEPLOY_ACTIVE = false;
+let PLATFORM = {};
+
+async function loadPlatform() {
+  try {
+    PLATFORM = await fetch(`${BASE}/platform`, { cache: 'no-store' }).then(response => response.json());
+    const domain = document.getElementById('domain-preview');
+    if (domain) domain.textContent = PLATFORM.domain || 'domain';
+  } catch (error) { /* keep neutral placeholders */ }
+}
 
 function blockedIfBusy() {
   if (SYS_BUSY) {
@@ -97,6 +117,11 @@ function showToast(msg, isErr) {
   t._timer = setTimeout(() => { t.style.display = 'none'; }, 2200);
 }
 
+async function logoutCockpit() {
+  await fetch(`${BASE}/auth/logout`, { method: 'POST' });
+  location.href = '/login';
+}
+
 async function loadUpdateStatus() {
   const panel = document.getElementById('update-panel');
   try {
@@ -132,6 +157,24 @@ async function loadUpdateStatus() {
 function copyUpdateCommand() {
   navigator.clipboard.writeText('sudo spawnwp update');
   showToast('Update command copied');
+}
+
+async function loadTelemetryStatus() {
+  const state = document.getElementById('telemetry-state');
+  if (!state) return;
+  try {
+    const status = await fetch(`${BASE}/telemetry`, { cache: 'no-store' }).then(response => response.json());
+    state.textContent = status.enabled ? 'Enabled until consent expiry' : 'Disabled';
+    document.getElementById('telemetry-disable').hidden = !status.enabled;
+  } catch (error) { state.textContent = 'Unavailable'; }
+}
+
+async function disableTelemetry() {
+  if (!confirm('Disable telemetry and delete the local installation identifier?')) return;
+  const response = await fetch(`${BASE}/telemetry/disable`, { method: 'POST' });
+  if (!response.ok) { showToast('Unable to disable telemetry', true); return; }
+  showToast('Telemetry disabled');
+  loadTelemetryStatus();
 }
 
 // ── Project list (rebuilds the .card-top, never the output box) ──────────────
@@ -502,7 +545,7 @@ function createProject(e) {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {
-      const url = `https://devel.presenzaweb.net/${encodeURIComponent(name)}`;
+      const url = `${PLATFORM.sites_url || ''}/${encodeURIComponent(name)}`;
       result.innerHTML = `<strong>Environment ready.</strong><div><a href="${url}/" target="_blank" rel="noopener">Open site ↗</a><a href="${url}/wp-admin/" target="_blank" rel="noopener">WP Admin ↗</a><a href="/manage">Manage environment →</a></div>`;
       result.hidden = false;
     }
@@ -618,10 +661,12 @@ function destroyProject(name) {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 updateClock();
+loadPlatform();
 if (document.body.dataset.page === 'deploy') loadBlueprints();
 if (document.body.dataset.page === 'manage') loadProjects();
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();
+loadTelemetryStatus();
 setInterval(updateClock, 1000);
 if (document.body.dataset.page === 'manage') setInterval(loadProjects, 30000);
 if (document.body.dataset.page !== 'updates') setInterval(pollMetrics, 4000);

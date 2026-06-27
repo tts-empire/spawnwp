@@ -19,6 +19,7 @@ The installer prompts for the values it needs:
 | `EMAIL` | yes | Contact email for Let's Encrypt |
 | `BASIC_AUTH_USER` | no | HTTP Basic Auth username (default: `admin`) |
 | `ENABLE_PORT_KNOCKING` | no | `1` (default, strongly recommended) or `0` |
+| `ENABLE_TELEMETRY` | no | `0` (default) or explicit 90-day opt-in with `1` |
 
 Interactive installs ask whether to enable port-knocking. Press **Enter** to accept the
 recommended default (`Y`). If you disable it, the cockpit remains protected by HTTPS
@@ -51,8 +52,9 @@ curl -fsSL https://spawnwp.com/install.sh \
    covering `DOMAIN` and `COCKPIT_DOMAIN`.
 5. When selected, sets up **port-knocking** (knockd) and its idle-session reaper. This
    protection is enabled and strongly recommended by default.
-6. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
-7. Prints a **credentials report**.
+6. Creates the application-auth database, encryption key and expiring setup code.
+7. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
+8. Prints a **credentials report**.
 
 It typically takes a few minutes (longer on the first image build).
 
@@ -61,9 +63,11 @@ It typically takes a few minutes (longer on the first image build).
 After the installer finishes, normal work moves to the browser:
 
 1. Open the cockpit URL from the credentials report.
-2. Log in with the Basic Auth credentials.
-3. Click **Create site**.
-4. Use the new WordPress site; snapshot or destroy it when you are done.
+2. Pass the outer HTTP Basic Auth prompt.
+3. Enter the one-time setup code, choose a fallback passphrase, register a passkey and
+   scan the TOTP QR code.
+4. Store the ten single-use recovery codes shown once by the cockpit.
+5. Click **Create site**.
 
 You can still use the CLI when you want to, but it should not be required for the
 daily create/test/reset loop.
@@ -83,6 +87,8 @@ HTTP Basic Auth
   user: admin
   pass: ••••••••••••••••
 
+Application setup code (expires in 24h): ••••••••••••••••
+
 WordPress admin (primary site)
   user: admin-xxxxxx
   pass: ••••••••••••••••
@@ -100,6 +106,22 @@ TCP ports are required in that mode.
     The secrets are shown once and are not recoverable elsewhere (only stored in the
     `600`-mode file on the server). Copy them to your password manager. Never commit or
     share the report or your `.env` files.
+
+## Optional telemetry
+
+The separate prompt `Share anonymous usage statistics for 90 days? [y/N]` defaults to
+No. Consent expires automatically. Payloads contain a random installation ID, platform
+versions, optional feature flags and aggregate counters. They exclude domains, IPs,
+email, usernames, site names, content, plugins, logs and credentials.
+
+```bash
+spawnwp telemetry status
+spawnwp telemetry payload
+sudo spawnwp telemetry disable
+```
+
+Revocation stops collection and deletes the local identifier and queue. Endpoint failure
+never blocks installation or cockpit operation.
 
 ## Re-running / forcing
 

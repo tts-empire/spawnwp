@@ -4,15 +4,54 @@ import os
 import re
 import shutil
 import subprocess
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(docs_url=None, redoc_url=None)
+from auth import initialize as initialize_auth
+from auth import is_enrolled, login_page, router as auth_router, session as auth_session, valid_csrf
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    initialize_auth()
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+app.include_router(auth_router)
+
+
+@app.middleware("http")
+async def application_authentication(request: Request, call_next):
+    path = request.url.path
+    public = path in {
+        "/login", "/api/version", "/api/auth/state", "/api/auth/setup/start",
+        "/api/auth/setup/finish", "/api/auth/passkey/start", "/api/auth/passkey/finish",
+        "/api/auth/fallback",
+    }
+    active = None if public else auth_session(request)
+    if not public and not active:
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
+        return RedirectResponse("/login", status_code=303)
+    if active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
+        return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
+    destructive = {"/api/destroy", "/api/restore", "/api/php-switch"}
+    if active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
+        return JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)")
+    if path == "/login":
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'")
+    return response
 
 # ── Sliding-window session keep-alive ───────────────────────────────────────────
 # The port-knock authorizes the IP; the reaper (cockpit-reaper.timer) revokes it
@@ -181,6 +220,19 @@ def version_info():
     return {"version": version}
 
 
+@app.get("/api/platform")
+def platform_info():
+    values = {}
+    config = Path("/etc/spawnwp/config.env")
+    if config.is_file():
+        for line in config.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                values[key] = value
+    domain = values.get("DOMAIN", "")
+    return {"domain": domain, "sites_url": f"https://{domain}" if domain else ""}
+
+
 @app.get("/api/update-status")
 def update_status():
     if not SPAWNWP_CLI.is_file():
@@ -198,6 +250,23 @@ def update_status():
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         return {"current": version_info()["version"], "available": False,
                 "error": str(exc)}
+
+
+@app.get("/api/telemetry")
+def telemetry_status():
+    result = subprocess.run([str(SPAWNWP_CLI), "telemetry", "status"], capture_output=True, text=True)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"enabled": False}
+
+
+@app.post("/api/telemetry/disable")
+def telemetry_disable():
+    result = subprocess.run([str(SPAWNWP_CLI), "telemetry", "disable"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise HTTPException(500, result.stderr.strip() or "Unable to disable telemetry")
+    return {"enabled": False}
 
 @app.get("/api/projects")
 def list_projects():
@@ -716,6 +785,11 @@ STATIC_DIR = Path("/srv/wp-cockpit/static")
 @app.get("/", include_in_schema=False)
 def cockpit_root():
     return RedirectResponse("/manage", status_code=307)
+
+
+@app.get("/login", include_in_schema=False)
+def cockpit_login():
+    return login_page()
 
 
 @app.get("/manage", include_in_schema=False)

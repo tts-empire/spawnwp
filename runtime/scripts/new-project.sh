@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source /etc/spawnwp/config.env
 
 NAME="${1:-}"
 BLUEPRINT="${2:-development}"
@@ -16,7 +17,7 @@ if [[ ! "$NAME" =~ ^[a-z0-9][a-z0-9-]{0,30}$ ]]; then
 fi
 
 PROJ_DIR="/srv/${NAME}"
-NGINX_CONF="/etc/nginx/sites-available/default"
+NGINX_CONF="/etc/nginx/sites-available/spawnwp"
 
 RESOLVE_ARGS=(resolve "$BLUEPRINT" --output /tmp/spawnwp-blueprint-$$.json --shell)
 if [ -n "$PHP_OVERRIDE" ]; then
@@ -76,7 +77,7 @@ if [ -d "$PROJ_DIR" ]; then
 fi
 
 echo "==> Creating project '$NAME' with blueprint '${BLUEPRINT_ID}' ${BLUEPRINT_VERSION} on PHP ${PHP_VERSION}"
-echo "    URL: https://devel.presenzaweb.net/${NAME}/ | port ${PORT}"
+echo "    URL: https://${DOMAIN}/${NAME}/ | port ${PORT}"
 
 # Generate secrets
 DB_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
@@ -115,10 +116,10 @@ DB_PASS=${DB_PASS}
 DB_ROOT_PASS=${DB_ROOT_PASS}
 DB_TABLE_PREFIX=wp_
 WP_ADMIN_USER=${WP_ADMIN_USER}
-WP_ADMIN_EMAIL=maurizio.savoni@gmail.com
+WP_ADMIN_EMAIL=${EMAIL}
 WP_ADMIN_PASS=${WP_ADMIN_PASS}
-WP_HOME=https://devel.presenzaweb.net/${NAME}
-WP_SITEURL=https://devel.presenzaweb.net/${NAME}
+WP_HOME=https://${DOMAIN}/${NAME}
+WP_SITEURL=https://${DOMAIN}/${NAME}
 WEB_PORT=${PORT}
 MAILPIT_PORT=${MAILPIT_PORT}
 MAILPIT_WEBROOT=/${NAME}-mail
@@ -127,7 +128,7 @@ REDIS_PASSWORD=${REDIS_PASS}
 EOF
 
 cp .env.example "${PROJ_DIR}/.env.example"
-cp .gitignore "${PROJ_DIR}/.gitignore"
+cp gitignore.template "${PROJ_DIR}/.gitignore"
 
 # Add Nginx location blocks using Python (handles multiline safely).
 # Two server blocks now: the WordPress site goes on the devel vhost; Adminer +
@@ -145,7 +146,7 @@ wp_block = """
     # the plugin authenticates requests with signed keys, timestamps and nonces.
     location /${NAME}/wp-json/spawnwp-deploy/v1/ {
         auth_basic off;
-        include /etc/nginx/snippets/wp-proxy-headers.conf;
+        include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/wp-json/spawnwp-deploy/v1/;
         proxy_intercept_errors on;
@@ -154,14 +155,14 @@ wp_block = """
 
     # ── ${NAME} (port ${PORT}) ──────────────────────────────────────────────
     location /${NAME}/ {
-        include /etc/nginx/snippets/wp-proxy-headers.conf;
+        include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/;
         # On the /wp-admin directory redirect, the backend (internal nginx) emits
         # an absolute http Location WITHOUT the prefix (e.g. http://host/wp-admin/):
         # we rewrite it, re-adding /${NAME} and forcing https. WordPress' own
         # redirects are already https+prefix, so they are not touched.
-        proxy_redirect http://devel.presenzaweb.net/ https://devel.presenzaweb.net/${NAME}/;
+        proxy_redirect http://${DOMAIN}/ https://${DOMAIN}/${NAME}/;
         proxy_intercept_errors on;
         error_page 502 503 504 =502 @wp_down;
     }
@@ -175,12 +176,16 @@ admin_block = """    # >>> SPAWNWP ADMIN ${NAME}
     # ── ${NAME} admin ──
     location /${NAME}-db/ {
         include /etc/nginx/cockpit-allowed.conf;
+        auth_request /_spawnwp_auth;
+        error_page 401 =303 /login;
         proxy_pass http://127.0.0.1:${ADMINER_PORT}/;
         add_header Cache-Control "no-store" always;
     }
     location /${NAME}-mail/ {
         include /etc/nginx/cockpit-allowed.conf;
-        include /etc/nginx/snippets/wp-proxy-headers.conf;
+        auth_request /_spawnwp_auth;
+        error_page 401 =303 /login;
+        include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_pass http://127.0.0.1:${MAILPIT_PORT};
         add_header Cache-Control "no-store" always;
     }
@@ -199,7 +204,7 @@ echo "  -> Nginx reloaded."
 
 echo ""
 echo "==> Project '$NAME' created at: ${PROJ_DIR}"
-echo "    URL:  https://devel.presenzaweb.net/${NAME}/"
+echo "    URL:  https://${DOMAIN}/${NAME}/"
 echo "    Port: ${PORT}"
 echo ""
 echo "    Next steps:"
@@ -260,10 +265,10 @@ echo "==> Fixing wp-content bind mount ownership (uid 33)..."
 chown -R 33:33 "${PROJ_DIR}/projects/primary/wp-content"
 
 echo ""
-echo "==> Done! Site available at: https://devel.presenzaweb.net/${NAME}/"
+echo "==> Done! Site available at: https://${DOMAIN}/${NAME}/"
 echo ""
 echo "    Admin credentials:"
-echo "      URL:  https://devel.presenzaweb.net/${NAME}/wp-admin/"
+echo "      URL:  https://${DOMAIN}/${NAME}/wp-admin/"
 echo "      User: ${WP_ADMIN_USER}"
 echo "      Pass: ${WP_ADMIN_PASS}"
 echo "    Blueprint: ${BLUEPRINT_NAME} ${BLUEPRINT_VERSION}"

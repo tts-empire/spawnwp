@@ -41,7 +41,7 @@ services:
     image: wp-dev-php:${PHP_VERSION:-8.3}
     restart: unless-stopped
     extra_hosts:
-      - "devel.presenzaweb.net:host-gateway"
+      - "${DOMAIN:-dev.example.com}:host-gateway"
     volumes:
       - wp_data:/var/www/html
       - ./projects/primary/wp-content:/var/www/html/wp-content

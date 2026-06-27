@@ -66,12 +66,18 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = f"static/{relative}" if relative != "app.py" else relative
+            target = relative if relative in {"app.py", "auth.py", "requirements.txt"} else f"static/{relative}"
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
             mode = "0755" if relative.startswith("scripts/") else "0644"
             add_entry(entries, package, ROOT / "runtime" / relative,
                       f"payload/runtime/{relative}", "runtime", relative, mode)
+        for relative in managed["installer"]:
+            mode = "0755" if relative in {"knock-session", "telemetry.py"} else "0644"
+            add_entry(entries, package, ROOT / "installer" / relative,
+                      f"payload/lib/installer/{relative}", "lib", f"installer/{relative}", mode)
+        add_entry(entries, package, ROOT / "install.sh", "payload/lib/installer/install.sh",
+                  "lib", "installer/install.sh", "0755")
         add_entry(entries, package, ROOT / "updater/spawnwp", "payload/bin/spawnwp",
                   "bin", "spawnwp", "0755")
         add_entry(entries, package, ROOT / "updater/release-public.pem",

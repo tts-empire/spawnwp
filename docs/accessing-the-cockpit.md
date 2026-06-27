@@ -1,16 +1,16 @@
 # Accessing the cockpit
 
-By default, the cockpit is protected by **three layers**. To open it you first **knock**,
+By default, the cockpit is protected by layered authentication. To open it you first **knock**,
 then authenticate.
 
 ```mermaid
 flowchart LR
-    A[1 · Port-knock<br/>opens your IP] --> B[2 · HTTP Basic Auth<br/>user + password] --> C[3 · HTTPS<br/>cockpit dashboard]
+    A[1 · Port-knock<br/>opens your IP] --> B[2 · HTTP Basic Auth<br/>outer prompt] --> C[3 · Application login<br/>passkey or password + TOTP] --> D[4 · Cockpit]
 ```
 
 Port-knocking is optional during installation, but **strongly recommended**. If you
 disabled it, skip the knock step and open `https://COCKPIT_DOMAIN/` directly. HTTPS and
-HTTP Basic Auth still protect the cockpit, but its authentication endpoint is visible to
+HTTP Basic Auth and application login still protect the cockpit, but its endpoint is visible to
 internet scanners and brute-force attempts.
 
 ## What is port-knocking, and why?
@@ -86,8 +86,16 @@ Within a few seconds of a successful knock, browse to:
 https://cockpit.example.com/
 ```
 
-Your browser will prompt for **HTTP Basic Auth** — enter the user and password from
-your credentials report. The dashboard then loads over HTTPS.
+Your browser first prompts for **HTTP Basic Auth**. On the first visit, enter the
+one-time setup code and enroll a passkey plus TOTP. Later visits use the passkey, or the
+password + TOTP fallback.
+
+If every authenticator and recovery code is lost, root can revoke application sessions
+and generate a new setup code without changing any WordPress environment:
+
+```bash
+sudo spawnwp auth reset
+```
 
 ## Sessions: sliding 30-minute window
 

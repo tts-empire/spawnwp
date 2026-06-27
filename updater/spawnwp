@@ -236,14 +236,24 @@ def restore_targets(entries: list[dict], backup: Path) -> None:
 
 
 def health_check() -> None:
-    checks = [
-        [sys.executable, "-m", "py_compile", "/srv/wp-cockpit/app.py"],
+    venv = Path("/srv/wp-cockpit/venv")
+    compile_files = ["/srv/wp-cockpit/app.py"]
+    if Path("/srv/wp-cockpit/auth.py").is_file():
+        compile_files.append("/srv/wp-cockpit/auth.py")
+    checks = []
+    if Path("/srv/wp-cockpit/requirements.txt").is_file():
+        checks.append([str(venv / "bin/pip"), "install", "--disable-pip-version-check", "-q",
+                       "-r", "/srv/wp-cockpit/requirements.txt"])
+    checks.extend([
+        [str(venv / "bin/python"), "-m", "py_compile", *compile_files],
+        [str(venv / "bin/python"), "-c", "import app"],
         ["nginx", "-t"],
         ["systemctl", "restart", "wp-cockpit"],
         ["systemctl", "is-active", "--quiet", "wp-cockpit"],
-    ]
+    ])
     for command in checks:
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True,
+                                cwd="/srv/wp-cockpit" if command[0].endswith("python") else None)
         if result.returncode != 0:
             raise UpdateError((result.stderr or result.stdout or "health check failed").strip())
     health_url = os.environ.get("SPAWNWP_HEALTH_URL", "http://127.0.0.1:9393/api/version")
@@ -323,6 +333,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="spawnwp")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("version")
+    auth = sub.add_parser("auth")
+    auth_sub = auth.add_subparsers(dest="auth_command", required=True)
+    auth_reset = auth_sub.add_parser("reset")
+    auth_reset.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
+    telemetry = sub.add_parser("telemetry")
+    telemetry.add_argument("action", choices=("status", "payload", "disable"))
     update = sub.add_parser("update")
     update.add_argument("--check", action="store_true")
     update.add_argument("--version")
@@ -332,6 +348,53 @@ def main() -> int:
     try:
         if args.command == "version":
             print(current_version())
+            return 0
+        if args.command == "auth":
+            if os.geteuid() != 0:
+                raise UpdateError("Authentication recovery must run as root")
+            if not args.yes:
+                if not sys.stdin.isatty():
+                    raise UpdateError("Run this command from an interactive root terminal")
+                answer = input("Revoke all cockpit sessions and create a new setup code? [y/N] ")
+                if answer.lower() != "y":
+                    print("Cancelled")
+                    return 0
+            python = Path("/srv/wp-cockpit/venv/bin/python")
+            code = subprocess.run(
+                [str(python), "-c", "from auth import create_bootstrap; print(create_bootstrap(reset_admin=True))"],
+                cwd="/srv/wp-cockpit", capture_output=True, text=True,
+            )
+            if code.returncode != 0:
+                raise UpdateError(code.stderr.strip() or "Unable to reset cockpit authentication")
+            value = code.stdout.strip()
+            report = Path("/root/spawnwp-credentials.txt")
+            with report.open("a") as stream:
+                stream.write(f"\nApplication setup code (reset): {value}\n")
+            os.chmod(report, 0o600)
+            print(f"Application setup code (expires in 24h): {value}")
+            return 0
+        if args.command == "telemetry":
+            consent_path = Path("/var/lib/spawnwp/telemetry/consent.json")
+            if args.action == "status":
+                if not consent_path.is_file():
+                    print(json.dumps({"enabled": False}))
+                else:
+                    consent = json.loads(consent_path.read_text())
+                    consent["enabled"] = bool(consent.get("enabled") and consent.get("expires_at", 0) > int(__import__("time").time()))
+                    print(json.dumps(consent))
+                return 0
+            script = Path("/usr/local/lib/spawnwp/telemetry.py")
+            if args.action == "payload":
+                if not script.is_file():
+                    print("null")
+                    return 0
+                return subprocess.run([str(script), "payload"]).returncode
+            if os.geteuid() != 0:
+                raise UpdateError("Telemetry revocation must run as root")
+            if script.is_file():
+                subprocess.run([str(script), "disable"], check=True)
+            subprocess.run(["systemctl", "disable", "--now", "spawnwp-telemetry.timer"], capture_output=True)
+            print("SpawnWP telemetry disabled and local identifier deleted")
             return 0
         if args.command == "update" and args.check:
             payload = status_payload(args.version)

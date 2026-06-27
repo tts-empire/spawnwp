@@ -15,6 +15,7 @@
     </a>
     <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy">Deploy</a><a href="/updates" aria-current="page">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
     <time id="header-clock" title="Local time"></time>
+    <button class="header-logout" type="button" onclick="logoutCockpit()">Log out</button>
   </header>
   <main class="updates-main">
     <section class="section">
@@ -32,6 +33,10 @@
       <div class="update-command"><span>Run as root</span><code>sudo spawnwp update</code><button class="icon-btn" type="button" onclick="copyUpdateCommand()" title="Copy command">⧉</button></div>
     </section>
     <div class="inline-alert" id="update-error" hidden></div>
+    <section class="section telemetry-settings">
+      <div class="section-title">Anonymous telemetry</div>
+      <div class="setting-row"><div><strong id="telemetry-state">Checking</strong><p>Time-limited aggregate usage consent. Update checks are independent.</p></div><button id="telemetry-disable" class="btn-danger" type="button" onclick="disableTelemetry()" hidden>Disable telemetry</button></div>
+    </section>
   </main>
   <div id="toast"></div>
   <script src="/assets/cockpit.js?v=20260627c"></script>

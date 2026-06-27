@@ -1,0 +1,5 @@
+.env
+backups/
+.spawnwp/
+projects/primary/wp-content/uploads/
+projects/primary/wp-content/cache/

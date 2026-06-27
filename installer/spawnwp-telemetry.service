@@ -1,0 +1,6 @@
+[Unit]
+Description=Send optional aggregate SpawnWP telemetry
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/spawnwp/telemetry.py send heartbeat

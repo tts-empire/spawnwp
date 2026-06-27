@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "development",
+  "name": "Development",
+  "version": "1.0.0",
+  "description": "WordPress development with .org checks, runtime debugging and the SpawnWP dev toolkit.",
+  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4"]},
+  "wordpress": "latest",
+  "debug": true,
+  "plugins": ["plugin-check", "query-monitor", "theme-check", "user-switching", "wp-crontrol"],
+  "theme": null,
+  "devkit": true,
+  "content_preset": "empty"
+}

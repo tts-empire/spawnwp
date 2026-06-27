@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Deploy · SpawnWP Cockpit</title>
+  <style>html{background:#000;color-scheme:dark}</style>
+  <link rel="stylesheet" href="/assets/cockpit.css?v=20260627c">
+</head>
+<body data-page="deploy">
+  <header>
+    <a class="brand" href="/manage" aria-label="SpawnWP Cockpit">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span class="outline"></span><span></span><span class="lit"></span><span></span><span></span><span></span><span></span></span>
+      <span class="brand-lockup"><span class="brand-name">Spawn<strong>WP</strong></span><span class="brand-context">Cockpit</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy" aria-current="page">Deploy</a><a href="/updates">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
+    <time id="header-clock" title="Local time"></time>
+  </header>
+  <main>
+    <div class="sys-banner" id="sys-banner"><span id="sys-banner-text">System under load</span></div>
+    <section class="resource-summary" aria-label="Host resources">
+      <div class="resource-ring" id="kpi-ram"><div class="ring"><div class="ring-core"><strong id="host-ram-pct">0%</strong></div></div><div><span>RAM</span><small id="host-ram-text">Loading</small></div></div>
+      <div class="resource-ring" id="kpi-disk"><div class="ring"><div class="ring-core"><strong id="host-disk-pct">0%</strong></div></div><div><span>Disk</span><small id="host-disk-text">Loading</small></div></div>
+      <div class="resource-ring" id="kpi-load"><div class="ring"><div class="ring-core"><strong id="host-load-pct">0%</strong></div></div><div><span>Load</span><small id="host-load">Loading</small></div></div>
+      <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
+    </section>
+    <section class="section">
+      <div class="section-title">Blueprint catalog</div>
+      <div id="blueprint-errors" class="inline-alert" hidden></div>
+      <div id="blueprint-catalog" class="blueprint-grid"><p class="loading-copy">Loading…</p></div>
+    </section>
+    <section class="section deploy-workspace">
+      <div class="section-title">Configure environment</div>
+      <form class="deploy-form" onsubmit="createProject(event)">
+        <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" pattern="[a-z0-9][a-z0-9\-]{0,30}" required></label>
+        <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select></label>
+        <input id="new-blueprint" type="hidden" value="development">
+        <div class="deploy-summary"><span>Destination</span><strong>https://devel.presenzaweb.net/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
+        <button type="submit" class="btn-primary sensitive" id="btn-create">Create site</button>
+      </form>
+      <div class="output-box" id="out-new">
+        <div class="output-head"><span class="out-label">deployment output</span><span><button class="icon-btn" type="button" onclick="copyBox('out-new')" title="Copy output">⧉</button><button class="icon-btn" type="button" onclick="closeBox('out-new')" title="Close output">×</button></span></div>
+        <div class="output-body" id="out-new-body"></div>
+      </div>
+      <div class="deploy-result" id="deploy-result" hidden></div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script src="/assets/cockpit.js?v=20260627c"></script>
+</body>
+</html>

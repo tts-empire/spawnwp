@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s updater/tests -v
+      - run: python -m py_compile updater/spawnwp updater/build-release.py runtime/app.py runtime/scripts/blueprint.py
+      - run: bash -n updater/publish-release.sh runtime/scripts/*.sh clients/knock.sh
+      - run: pip install mkdocs-material
+      - run: mkdocs build --strict

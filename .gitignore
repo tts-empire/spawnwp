@@ -1,0 +1,16 @@
+.env
+*.env
+!*.env.example
+*.fixed
+*.fixed.*
+*.healthcheck.yaml
+runtime/primary.env
+site/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+dist/
+*.tar.gz
+*.manifest.sig
+release-private.pem

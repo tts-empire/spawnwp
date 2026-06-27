@@ -1,0 +1,11 @@
+# Ready-to-use PHPStan config for WordPress code (WP stubs included).
+# Usage inside the php container:
+#   phpstan analyse -c /usr/local/etc/phpstan-wp.neon --memory-limit=512M <plugin-or-theme-path>
+# Example:
+#   docker compose exec -u www-data php \
+#     phpstan analyse -c /usr/local/etc/phpstan-wp.neon \
+#     /var/www/html/wp-content/plugins/my-plugin
+includes:
+    - /usr/local/composer/vendor/szepeviktor/phpstan-wordpress/extension.neon
+parameters:
+    level: 5

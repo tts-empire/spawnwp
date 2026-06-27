@@ -1,0 +1,100 @@
+<!-- markdownlint-disable MD033 MD041 -->
+<h1 align="center">spawnwp</h1>
+
+<p align="center">
+  <strong>A self-hosted WordPress lab for disposable dev environments.</strong><br>
+  Bring your VPS. Spawn temporary WordPress projects without server babysitting.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <img alt="Docs: MkDocs Material" src="https://img.shields.io/badge/docs-MkDocs%20Material-526CFE">
+  <img alt="Platform: Ubuntu/Debian" src="https://img.shields.io/badge/platform-Ubuntu%20%7C%20Debian-E95420">
+  <img alt="Arch: amd64/arm64" src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-444">
+</p>
+
+---
+
+spawnwp turns a fresh VPS into a WordPress lab for temporary, isolated and
+sacrificable development environments. A single installer sets up Docker, an
+nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
+destroy WordPress environments — each in its own container stack.
+
+The goal is brutally simple:
+
+```text
+install -> open cockpit -> create site -> done
+```
+
+No hand-built nginx config, no Docker commands to remember, no shared test site
+to accidentally break. Build a plugin, test a theme, demo a project, destroy the
+environment and create another one. Every site ships ready for **WordPress.org
+plugin/theme development** through the default Development blueprint: Plugin Check, Theme Check, PHP_CodeSniffer (WPCS),
+PHPStan, Query Monitor, Mailpit and more, preinstalled.
+
+The cockpit lives on its own subdomain and is protected by HTTP Basic Auth and HTTPS.
+The installer enables a strongly recommended third layer, **port-knocking**, by default;
+you can explicitly turn it off.
+
+## Highlights
+
+- **One-command install** — `curl … | bash`, no manual setup.
+- **Web cockpit first** — create environments, start/stop, snapshot, restore and
+  destroy without memorizing commands.
+- **Two-domain design** — your content domain stays pure WordPress; all admin tooling
+  lives on a separate cockpit subdomain, optionally hidden by port-knocking.
+- **WordPress.org QA built in** — the exact checks the .org review runs, in-browser
+  and on the CLI.
+- **Secure by default** — random per-install secrets, dropped Linux capabilities,
+  no Docker socket exposure, loopback-only service ports, automatic TLS.
+- **Portable** — Ubuntu 22.04/24.04 and Debian 12/13, amd64 and arm64; web traffic uses
+  80/443, plus three generated TCP ports when port-knocking is enabled.
+- **Not managed hosting** — built for test environments, demos and development
+  labs, not production hosting or client control panels.
+
+## Quickstart
+
+You need a fresh VPS (root) and **two hostnames you control**, both pointing at the
+VPS — one for your sites, one for the cockpit. The installer handles the server
+setup; after that, day-to-day work happens in the browser.
+
+```bash
+curl -fsSL https://spawnwp.com/install.sh | sudo bash
+```
+
+The installer asks for your content hostname, cockpit hostname and Let's Encrypt email.
+For automated installs you can pass them up front:
+
+```bash
+curl -fsSL https://spawnwp.com/install.sh \
+  | sudo DOMAIN=dev.example.com COCKPIT_DOMAIN=cockpit.example.com EMAIL=you@example.com bash
+```
+
+When it finishes, the installer prints (and saves to `/root/spawnwp-credentials.txt`)
+your URLs, the Basic Auth login, the WordPress admin login, and your **port-knock
+sequence** with the exact command to open the cockpit.
+
+Then the workflow is:
+
+1. Open the cockpit URL from the report.
+2. Log in.
+3. Click **Create site**.
+4. Use the new WordPress site.
+
+→ **Full documentation:** <https://OWNER.github.io/spawnwp/>
+
+## Documentation
+
+| Guide | |
+|---|---|
+| [Requirements](docs/requirements.md) | What you need before installing |
+| [DNS setup](docs/dns-setup.md) | Point your two hostnames at the VPS |
+| [Installation](docs/installation.md) | The one-liner, explained |
+| [Accessing the cockpit](docs/accessing-the-cockpit.md) | Port-knock + Basic Auth |
+| [Using the cockpit](docs/using-the-cockpit.md) | Create, reset and destroy environments |
+| [WordPress development](docs/wordpress-development.md) | Plugins, themes, QA tools |
+| [Architecture](docs/architecture.md) · [Security](docs/security.md) | How it works & threat model |
+
+## License
+
+[MIT](LICENSE) — © 2026 spawnwp contributors.

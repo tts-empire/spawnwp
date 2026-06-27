@@ -1,0 +1,81 @@
+site_name: spawnwp
+site_description: >-
+  Self-hosted WordPress lab with optional port-knocking that spawns isolated sites from
+  a web cockpit — with a built-in WordPress.org QA toolchain. One curl | bash install.
+site_url: https://OWNER.github.io/spawnwp/
+repo_url: https://github.com/OWNER/spawnwp
+repo_name: OWNER/spawnwp
+copyright: Copyright &copy; 2026 spawnwp contributors — MIT License
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Requirements: requirements.md
+      - DNS setup: dns-setup.md
+      - Installation: installation.md
+      - Accessing the cockpit: accessing-the-cockpit.md
+  - Guide:
+      - Using the cockpit: using-the-cockpit.md
+      - Blueprints: blueprints.md
+      - WordPress development: wordpress-development.md
+      - CLI reference: cli-reference.md
+  - Reference:
+      - Architecture: architecture.md
+      - Security: security.md
+      - Operations: operations.md
+      - Troubleshooting: troubleshooting.md
+      - Uninstall: uninstall.md
+      - Changelog: changelog.md

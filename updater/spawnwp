@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""SpawnWP release checker, transactional updater and rollback command."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+REPOSITORY = os.environ.get("SPAWNWP_REPOSITORY", "tts-empire/spawnwp")
+API_ROOT = os.environ.get("SPAWNWP_GITHUB_API", "https://api.github.com")
+STATE_ROOT = Path(os.environ.get("SPAWNWP_STATE_ROOT", "/var/lib/spawnwp/updater"))
+RELEASES_ROOT = Path(os.environ.get("SPAWNWP_RELEASES_ROOT", "/opt/spawnwp/releases"))
+PUBLIC_KEY = Path(os.environ.get("SPAWNWP_PUBLIC_KEY", "/usr/local/lib/spawnwp/release-public.pem"))
+CURRENT_LINK = Path(os.environ.get("SPAWNWP_CURRENT_LINK", "/opt/spawnwp/current"))
+VERSION_FILE = Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION"))
+TARGETS = {
+    "cockpit": Path(os.environ.get("SPAWNWP_COCKPIT_ROOT", "/srv/wp-cockpit")),
+    "runtime": Path(os.environ.get("SPAWNWP_RUNTIME_ROOT", "/srv/wp-dev")),
+    "bin": Path(os.environ.get("SPAWNWP_BIN_ROOT", "/usr/local/bin")),
+    "lib": Path(os.environ.get("SPAWNWP_LIB_ROOT", "/usr/local/lib/spawnwp")),
+}
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+
+
+class UpdateError(RuntimeError):
+    pass
+
+
+def version_tuple(value: str) -> tuple[int, int, int]:
+    match = SEMVER.fullmatch(value)
+    if not match:
+        raise UpdateError(f"Invalid stable version: {value}")
+    return tuple(int(part) for part in match.groups())
+
+
+def current_version() -> str:
+    if VERSION_FILE.is_file():
+        return VERSION_FILE.read_text().strip()
+    return "0.0.0"
+
+
+def github_token() -> str | None:
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        return token.strip()
+    gh = shutil.which("gh")
+    if gh:
+        result = subprocess.run([gh, "auth", "token"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    return None
+
+
+def request(url: str) -> urllib.request.Request:
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "SpawnWP-Updater"}
+    token = github_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return urllib.request.Request(url, headers=headers)
+
+
+def fetch_json(url: str) -> dict:
+    try:
+        with urllib.request.urlopen(request(url), timeout=8) as response:
+            return json.load(response)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise UpdateError(f"Unable to query GitHub Releases: {exc}") from exc
+
+
+def release_info(version: str | None = None) -> dict:
+    endpoint = f"{API_ROOT}/repos/{REPOSITORY}/releases"
+    data = fetch_json(f"{endpoint}/tags/v{version}" if version else f"{endpoint}/latest")
+    tag = str(data.get("tag_name", ""))
+    release_version = tag.removeprefix("v")
+    version_tuple(release_version)
+    if data.get("draft") or data.get("prerelease"):
+        raise UpdateError("Only stable, published releases are accepted")
+    assets = {item["name"]: item for item in data.get("assets", [])}
+    prefix = f"spawnwp-{release_version}"
+    required = [f"{prefix}.tar.gz", f"{prefix}.manifest.json", f"{prefix}.manifest.sig"]
+    missing = [name for name in required if name not in assets]
+    if missing:
+        raise UpdateError("Release is missing required assets: " + ", ".join(missing))
+    return {
+        "version": release_version,
+        "name": data.get("name") or tag,
+        "notes": data.get("body") or "",
+        "published_at": data.get("published_at"),
+        "assets": {name: assets[name]["url"] for name in required},
+    }
+
+
+def download(url: str, destination: Path) -> None:
+    req = request(url)
+    req.add_header("Accept", "application/octet-stream")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response, destination.open("wb") as out:
+            shutil.copyfileobj(response, out)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise UpdateError(f"Download failed: {exc}") from exc
+
+
+def verify_signature(manifest: Path, signature: Path) -> None:
+    if not PUBLIC_KEY.is_file():
+        raise UpdateError(f"Release public key not found: {PUBLIC_KEY}")
+    result = subprocess.run(
+        ["openssl", "pkeyutl", "-verify", "-pubin", "-inkey", str(PUBLIC_KEY),
+         "-rawin", "-in", str(manifest), "-sigfile", str(signature)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise UpdateError("Release manifest signature verification failed")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def safe_extract(archive: Path, destination: Path) -> None:
+    with tarfile.open(archive, "r:gz") as package:
+        root = destination.resolve()
+        for member in package.getmembers():
+            target = (destination / member.name).resolve()
+            if root not in target.parents and target != root:
+                raise UpdateError("Release archive contains an unsafe path")
+            if member.issym() or member.islnk() or member.isdev():
+                raise UpdateError("Release archive contains an unsupported entry")
+        package.extractall(destination, filter="data")
+
+
+def load_manifest(path: Path, expected_version: str) -> dict:
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise UpdateError("Release manifest is invalid") from exc
+    if manifest.get("schema") != 1 or manifest.get("version") != expected_version:
+        raise UpdateError("Release manifest version/schema mismatch")
+    version_tuple(manifest.get("min_updater_version", "0.0.0"))
+    return manifest
+
+
+def install_release(info: dict) -> Path:
+    version = info["version"]
+    destination = RELEASES_ROOT / version
+    if destination.is_dir():
+        return destination
+    STATE_ROOT.mkdir(parents=True, exist_ok=True)
+    RELEASES_ROOT.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="spawnwp-update-", dir=STATE_ROOT) as tmp:
+        tmp_path = Path(tmp)
+        prefix = f"spawnwp-{version}"
+        archive = tmp_path / f"{prefix}.tar.gz"
+        manifest_path = tmp_path / f"{prefix}.manifest.json"
+        signature = tmp_path / f"{prefix}.manifest.sig"
+        for name, target in ((archive.name, archive), (manifest_path.name, manifest_path), (signature.name, signature)):
+            download(info["assets"][name], target)
+        verify_signature(manifest_path, signature)
+        manifest = load_manifest(manifest_path, version)
+        if sha256(archive) != manifest.get("archive_sha256"):
+            raise UpdateError("Release archive checksum verification failed")
+        unpacked = tmp_path / "unpacked"
+        unpacked.mkdir()
+        safe_extract(archive, unpacked)
+        package = unpacked / f"spawnwp-{version}"
+        if not package.is_dir():
+            raise UpdateError("Release archive layout is invalid")
+        for entry in manifest.get("files", []):
+            source = package / entry["source"]
+            if not source.is_file() or sha256(source) != entry["sha256"]:
+                raise UpdateError(f"Release file verification failed: {entry.get('source')}")
+            if entry.get("target_root") not in TARGETS or Path(entry["target"]).is_absolute() or ".." in Path(entry["target"]).parts:
+                raise UpdateError("Release manifest contains an invalid target")
+        shutil.copy2(manifest_path, package / "manifest.json")
+        os.replace(package, destination)
+    return destination
+
+
+def atomic_copy(source: Path, target: Path, mode: int) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.spawnwp-new")
+    shutil.copyfile(source, temporary)
+    os.chmod(temporary, mode)
+    os.replace(temporary, target)
+
+
+def merged_entries(*manifests: dict) -> list[dict]:
+    entries = {}
+    for manifest in manifests:
+        for entry in manifest.get("files", []):
+            entries[(entry["target_root"], entry["target"])] = entry
+    return list(entries.values())
+
+
+def snapshot_targets(entries: list[dict], backup: Path) -> None:
+    absent = []
+    for entry in entries:
+        target = TARGETS[entry["target_root"]] / entry["target"]
+        if target.is_file():
+            saved = backup / entry["target_root"] / entry["target"]
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(target, saved)
+        else:
+            absent.append([entry["target_root"], entry["target"]])
+    (backup / "absent.json").write_text(json.dumps(absent) + "\n")
+
+
+def restore_targets(entries: list[dict], backup: Path) -> None:
+    absent = {tuple(item) for item in json.loads((backup / "absent.json").read_text())}
+    for entry in entries:
+        target = TARGETS[entry["target_root"]] / entry["target"]
+        saved = backup / entry["target_root"] / entry["target"]
+        if saved.is_file():
+            atomic_copy(saved, target, saved.stat().st_mode & 0o777)
+        elif (entry["target_root"], entry["target"]) in absent:
+            target.unlink(missing_ok=True)
+
+
+def health_check() -> None:
+    checks = [
+        [sys.executable, "-m", "py_compile", "/srv/wp-cockpit/app.py"],
+        ["nginx", "-t"],
+        ["systemctl", "restart", "wp-cockpit"],
+        ["systemctl", "is-active", "--quiet", "wp-cockpit"],
+    ]
+    for command in checks:
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise UpdateError((result.stderr or result.stdout or "health check failed").strip())
+
+
+def activate(release: Path, *, rollback: bool = False) -> None:
+    manifest = json.loads((release / "manifest.json").read_text())
+    current_manifest = {}
+    if CURRENT_LINK.is_dir() and (CURRENT_LINK / "manifest.json").is_file():
+        current_manifest = json.loads((CURRENT_LINK / "manifest.json").read_text())
+    all_entries = merged_entries(current_manifest, manifest)
+    new_targets = {(entry["target_root"], entry["target"]) for entry in manifest["files"]}
+    version = manifest["version"]
+    previous = current_version()
+    backup = STATE_ROOT / "backups" / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{previous}"
+    backup.mkdir(parents=True, exist_ok=False)
+    snapshot_targets(all_entries, backup)
+    try:
+        for entry in manifest["files"]:
+            atomic_copy(
+                release / entry["source"],
+                TARGETS[entry["target_root"]] / entry["target"],
+                int(entry.get("mode", "0644"), 8),
+            )
+        for entry in all_entries:
+            if (entry["target_root"], entry["target"]) not in new_targets:
+                (TARGETS[entry["target_root"]] / entry["target"]).unlink(missing_ok=True)
+        health_check()
+    except Exception:
+        restore_targets(all_entries, backup)
+        subprocess.run(["systemctl", "restart", "wp-cockpit"], capture_output=True)
+        raise
+    VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+    VERSION_FILE.write_text(version + "\n")
+    CURRENT_LINK.parent.mkdir(parents=True, exist_ok=True)
+    temporary_link = CURRENT_LINK.with_name(".current-new")
+    temporary_link.unlink(missing_ok=True)
+    temporary_link.symlink_to(release)
+    os.replace(temporary_link, CURRENT_LINK)
+    state = {"current": version, "previous": None if rollback else previous, "backup": str(backup)}
+    (STATE_ROOT / "state.json").write_text(json.dumps(state, indent=2) + "\n")
+
+
+@contextlib.contextmanager
+def update_lock():
+    STATE_ROOT.mkdir(parents=True, exist_ok=True)
+    with (STATE_ROOT / "update.lock").open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise UpdateError("Another SpawnWP update is already running") from exc
+        yield
+
+
+def status_payload(version: str | None = None) -> dict:
+    info = release_info(version)
+    installed = current_version()
+    return {
+        **{key: info[key] for key in ("version", "name", "notes", "published_at")},
+        "current": installed,
+        "update_available": version_tuple(info["version"]) > version_tuple(installed),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="spawnwp")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("version")
+    update = sub.add_parser("update")
+    update.add_argument("--check", action="store_true")
+    update.add_argument("--version")
+    update.add_argument("--json", action="store_true")
+    sub.add_parser("rollback")
+    args = parser.parse_args()
+    try:
+        if args.command == "version":
+            print(current_version())
+            return 0
+        if args.command == "update" and args.check:
+            payload = status_payload(args.version)
+            print(json.dumps(payload) if args.json else (
+                f"SpawnWP {payload['current']} installed; {payload['version']} available"
+                if payload["update_available"] else f"SpawnWP {payload['current']} is up to date"
+            ))
+            return 0
+        if os.geteuid() != 0:
+            raise UpdateError("Updates and rollback must run as root")
+        with update_lock():
+            if args.command == "update":
+                info = release_info(args.version)
+                if not args.version and version_tuple(info["version"]) <= version_tuple(current_version()):
+                    print(f"SpawnWP {current_version()} is already up to date")
+                    return 0
+                release = install_release(info)
+                activate(release)
+                print(f"SpawnWP updated to {info['version']}")
+                return 0
+            state_file = STATE_ROOT / "state.json"
+            if not state_file.is_file():
+                raise UpdateError("No previous SpawnWP release is available")
+            previous = json.loads(state_file.read_text()).get("previous")
+            release = RELEASES_ROOT / str(previous)
+            if not previous or not release.is_dir():
+                raise UpdateError("No previous SpawnWP release is available")
+            activate(release, rollback=True)
+            print(f"SpawnWP rolled back to {previous}")
+            return 0
+    except UpdateError as exc:
+        if getattr(args, "json", False):
+            print(json.dumps({"error": str(exc), "current": current_version()}))
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

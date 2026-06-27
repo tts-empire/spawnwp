@@ -1,0 +1,27 @@
+{
+  "cockpit": [
+    "app.py",
+    "manage.html",
+    "deploy.html",
+    "updates.html",
+    "assets/cockpit.css",
+    "assets/cockpit.js"
+  ],
+  "runtime": [
+    "Makefile",
+    "compose.yaml",
+    "env.example",
+    "blueprints/clean.json",
+    "blueprints/demo.json",
+    "blueprints/development.json",
+    "docker/php/Dockerfile",
+    "docker/php/opcache.ini",
+    "docker/php/php.ini",
+    "docker/php/phpstan-wp.neon",
+    "docker/php/xdebug.ini",
+    "scripts/apply-blueprint.sh",
+    "scripts/blueprint.py",
+    "scripts/destroy-project.sh",
+    "scripts/new-project.sh"
+  ]
+}

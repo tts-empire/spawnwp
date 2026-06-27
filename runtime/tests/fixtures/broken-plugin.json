@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "broken-plugin",
+  "name": "Broken plugin test",
+  "version": "1.0.0",
+  "description": "Temporary fixture used to verify transactional cleanup.",
+  "php": {"default": "8.3", "allowed": ["8.3"]},
+  "wordpress": "latest",
+  "debug": false,
+  "plugins": ["spawnwp-plugin-that-does-not-exist"],
+  "theme": null,
+  "devkit": false,
+  "content_preset": "empty"
+}

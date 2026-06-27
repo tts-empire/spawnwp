@@ -6,19 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Added
+## [0.1.1] — 2026-06-27
 
-- Signed GitHub Release updater with explicit update checks, transactional activation and
-  rollback; existing WordPress environments remain untouched.
+### Fixed
 
-- Initial public documentation (MkDocs + Material).
+- Update and rollback health checks now wait for the cockpit HTTP endpoint instead of
+  treating an early systemd `active` state as application readiness.
 
-## [0.1.0] — TBD
+## [0.1.0] — 2026-06-27
 
 First public release.
 
 ### Added
 
+- Signed GitHub Release updater with explicit update checks, transactional activation and
+  rollback; existing WordPress environments remain untouched.
+- Initial public documentation (MkDocs + Material).
 - One-command installer for Ubuntu/Debian (amd64/arm64).
 - Web cockpit: spawn, start/stop/restart, snapshot/restore, destroy sites; live
   metrics; PHP-version switching; one-click Adminer and Mailpit.
@@ -31,5 +34,6 @@ First public release.
   HTTPS, dropped Linux capabilities, no Docker socket exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/OWNER/spawnwp/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OWNER/spawnwp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tts-empire/spawnwp/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/tts-empire/spawnwp/releases/tag/v0.1.0

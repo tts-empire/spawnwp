@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -245,6 +246,18 @@ def health_check() -> None:
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode != 0:
             raise UpdateError((result.stderr or result.stdout or "health check failed").strip())
+    health_url = os.environ.get("SPAWNWP_HEALTH_URL", "http://127.0.0.1:9393/api/version")
+    last_error = "cockpit did not become ready"
+    for _ in range(20):
+        try:
+            with urllib.request.urlopen(health_url, timeout=1) as response:
+                if response.status == 200:
+                    return
+                last_error = f"cockpit returned HTTP {response.status}"
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = str(exc)
+        time.sleep(0.5)
+    raise UpdateError(f"Cockpit HTTP health check failed: {last_error}")
 
 
 def activate(release: Path, *, rollback: bool = False) -> None:

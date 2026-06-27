@@ -15,7 +15,7 @@
 
 ---
 
-spawnwp turns a fresh VPS into a WordPress lab for temporary, isolated and
+Spawnwp turns a fresh VPS into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.

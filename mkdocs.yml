@@ -2,9 +2,9 @@ site_name: spawnwp
 site_description: >-
   Self-hosted WordPress lab with optional port-knocking that spawns isolated sites from
   a web cockpit — with a built-in WordPress.org QA toolchain. One curl | bash install.
-site_url: https://OWNER.github.io/spawnwp/
-repo_url: https://github.com/OWNER/spawnwp
-repo_name: OWNER/spawnwp
+site_url: https://spawnwp.com/
+repo_url: https://github.com/tts-empire/spawnwp
+repo_name: tts-empire/spawnwp
 copyright: Copyright &copy; 2026 spawnwp contributors — MIT License
 
 theme:
@@ -76,6 +76,7 @@ nav:
       - Architecture: architecture.md
       - Security: security.md
       - Operations: operations.md
+      - Releasing: releasing.md
       - Troubleshooting: troubleshooting.md
       - Uninstall: uninstall.md
       - Changelog: changelog.md

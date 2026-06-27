@@ -21,8 +21,11 @@ class AuthenticationTests(unittest.TestCase):
         cls.key.write_bytes(Fernet.generate_key() + b"\n")
         cls.config = root / "config.env"
         cls.config.write_text("COCKPIT_DOMAIN=cockpit.example.com\n")
+        cls.static = root / "static"
+        (cls.static / "assets").mkdir(parents=True)
         os.environ.update(SPAWNWP_AUTH_DB=str(root / "auth.db"),
-                          SPAWNWP_AUTH_KEY=str(cls.key), SPAWNWP_CONFIG=str(cls.config))
+                          SPAWNWP_AUTH_KEY=str(cls.key), SPAWNWP_CONFIG=str(cls.config),
+                          SPAWNWP_STATIC_DIR=str(cls.static))
         cls.auth = importlib.import_module("auth")
 
     @classmethod

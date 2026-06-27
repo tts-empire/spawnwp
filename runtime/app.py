@@ -779,7 +779,7 @@ def disk_project(project: str):
 
 # ── Cockpit pages and shared assets ───────────────────────────────────────────
 
-STATIC_DIR = Path("/srv/wp-cockpit/static")
+STATIC_DIR = Path(os.environ.get("SPAWNWP_STATIC_DIR", "/srv/wp-cockpit/static"))
 
 
 @app.get("/", include_in_schema=False)

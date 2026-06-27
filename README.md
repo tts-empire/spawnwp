@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<h1 align="center">Spawnwp</h1>
+<h1 align="center">SpawnWP</h1>
 
 <p align="center">
   <strong>A self-hosted WordPress lab for disposable dev environments.</strong><br>
@@ -15,7 +15,7 @@
 
 ---
 
-Spawnwp turns a fresh VPS into a WordPress lab for temporary, isolated and
+SpawnWP turns a fresh VPS into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.

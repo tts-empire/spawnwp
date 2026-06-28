@@ -182,8 +182,21 @@
   .update-command { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid var(--border); background: var(--surface); padding: 12px 14px; }
   .update-command > span { grid-column: 1 / -1; }
   .update-command code { color: var(--accent); }
-  .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 16px 4px; }
-  .setting-row p { color: var(--muted); font-size: 12px; margin-top: 5px; }
+  .telemetry-card { display: flex; justify-content: space-between; align-items: center; gap: 28px; padding: 20px 4px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .telemetry-card > div { max-width: 650px; }
+  .telemetry-card p { color: var(--muted); margin: 7px 0; font-size: 13px; line-height: 1.55; }
+  .telemetry-card .telemetry-exclusions { font-size: 11px; }
+  .telemetry-card a { color: var(--accent); }
+  #telemetry-state { display: block; margin-top: 12px; color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .toggle { display: grid; grid-template-columns: 42px max-content; align-items: center; gap: 10px; cursor: pointer; }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .toggle > span { width: 42px; height: 24px; padding: 3px; border-radius: 20px; background: var(--surface3); border: 1px solid var(--border-strong); transition: background .15s; }
+  .toggle > span::after { content: ""; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .15s,background .15s; }
+  .toggle input:checked + span { background: #513b20; border-color: var(--accent); }
+  .toggle input:checked + span::after { transform: translateX(18px); background: var(--accent); }
+  .toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toggle input:disabled + span,.toggle input:disabled ~ b { opacity: .45; cursor: wait; }
+  .toggle b { font-size: 12px; }
 
   @media (max-width: 760px) {
     .resource-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -191,6 +204,7 @@
     .main-nav a { padding: 0 9px; }
     .deploy-form { grid-template-columns: 1fr 1fr; }
     .deploy-form button { grid-column: 1 / -1; }
+    .telemetry-card { align-items: flex-start; flex-direction: column; }
   }
   @media (max-width: 440px) {
     .brand-context,#header-clock { display: none; }

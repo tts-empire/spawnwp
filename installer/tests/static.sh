@@ -14,6 +14,7 @@ fi
 grep -q 'confirm ENABLE_PORT_KNOCKING .* 1' "$ROOT/install.sh"
 grep -q 'include /etc/nginx/cockpit-allowed.conf' "$ROOT/installer/nginx.conf.tpl"
 grep -q 'Share anonymous usage statistics for 90 days' "$ROOT/install.sh"
+grep -q 'telemetry.py enable' "$ROOT/install.sh"
 grep -q 'COCKPIT FIRST-TIME ACTIVATION' "$ROOT/install.sh"
 grep -q 'Valid for 24 hours and usable once' "$ROOT/install.sh"
 grep -q 'sudo cat \$REPORT' "$ROOT/install.sh"

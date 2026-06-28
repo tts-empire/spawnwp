@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Updates · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=20260627c">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=20260628c">
 </head>
 <body data-page="updates">
   <header>
@@ -35,10 +35,13 @@
     <div class="inline-alert" id="update-error" hidden></div>
     <section class="section telemetry-settings">
       <div class="section-title">Anonymous telemetry</div>
-      <div class="setting-row"><div><strong id="telemetry-state">Checking</strong><p>Time-limited aggregate usage consent. Update checks are independent.</p></div><button id="telemetry-disable" class="btn-danger" type="button" onclick="disableTelemetry()" hidden>Disable telemetry</button></div>
+      <div class="telemetry-card">
+        <div><strong>Help us improve SpawnWP</strong><p>Share anonymous, aggregate usage data so we can focus development on the versions, platforms and workflows people actually use.</p><p class="telemetry-exclusions">No domains, IP addresses, site names, content, credentials or logs. Sent weekly; consent expires after 90 days. <a href="https://spawnwp.com/privacy/telemetry/" target="_blank" rel="noopener">Privacy details ↗</a></p><span id="telemetry-state">Checking</span></div>
+        <label class="toggle"><input id="telemetry-toggle" type="checkbox" onchange="changeTelemetry(this)" disabled><span aria-hidden="true"></span><b>Share anonymous usage</b></label>
+      </div>
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=20260628b"></script>
+  <script src="/assets/cockpit.js?v=20260628c"></script>
 </body>
 </html>

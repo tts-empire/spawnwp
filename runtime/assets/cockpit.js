@@ -162,20 +162,40 @@ function copyUpdateCommand() {
 
 async function loadTelemetryStatus() {
   const state = document.getElementById('telemetry-state');
+  const toggle = document.getElementById('telemetry-toggle');
   if (!state) return;
   try {
     const status = await fetch(`${BASE}/telemetry`, { cache: 'no-store' }).then(response => response.json());
-    state.textContent = status.enabled ? 'Enabled until consent expiry' : 'Disabled';
-    document.getElementById('telemetry-disable').hidden = !status.enabled;
-  } catch (error) { state.textContent = 'Unavailable'; }
+    state.textContent = status.enabled && status.expires_at
+      ? `Enabled until ${new Date(status.expires_at * 1000).toLocaleDateString()}` : 'Disabled';
+    toggle.checked = !!status.enabled;
+    toggle.disabled = false;
+  } catch (error) {
+    state.textContent = 'Unavailable';
+    toggle.disabled = true;
+  }
 }
 
-async function disableTelemetry() {
-  if (!confirm('Disable telemetry and delete the local installation identifier?')) return;
-  const response = await fetch(`${BASE}/telemetry/disable`, { method: 'POST' });
-  if (!response.ok) { showToast('Unable to disable telemetry', true); return; }
-  showToast('Telemetry disabled');
-  loadTelemetryStatus();
+async function changeTelemetry(toggle) {
+  toggle.disabled = true;
+  const enabling = toggle.checked;
+  if (enabling) {
+    const accepted = confirm('Help us improve SpawnWP\n\nShare anonymous aggregate data once a week for 90 days: SpawnWP version, OS, architecture, enabled feature flags and current environment count.\n\nWe do not collect domains, IP addresses, site names, content, credentials or logs. You can disable this at any time.\n\nEnable telemetry?');
+    if (!accepted) { toggle.checked = false; toggle.disabled = false; return; }
+  } else if (!confirm('Disable telemetry and delete the local installation identifier?')) {
+    toggle.checked = true;
+    toggle.disabled = false;
+    return;
+  }
+  try {
+    const response = await fetch(`${BASE}/telemetry/${enabling ? 'enable' : 'disable'}`, { method: 'POST' });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || 'Request failed');
+    showToast(enabling ? 'Telemetry enabled for 90 days' : 'Telemetry disabled');
+  } catch (error) {
+    showToast(`Unable to ${enabling ? 'enable' : 'disable'} telemetry: ${error.message}`, true);
+  } finally {
+    await loadTelemetryStatus();
+  }
 }
 
 // ── Project list (rebuilds the .card-top, never the output box) ──────────────

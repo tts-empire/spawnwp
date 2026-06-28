@@ -1,0 +1,15 @@
+[Unit]
+Description=Purge expired SpawnWP telemetry records
+
+[Service]
+Type=oneshot
+User=spawnwp-telemetry
+Group=spawnwp-telemetry
+WorkingDirectory=/opt/spawnwp-telemetry-receiver
+Environment=SPAWNWP_TELEMETRY_DB=/var/lib/spawnwp-telemetry-receiver/telemetry.sqlite3
+ExecStart=/opt/spawnwp-telemetry-receiver/venv/bin/python app.py cleanup
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spawnwp-telemetry-receiver

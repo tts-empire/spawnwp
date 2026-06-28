@@ -265,6 +265,18 @@ def telemetry_disable():
         raise HTTPException(500, result.stderr.strip() or "Unable to disable telemetry")
     return {"enabled": False}
 
+
+@app.post("/api/telemetry/enable")
+def telemetry_enable():
+    result = subprocess.run([str(SPAWNWP_CLI), "telemetry", "enable"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise HTTPException(500, result.stderr.strip() or "Unable to enable telemetry")
+    status = subprocess.run([str(SPAWNWP_CLI), "telemetry", "status"], capture_output=True, text=True)
+    try:
+        return json.loads(status.stdout)
+    except json.JSONDecodeError:
+        return {"enabled": True}
+
 @app.get("/api/projects")
 def list_projects():
     result = []

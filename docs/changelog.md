@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Added explicit 90-day telemetry enable/disable controls to the Updates page.
+- Added the minimal self-hosted telemetry receiver, retention cleanup and local report.
+- Expanded the privacy notice with payload, retention and revocation details.
+
 ## 0.3.0
 
 - Removed HTTP Basic Auth while retaining optional, default-on port-knocking.

@@ -5,6 +5,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 class TelemetryTests(unittest.TestCase):
@@ -39,8 +40,24 @@ class TelemetryTests(unittest.TestCase):
         for prohibited in ("domain", "email", "username", "site_name", "password", "command"):
             self.assertNotIn(prohibited, serialized)
         self.module.CONSENT.write_text(json.dumps({"enabled": True, "expires_at": int(time.time()) - 1}))
-        self.assertIsNone(self.module.payload())
+        with patch.object(self.module, "post", return_value=True):
+            self.assertIsNone(self.module.payload())
         self.assertFalse((self.module.ROOT / "installation-id").exists())
+
+    def test_enable_and_disable_manage_consent_identifier_and_features(self):
+        old_identifier = (self.module.ROOT / "installation-id").read_text()
+        with patch.object(self.module, "post", return_value=True):
+            self.module.enable()
+        consent = json.loads(self.module.CONSENT.read_text())
+        self.assertTrue(consent["enabled"])
+        self.assertGreater(consent["expires_at"], int(time.time()) + 89 * 24 * 60 * 60)
+        self.assertNotEqual(old_identifier, (self.module.ROOT / "installation-id").read_text())
+        self.assertTrue(json.loads(self.module.FEATURES_FILE.read_text())["telemetry"])
+        with patch.object(self.module, "post", return_value=True) as send:
+            self.module.disable()
+        self.assertEqual("disable", send.call_args.args[0]["event"])
+        self.assertFalse(self.module.CONSENT.exists())
+        self.assertFalse(json.loads(self.module.FEATURES_FILE.read_text())["telemetry"])
 
 
 if __name__ == "__main__":

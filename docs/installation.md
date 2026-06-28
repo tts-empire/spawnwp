@@ -120,10 +120,14 @@ email, usernames, site names, content, plugins, logs and credentials.
 spawnwp telemetry status
 spawnwp telemetry payload
 sudo spawnwp telemetry disable
+sudo spawnwp telemetry enable
 ```
 
-Revocation stops collection and deletes the local identifier and queue. Endpoint failure
-never blocks installation or cockpit operation.
+The same control is available on the cockpit Updates page. Enabling creates a fresh
+random identifier and consent valid for 90 days. Revocation stops collection, requests
+deletion of the receiver record, and deletes the local identifier and queue. Endpoint
+failure never blocks installation or cockpit operation; inactive receiver records expire
+after 90 days.
 
 ## Re-running / forcing
 

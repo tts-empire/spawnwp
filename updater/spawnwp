@@ -353,7 +353,7 @@ def main() -> int:
     auth_reset = auth_sub.add_parser("reset")
     auth_reset.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
     telemetry = sub.add_parser("telemetry")
-    telemetry.add_argument("action", choices=("status", "payload", "disable"))
+    telemetry.add_argument("action", choices=("enable", "status", "payload", "disable"))
     update = sub.add_parser("update")
     update.add_argument("--check", action="store_true")
     update.add_argument("--version")
@@ -400,13 +400,33 @@ def main() -> int:
                     print(json.dumps(consent))
                 return 0
             script = Path("/usr/local/lib/spawnwp/telemetry.py")
+            packaged_script = Path("/usr/local/lib/spawnwp/installer/telemetry.py")
             if args.action == "payload":
                 if not script.is_file():
                     print("null")
                     return 0
                 return subprocess.run([str(script), "payload"]).returncode
             if os.geteuid() != 0:
-                raise UpdateError("Telemetry revocation must run as root")
+                raise UpdateError("Telemetry changes must run as root")
+            if args.action == "enable":
+                if not packaged_script.is_file():
+                    raise UpdateError("Telemetry sender is not installed")
+                script.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(packaged_script, script)
+                script.chmod(0o755)
+                service_root = packaged_script.parent
+                for name in ("spawnwp-telemetry.service", "spawnwp-telemetry.timer"):
+                    source = service_root / name
+                    if not source.is_file():
+                        raise UpdateError(f"Missing telemetry unit: {name}")
+                    shutil.copy2(source, Path("/etc/systemd/system") / name)
+                result = subprocess.run([str(script), "enable"], capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise UpdateError(result.stderr.strip() or "Unable to enable telemetry")
+                subprocess.run(["systemctl", "daemon-reload"], check=True)
+                subprocess.run(["systemctl", "enable", "--now", "spawnwp-telemetry.timer"], check=True)
+                print("SpawnWP telemetry enabled for 90 days")
+                return 0
             if script.is_file():
                 subprocess.run([str(script), "disable"], check=True)
             subprocess.run(["systemctl", "disable", "--now", "spawnwp-telemetry.timer"], capture_output=True)

@@ -254,17 +254,13 @@ for _ in $(seq 1 60); do
 done
 (cd /srv/wp-dev && docker compose up -d && make bootstrap && bash scripts/apply-blueprint.sh .spawnwp/blueprint.json)
 
+printf '{"port_knocking":%s,"telemetry":false}\n' "$([ "$ENABLE_PORT_KNOCKING" = 1 ] && echo true || echo false)" > /var/lib/spawnwp/features.json
 if [ "$ENABLE_TELEMETRY" = 1 ]; then
   install -d -m 0700 /var/lib/spawnwp/telemetry
   install -m 0755 "$(src installer telemetry.py)" /usr/local/lib/spawnwp/telemetry.py
   install -m 0644 "$(src installer spawnwp-telemetry.service)" "$(src installer spawnwp-telemetry.timer)" /etc/systemd/system/
-  uuid=$(cat /proc/sys/kernel/random/uuid); echo "$uuid" > /var/lib/spawnwp/telemetry/installation-id
-  now=$(date +%s); printf '{"enabled":true,"notice_version":"1","consented_at":%s,"expires_at":%s}\n' "$now" "$((now+7776000))" > /var/lib/spawnwp/telemetry/consent.json
-  printf '{"port_knocking":%s,"telemetry":true}\n' "$([ "$ENABLE_PORT_KNOCKING" = 1 ] && echo true || echo false)" > /var/lib/spawnwp/features.json
+  /usr/local/lib/spawnwp/telemetry.py enable
   systemctl daemon-reload; systemctl enable --now spawnwp-telemetry.timer
-  /usr/local/lib/spawnwp/telemetry.py send installation || true
-else
-  printf '{"port_knocking":%s,"telemetry":false}\n' "$([ "$ENABLE_PORT_KNOCKING" = 1 ] && echo true || echo false)" > /var/lib/spawnwp/features.json
 fi
 
 touch "$MARKER"

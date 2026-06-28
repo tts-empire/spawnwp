@@ -1,0 +1,20 @@
+[Unit]
+Description=SpawnWP opt-in telemetry receiver
+After=network.target
+
+[Service]
+User=spawnwp-telemetry
+Group=spawnwp-telemetry
+WorkingDirectory=/opt/spawnwp-telemetry-receiver
+Environment=SPAWNWP_TELEMETRY_DB=/var/lib/spawnwp-telemetry-receiver/telemetry.sqlite3
+ExecStart=/opt/spawnwp-telemetry-receiver/venv/bin/uvicorn app:app --host 127.0.0.1 --port 9494 --workers 1 --no-access-log
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spawnwp-telemetry-receiver
+
+[Install]
+WantedBy=multi-user.target

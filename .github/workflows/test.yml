@@ -20,6 +20,7 @@ jobs:
       - run: PYTHONPATH=runtime python -m unittest discover -s updater/tests -v
       - run: PYTHONPATH=runtime python -m unittest discover -s runtime/tests -v
       - run: python -m unittest discover -s installer/tests -p 'test_*.py' -v
+      - run: python -m unittest discover -s ops/telemetry-receiver -p 'test_*.py' -v
       - run: python -m py_compile updater/spawnwp updater/build-release.py runtime/app.py runtime/scripts/blueprint.py
       - run: bash -n updater/publish-release.sh runtime/scripts/*.sh clients/knock.sh
       - run: bash installer/tests/static.sh

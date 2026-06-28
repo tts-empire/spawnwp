@@ -6,6 +6,7 @@ import platform
 import sys
 import time
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,14 +17,46 @@ VERSION_FILE = Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VER
 FEATURES_FILE = Path(os.environ.get("SPAWNWP_FEATURES_FILE", "/var/lib/spawnwp/features.json"))
 ENVIRONMENTS_ROOT = Path(os.environ.get("SPAWNWP_ENVIRONMENTS_ROOT", "/srv"))
 ENDPOINT = os.environ.get("SPAWNWP_TELEMETRY_ENDPOINT", "https://spawnwp.com/api/v1/telemetry")
+CONSENT_SECONDS = 90 * 24 * 60 * 60
 
 def load(path):
     try: return json.loads(path.read_text())
     except (OSError, json.JSONDecodeError): return {}
 
-def disable():
+def set_feature(enabled):
+    features = load(FEATURES_FILE)
+    features["telemetry"] = bool(enabled)
+    FEATURES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    FEATURES_FILE.write_text(json.dumps(features, separators=(",", ":")) + "\n")
+
+def post(data):
+    request = urllib.request.Request(ENDPOINT, data=json.dumps(data).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            return 200 <= response.status < 300
+    except Exception:
+        return False
+
+def disable(notify=True):
+    identifier_path = ROOT / "installation-id"
+    if notify and identifier_path.is_file():
+        post({"installation_id": identifier_path.read_text().strip(), "event": "disable",
+              "timestamp": datetime.now(timezone.utc).isoformat()})
     for path in (CONSENT, PENDING, ROOT / "installation-id"):
         path.unlink(missing_ok=True)
+    set_feature(False)
+
+def enable():
+    ROOT.mkdir(parents=True, exist_ok=True)
+    identifier = str(uuid.uuid4())
+    now = int(time.time())
+    (ROOT / "installation-id").write_text(identifier + "\n")
+    CONSENT.write_text(json.dumps({"enabled": True, "notice_version": "2",
+                                   "consented_at": now, "expires_at": now + CONSENT_SECONDS}) + "\n")
+    PENDING.unlink(missing_ok=True)
+    set_feature(True)
+    send("installation")
 
 def payload(event="heartbeat"):
     consent = load(CONSENT)
@@ -45,17 +78,12 @@ def send(event="heartbeat"):
     if not data: return 0
     ROOT.mkdir(parents=True, exist_ok=True)
     PENDING.write_text(json.dumps(data, indent=2) + "\n")
-    request = urllib.request.Request(ENDPOINT, data=json.dumps(data).encode(),
-                                     headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(request, timeout=3) as response:
-            if 200 <= response.status < 300: PENDING.unlink(missing_ok=True)
-    except Exception:
-        pass
+    if post(data): PENDING.unlink(missing_ok=True)
     return 0
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "send"
-    if command == "disable": disable()
+    if command == "enable": enable()
+    elif command == "disable": disable()
     elif command == "payload": print(json.dumps(payload(), indent=2))
     else: raise SystemExit(send(sys.argv[2] if len(sys.argv) > 2 else "heartbeat"))

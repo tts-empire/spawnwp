@@ -82,7 +82,7 @@ Then the workflow is:
 3. Click **Create site**.
 4. Use the new WordPress site.
 
-→ **Full documentation:** <https://OWNER.github.io/spawnwp/>
+→ **Full documentation:** <https://spawnwp.com/docs/>
 
 ## Documentation
 

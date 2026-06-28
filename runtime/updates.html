@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Updates · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=20260628d">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=20260628e">
 </head>
 <body data-page="updates">
   <header>
@@ -30,6 +30,7 @@
       <div class="section-title">Release notes</div>
       <h1 id="release-name"></h1>
       <pre id="release-notes"></pre>
+      <div class="update-actions"><button class="btn-primary sensitive" id="apply-update" type="button" onclick="applyDashboardUpdate()">Install update</button><span id="update-progress">The cockpit will restart automatically.</span></div>
       <div class="update-command"><span>Run as root</span><code>sudo spawnwp update</code><button class="icon-btn" type="button" onclick="copyUpdateCommand()" title="Copy command">⧉</button></div>
     </section>
     <div class="inline-alert" id="update-error" hidden></div>
@@ -42,6 +43,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=20260628d"></script>
+  <script src="/assets/cockpit.js?v=20260628e"></script>
 </body>
 </html>

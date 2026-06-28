@@ -1,0 +1,14 @@
+[Unit]
+Description=Install the latest signed SpawnWP release
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Environment=HOME=/var/lib/spawnwp
+Environment=DOCKER_CONFIG=/var/lib/spawnwp/docker
+ExecStart=/usr/local/bin/spawnwp update
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6

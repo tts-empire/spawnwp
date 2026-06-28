@@ -157,6 +157,7 @@ src() {
 
 log "Installing SpawnWP $VERSION"
 install -d -m 0755 /srv/wp-dev /srv/wp-cockpit/static/assets /usr/local/lib/spawnwp/installer /etc/spawnwp /var/lib/spawnwp /opt/spawnwp/releases
+install -d -m 0700 /var/lib/spawnwp/docker
 if [ "$mode" = source ]; then
   rsync -a --exclude primary.env "$(src runtime .)/" /srv/wp-dev/
   install -m 0644 "$(src cockpit app.py)" "$(src cockpit auth.py)" "$(src cockpit requirements.txt)" /srv/wp-cockpit/
@@ -211,6 +212,7 @@ printf '%s\n' "$FernetKey" > /etc/spawnwp/auth.key
 chmod 600 /etc/spawnwp/auth.key
 APP_SETUP_CODE=$(cd /srv/wp-cockpit && /srv/wp-cockpit/venv/bin/python -c 'from auth import create_bootstrap; print(create_bootstrap())')
 install -m 0644 "$(src installer wp-cockpit.service)" /etc/systemd/system/wp-cockpit.service
+install -m 0644 "$(src installer spawnwp-update.service)" /etc/systemd/system/spawnwp-update.service
 install -m 0644 "$(src installer docker-prune.service)" "$(src installer docker-prune.timer)" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now wp-cockpit docker-prune.timer

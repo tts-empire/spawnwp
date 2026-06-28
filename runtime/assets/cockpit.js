@@ -16,6 +16,7 @@ let BLUEPRINTS = [];
 let SYS_BUSY = false; // true when a build is running / high load (guardrail)
 let DEPLOY_ACTIVE = false;
 let PLATFORM = {};
+let UPDATE_RUNNING = false;
 
 async function loadPlatform() {
   try {
@@ -162,6 +163,62 @@ async function loadUpdateStatus() {
 function copyUpdateCommand() {
   navigator.clipboard.writeText('sudo spawnwp update');
   showToast('Update command copied');
+}
+
+async function applyDashboardUpdate() {
+  if (UPDATE_RUNNING) return;
+  const current = document.getElementById('installed-version').textContent;
+  const latest = document.getElementById('latest-version').textContent;
+  if (!confirm(`Install SpawnWP ${latest}?\n\nThe cockpit will restart during the update. Existing WordPress environments keep running.`)) return;
+  const button = document.getElementById('apply-update');
+  const progress = document.getElementById('update-progress');
+  UPDATE_RUNNING = true;
+  button.disabled = true;
+  progress.textContent = 'Starting signed update…';
+  document.getElementById('update-state').textContent = 'Updating';
+  try {
+    const response = await fetch(`${BASE}/update/apply`, { method: 'POST' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+    monitorDashboardUpdate(current, 0);
+  } catch (error) {
+    UPDATE_RUNNING = false;
+    button.disabled = false;
+    progress.textContent = error.message;
+    showToast(error.message, true);
+  }
+}
+
+async function monitorDashboardUpdate(previousVersion, attempt) {
+  const progress = document.getElementById('update-progress');
+  try {
+    const version = await fetch(`${BASE}/version`, { cache: 'no-store' }).then(response => response.json());
+    if (version.version && version.version !== previousVersion) {
+      progress.textContent = `Updated to ${version.version}. Reloading…`;
+      document.getElementById('update-state').textContent = 'Up to date';
+      setTimeout(() => location.reload(), 1500);
+      return;
+    }
+    const job = await fetch(`${BASE}/update/job`, { cache: 'no-store' }).then(response => response.json());
+    if (job.state === 'failed' || job.exit_code) throw new Error(job.error || 'Update failed');
+    progress.textContent = job.state === 'active' ? 'Installing and verifying the release…' : 'Waiting for the updater…';
+  } catch (error) {
+    if (attempt > 8 && !String(error.message).includes('fetch')) {
+      UPDATE_RUNNING = false;
+      document.getElementById('apply-update').disabled = false;
+      progress.textContent = error.message;
+      showToast(error.message, true);
+      return;
+    }
+    progress.textContent = 'Cockpit is restarting; reconnecting…';
+  }
+  if (attempt >= 120) {
+    UPDATE_RUNNING = false;
+    document.getElementById('apply-update').disabled = false;
+    progress.textContent = 'Update timed out. Check: sudo systemctl status spawnwp-update';
+    return;
+  }
+  setTimeout(() => monitorDashboardUpdate(previousVersion, attempt + 1), 2000);
 }
 
 async function loadTelemetryStatus() {

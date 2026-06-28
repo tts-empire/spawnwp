@@ -168,6 +168,8 @@
   .deploy-form .field-help { display:block; margin-top:6px; color:var(--muted); font-size:11px; line-height:1.35; text-transform:none; }
   .deploy-form input.input-error { border-color:var(--red); }
   .deploy-form .field-help.input-error { color:var(--red); }
+  .update-actions { display:flex; align-items:center; gap:14px; margin:18px 0; }
+  .update-actions span { color:var(--muted); font-size:12px; }
   .deploy-summary { grid-column: 1 / -1; padding: 12px 0; border-top: 1px solid var(--border); }
   .deploy-form > button { grid-column: 1 / -1; }
   .deploy-summary strong { display: block; font-family: monospace; overflow-wrap: anywhere; }

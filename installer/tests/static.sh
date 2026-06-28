@@ -28,6 +28,9 @@ if grep -Eq 'docker compose (build|up)|make bootstrap|apply-blueprint\.sh' "$ROO
 fi
 grep -q 'cp env.example "${PROJ_DIR}/.env.example"' "$ROOT/runtime/scripts/new-project.sh"
 grep -q 'Spaces are not allowed in site URLs' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'DOCKER_CONFIG=/var/lib/spawnwp/docker' "$ROOT/installer/wp-cockpit.service"
+grep -q 'ExecStart=/usr/local/bin/spawnwp update' "$ROOT/installer/spawnwp-update.service"
+grep -q 'Install update' "$ROOT/runtime/updates.html"
 if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then
   echo "active runtime must not reference the removed cockpit network allow-list" >&2
   exit 1

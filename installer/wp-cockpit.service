@@ -9,6 +9,7 @@ Type=simple
 User=root
 WorkingDirectory=/srv/wp-cockpit
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DOCKER_CONFIG=/var/lib/spawnwp/docker
 ExecStart=/srv/wp-cockpit/venv/bin/uvicorn app:app --host 127.0.0.1 --port 9393 --workers 1
 Restart=always
 RestartSec=5

@@ -3,6 +3,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source /etc/spawnwp/config.env
 
+export DOCKER_CONFIG=${DOCKER_CONFIG:-/var/lib/spawnwp/docker}
+install -d -m 0700 "$DOCKER_CONFIG"
+
 NAME="${1:-}"
 BLUEPRINT="${2:-development}"
 PHP_OVERRIDE="${3:-}"

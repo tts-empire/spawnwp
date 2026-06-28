@@ -6,6 +6,13 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.9
+
+- Moved Docker Buildx state out of read-only `/root` when deployments are started
+  by the sandboxed cockpit service.
+- Added authenticated, one-click installation of signed SpawnWP updates from the
+  Updates page, with restart-aware progress reporting.
+
 ## 0.3.8
 
 - Removed the stale `cockpit-allowed.conf` include from per-environment Adminer and
@@ -122,7 +129,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...HEAD
+[0.3.9]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...v0.3.6

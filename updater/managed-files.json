@@ -39,11 +39,13 @@
     "docker-prune.timer",
     "migrations/remove-legacy-access.py",
     "migrations/remove-obsolete-network-gate.py",
+    "migrations/install-dashboard-update-service.py",
     "nginx-http.conf.tpl",
     "nginx.conf.tpl",
     "spawnwp-proxy.conf",
     "spawnwp-telemetry.service",
     "spawnwp-telemetry.timer",
+    "spawnwp-update.service",
     "telemetry.py",
     "wp-cockpit.service"
   ]

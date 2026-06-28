@@ -41,7 +41,7 @@ async def application_authentication(request: Request, call_next):
         return RedirectResponse("/login", status_code=303)
     if active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
         return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
-    destructive = {"/api/destroy", "/api/restore", "/api/php-switch"}
+    destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply"}
     if active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
         return JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     response = await call_next(request)
@@ -61,6 +61,7 @@ TEMPLATE_MARKER = PRIMARY_PROJECT / ".spawnwp" / "template-only"
 BLUEPRINT_TOOL = PRIMARY_PROJECT / "scripts" / "blueprint.py"
 SPAWNWP_CLI = Path("/usr/local/bin/spawnwp")
 SPAWNWP_VERSION = Path("/var/lib/spawnwp/VERSION")
+UPDATE_SERVICE = "spawnwp-update.service"
 
 # Every project dir contains a compose.yaml and a Makefile
 def is_project(p: Path) -> bool:
@@ -228,6 +229,54 @@ def update_status():
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         return {"current": version_info()["version"], "available": False,
                 "error": str(exc)}
+
+
+@app.post("/api/update/apply")
+def apply_update():
+    guard_not_busy()
+    if not Path(f"/etc/systemd/system/{UPDATE_SERVICE}").is_file():
+        raise HTTPException(503, "Dashboard update service is not installed")
+    active = subprocess.run(
+        ["systemctl", "is-active", "--quiet", UPDATE_SERVICE],
+        capture_output=True,
+    )
+    if active.returncode == 0:
+        raise HTTPException(409, "A SpawnWP update is already running")
+    subprocess.run(["systemctl", "reset-failed", UPDATE_SERVICE], capture_output=True)
+    result = subprocess.run(
+        ["systemctl", "start", "--no-block", UPDATE_SERVICE],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise HTTPException(500, result.stderr.strip() or "Unable to start update")
+    return {"started": True, "service": UPDATE_SERVICE}
+
+
+@app.get("/api/update/job")
+def update_job():
+    result = subprocess.run(
+        ["systemctl", "show", UPDATE_SERVICE, "--property=ActiveState",
+         "--property=SubState", "--property=Result", "--property=ExecMainStatus"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return {"state": "unavailable", "error": result.stderr.strip()}
+    values = dict(
+        line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
+    )
+    payload = {
+        "state": values.get("ActiveState", "unknown"),
+        "substate": values.get("SubState", "unknown"),
+        "result": values.get("Result", ""),
+        "exit_code": int(values.get("ExecMainStatus", "0") or 0),
+    }
+    if payload["state"] == "failed" or payload["exit_code"] != 0:
+        logs = subprocess.run(
+            ["journalctl", "-u", UPDATE_SERVICE, "-n", "20", "--no-pager", "-o", "cat"],
+            capture_output=True, text=True,
+        )
+        payload["error"] = logs.stdout.strip() or "Update failed"
+    return payload
 
 
 @app.get("/api/telemetry")

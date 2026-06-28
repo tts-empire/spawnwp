@@ -28,7 +28,9 @@ systemctl list-timers | grep docker-prune
 
 The cockpit checks the latest stable GitHub Release and shows an **Updates** indicator.
 Checks are anonymous once the repository is public and remain independent from telemetry.
-Review the release notes, then update explicitly as root:
+Review the release notes and use **Install update** on the Updates page. The signed
+update runs as a separate systemd job so it continues while the cockpit restarts.
+The root command remains available as a recovery path:
 
 ```bash
 spawnwp update --check

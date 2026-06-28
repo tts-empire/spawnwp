@@ -6,6 +6,11 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.5
+
+- Replaced the installer domain regular expression with label-by-label validation
+  and normalized accidental terminal whitespace before validation.
+
 ## 0.3.4
 
 - Restored the missing runtime Nginx default server config so new environments can
@@ -98,7 +103,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/tts-empire/spawnwp/compare/v0.3.3...v0.3.4
 [0.2.2]: https://github.com/tts-empire/spawnwp/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tts-empire/spawnwp/compare/v0.2.0...v0.2.1

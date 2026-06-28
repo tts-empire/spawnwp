@@ -22,6 +22,9 @@ prompt() {
     read -r -p "$label${default:+ [$default]}: " value </dev/tty
   fi
   value=${value:-$default}
+  value=${value//$'\r'/}
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
   printf -v "$variable" '%s' "$value"
 }
 confirm() {
@@ -37,7 +40,19 @@ confirm() {
   [[ "$value" =~ ^[01]$ ]] || die "$variable must be 1 or 0"
   printf -v "$variable" '%s' "$value"
 }
-validate_domain() { [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]; }
+validate_domain() {
+  local domain=${1%.} label tld
+  local -a labels
+  [ -n "$domain" ] && [ "${#domain}" -le 253 ] && [[ "$domain" == *.* ]] || return 1
+  IFS=. read -r -a labels <<< "$domain"
+  [ "${#labels[@]}" -ge 2 ] || return 1
+  for label in "${labels[@]}"; do
+    [ -n "$label" ] && [ "${#label}" -le 63 ] || return 1
+    [[ "$label" != -* && "$label" != *- && "$label" != *[!A-Za-z0-9-]* ]] || return 1
+  done
+  tld=${labels[${#labels[@]}-1]}
+  [ "${#tld}" -ge 2 ] && [[ "$tld" != *[!A-Za-z]* ]]
+}
 render() {
   sed -e "s|@@DOMAIN@@|$DOMAIN|g" -e "s|@@COCKPIT_DOMAIN@@|$COCKPIT_DOMAIN|g" "$1" > "$2"
 }
@@ -62,8 +77,8 @@ cleanup_previous_install
 prompt DOMAIN "WordPress sites hostname"
 prompt COCKPIT_DOMAIN "Cockpit hostname"
 prompt EMAIL "Let's Encrypt email"
-validate_domain "$DOMAIN" || die "Invalid DOMAIN"
-validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN"
+validate_domain "$DOMAIN" || die "Invalid DOMAIN: '$DOMAIN'"
+validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN: '$COCKPIT_DOMAIN'"
 [ "$DOMAIN" != "$COCKPIT_DOMAIN" ] || die "DOMAIN and COCKPIT_DOMAIN must differ"
 [[ "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid EMAIL"
 echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs."

@@ -82,8 +82,7 @@ chosen snapshot.
 
 Destroy is intentionally guarded: it's only enabled when the site is **Down**, and it
 asks for a typed confirmation of the site name. It removes the containers and volumes,
-the `/srv/<name>` directory, and the site's nginx blocks on both domains. The primary
-site cannot be destroyed.
+the `/srv/<name>` directory, and the site's nginx blocks on both domains.
 
 ### Database & email
 

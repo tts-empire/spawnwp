@@ -57,6 +57,7 @@ async def application_authentication(request: Request, call_next):
 
 PROJECTS_ROOT = Path("/srv")
 PRIMARY_PROJECT = PROJECTS_ROOT / "wp-dev"
+TEMPLATE_MARKER = PRIMARY_PROJECT / ".spawnwp" / "template-only"
 BLUEPRINT_TOOL = PRIMARY_PROJECT / "scripts" / "blueprint.py"
 SPAWNWP_CLI = Path("/usr/local/bin/spawnwp")
 SPAWNWP_VERSION = Path("/var/lib/spawnwp/VERSION")
@@ -66,11 +67,10 @@ def is_project(p: Path) -> bool:
     return p.is_dir() and (p / "compose.yaml").exists() and (p / "Makefile").exists()
 
 def get_projects() -> list[Path]:
-    dirs = sorted([PRIMARY_PROJECT] + [
+    return sorted([
         p for p in PROJECTS_ROOT.iterdir()
-        if p != PRIMARY_PROJECT and is_project(p)
+        if is_project(p) and not (p == PRIMARY_PROJECT and TEMPLATE_MARKER.is_file())
     ])
-    return [d for d in dirs if is_project(d)]
 
 
 def blueprint_catalog() -> dict:

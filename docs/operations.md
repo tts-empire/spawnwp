@@ -6,7 +6,7 @@ Day-to-day running of a SpawnWP host.
 
 | Path | Contents |
 |---|---|
-| `/srv/wp-dev/` | The primary site (and the stack template scripts) |
+| `/srv/wp-dev/` | Internal stack template used to create environments; not a site |
 | `/srv/<name>/` | Each spawned site (Compose project, `.env`, backups, `wp-content`) |
 | `/srv/wp-cockpit/` | The cockpit app |
 | `/etc/nginx/sites-available/spawnwp` | Both vhosts (content + cockpit) |

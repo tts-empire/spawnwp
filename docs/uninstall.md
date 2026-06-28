@@ -13,7 +13,7 @@ From the cockpit, bring each site **Down** and **Destroy** it. Or from the shell
 
 ```bash
 for d in /srv/*/; do
-  [ -f "$d/compose.yaml" ] || continue
+  [ -f "$d/compose.yaml" ] && [ -f "$d/.env" ] || continue
   (cd "$d" && docker compose down -v --remove-orphans)
 done
 ```

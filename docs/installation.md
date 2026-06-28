@@ -38,16 +38,16 @@ curl -fsSL https://spawnwp.com/install.sh \
 
 1. Detects the OS (Ubuntu/Debian) and installs prerequisites: Docker Engine + Compose,
    nginx, certbot and supporting tools.
-2. Generates **fresh random secrets** for this install (databases, WordPress admin,
-   WordPress and application authentication).
-3. Deploys the stack to `/srv` and the cockpit app, builds the WordPress/PHP image.
+2. Deploys the generic environment template and the cockpit app, without creating
+   a WordPress environment or starting application containers.
+3. Generates fresh application-authentication secrets for this install.
 4. Configures nginx for both hostnames and obtains a **single SAN TLS certificate**
    covering `DOMAIN` and `COCKPIT_DOMAIN`.
 5. Creates the application-auth database, encryption key and one-time activation code.
-6. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
-7. Prints a **credentials report**.
+6. Starts the empty cockpit and prints the one-time **activation report**.
 
-It typically takes a few minutes (longer on the first image build).
+It typically takes a few minutes. WordPress images and selected blueprint components
+are downloaded only when you create an environment from the cockpit.
 
 ## What you do next
 
@@ -87,9 +87,8 @@ COCKPIT FIRST-TIME ACTIVATION
 5. Create a passkey when prompted by the browser.
 6. Save the ten recovery codes shown at the end.
 
-WordPress admin (primary site)
-  user: admin-xxxxxx
-  pass: ••••••••••••••••
+No WordPress environment was created automatically.
+Create the first one from the cockpit after activation.
 
 This root-only report is stored at:
   /root/spawnwp-credentials.txt
@@ -101,7 +100,7 @@ Read it again with:
 !!! danger "Save these now"
     The report is root-readable with mode `600`; the activation code expires after 24
     hours and is invalidated after use. Store credentials and recovery codes in your
-    password manager. Never commit or share the report or your `.env` files.
+    password manager. Never commit or share the report or your environment `.env` files.
 
 ## Optional telemetry
 

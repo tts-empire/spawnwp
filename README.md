@@ -70,12 +70,13 @@ curl -fsSL https://spawnwp.com/install.sh \
 ```
 
 When it finishes, the installer prints (and saves to `/root/spawnwp-credentials.txt`)
-your URLs, the one-time cockpit activation code and the WordPress admin login.
+your URLs and the one-time cockpit activation procedure. It does not create a
+WordPress environment automatically.
 
 Then the workflow is:
 
 1. Open the cockpit URL from the report.
-2. Log in.
+2. Complete administrator activation.
 3. Click **Create site**.
 4. Use the new WordPress site.
 

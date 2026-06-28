@@ -20,7 +20,6 @@ flowchart TB
     user -->|https| develVH
     user -->|https| cockpitVH
 
-    develVH -->|/| primary[(primary WordPress<br/>127.0.0.1:8080)]
     develVH -->|/site-a/| siteA[(site-a WordPress<br/>127.0.0.1:8081)]
 
     cockpitVH -->|/| cockpit[WP Cockpit<br/>127.0.0.1:9393]
@@ -28,8 +27,7 @@ flowchart TB
     cockpitVH -->|/site-a-mail/| mailpit[(Mailpit · site-a)]
 ```
 
-- **`DOMAIN`** serves only WordPress: the primary site at `/` and each spawned site
-  at `/<site>/`, over public HTTPS.
+- **`DOMAIN`** serves spawned WordPress environments at `/<site>/`, over public HTTPS.
 - **`COCKPIT_DOMAIN`** serves the cockpit at `/` and each site's Adminer (`/<site>-db/`)
   and Mailpit (`/<site>-mail/`). Cockpit sessions protect all admin tooling.
 
@@ -40,7 +38,7 @@ keeps the cockpit's Adminer auto-login same-origin, and serves every web interfa
 
 ## Per-site container stack
 
-Each site (primary or spawned) is an independent Docker Compose project under `/srv/<name>/`:
+Each spawned site is an independent Docker Compose project under `/srv/<name>/`:
 
 ```mermaid
 flowchart LR

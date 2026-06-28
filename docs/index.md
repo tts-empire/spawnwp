@@ -45,7 +45,7 @@ SpawnWP uses **two hostnames** that you choose and point at your VPS:
 
 | Hostname | Serves |
 |---|---|
-| `DOMAIN` (e.g. `dev.example.com`) | The primary WordPress site (`/`) and every spawned site (`/<site>/`) — content only |
+| `DOMAIN` (e.g. `dev.example.com`) | Every spawned WordPress site (`/<site>/`) — content only |
 | `COCKPIT_DOMAIN` (e.g. `cockpit.example.com`) | The authenticated cockpit dashboard and each site's Adminer / Mailpit |
 
 Keeping admin tooling on its own subdomain means there is no conflict between
@@ -62,8 +62,8 @@ WordPress URLs and the cockpit. Every web interface uses ports 80/443.
 curl -fsSL https://spawnwp.com/install.sh | sudo bash
 ```
 
-The installer asks for the two hostnames and your Let's Encrypt email, then prints the
-cockpit URL and login details.
+The installer asks for the two hostnames and your Let's Encrypt email, then starts an
+empty cockpit and prints its one-time activation procedure.
 
 !!! note
     SpawnWP is built for test environments, demos and development labs. It is not

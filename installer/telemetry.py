@@ -66,7 +66,11 @@ def payload(event="heartbeat"):
     identifier = (ROOT / "installation-id").read_text().strip()
     version = VERSION_FILE.read_text().strip()
     config = load(FEATURES_FILE)
-    environments = sum(1 for path in ENVIRONMENTS_ROOT.iterdir() if (path / "compose.yaml").is_file())
+    environments = sum(
+        1 for path in ENVIRONMENTS_ROOT.iterdir()
+        if (path / "compose.yaml").is_file()
+        and not (path / ".spawnwp" / "template-only").is_file()
+    )
     return {"installation_id": identifier, "event": event,
             "timestamp": datetime.now(timezone.utc).isoformat(), "spawnwp_version": version,
             "os_family": platform.system(), "os_version": platform.release(),

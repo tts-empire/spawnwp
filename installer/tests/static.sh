@@ -21,3 +21,8 @@ grep -q 'COCKPIT FIRST-TIME ACTIVATION' "$ROOT/install.sh"
 grep -q 'Valid for 24 hours and usable once' "$ROOT/install.sh"
 grep -q 'sudo cat \$REPORT' "$ROOT/install.sh"
 grep -q 'pkeyutl -verify' "$ROOT/install.sh"
+grep -q 'template-only' "$ROOT/install.sh"
+if grep -Eq 'docker compose (build|up)|make bootstrap|apply-blueprint\.sh' "$ROOT/install.sh"; then
+  echo "installer must not create or bootstrap a WordPress environment" >&2
+  exit 1
+fi

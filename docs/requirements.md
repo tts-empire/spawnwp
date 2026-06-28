@@ -1,8 +1,8 @@
 # Requirements
 
-You need a fresh server and two hostnames. The installer handles everything else:
-Docker, nginx, certificates, the cockpit and the first WordPress
-environment.
+You need a fresh server and two hostnames. The installer handles Docker, nginx,
+certificates and the cockpit. It leaves the environment list empty; you create the
+first WordPress environment after activating the cockpit.
 
 You do **not** need to preinstall Docker, write nginx config, open custom admin
 ports, or remember server commands for normal use. After setup, the cockpit is the

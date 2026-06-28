@@ -73,7 +73,7 @@ plain Docker Compose project with a `Makefile`. Run these from the site director
 
 ## New site
 
-From the primary site directory (`/srv/wp-dev/`):
+From the internal environment-template directory (`/srv/wp-dev/`):
 
 | Command | Description |
 |---|---|

@@ -66,7 +66,7 @@ case "$ID:$VERSION_ID" in ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debia
 cleanup_previous_install() {
   if [ -f /srv/wp-dev/compose.yaml ] || [ -d /srv/wp-cockpit ] || [ -d /etc/spawnwp ] || [ -d /var/lib/spawnwp ] || [ -d /opt/spawnwp ]; then
     log "Resetting any previous SpawnWP footprint"
-    [ ! -f /srv/wp-dev/compose.yaml ] || (cd /srv/wp-dev && docker compose down -v --remove-orphans) || true
+    [ ! -f /srv/wp-dev/.env ] || (cd /srv/wp-dev && docker compose down -v --remove-orphans) || true
     systemctl disable --now wp-cockpit spawnwp-telemetry.timer 2>/dev/null || true
     rm -rf /srv/wp-dev /srv/wp-cockpit /etc/spawnwp /var/lib/spawnwp /opt/spawnwp
   fi
@@ -181,8 +181,6 @@ echo "$VERSION" > /var/lib/spawnwp/VERSION
 python3 -m venv /srv/wp-cockpit/venv
 /srv/wp-cockpit/venv/bin/pip install --disable-pip-version-check -q -r /srv/wp-cockpit/requirements.txt
 
-DB_PASS=$(random_secret 32); DB_ROOT_PASS=$(random_secret 32); WP_ADMIN_PASS=$(random_secret 32); REDIS_PASSWORD=$(random_secret 32)
-WP_ADMIN_USER="spawnwp-$(openssl rand -hex 3)"
 cat > /etc/spawnwp/config.env <<EOF
 DOMAIN=$DOMAIN
 COCKPIT_DOMAIN=$COCKPIT_DOMAIN
@@ -190,35 +188,8 @@ EMAIL=$EMAIL
 ENABLE_TELEMETRY=$ENABLE_TELEMETRY
 EOF
 chmod 600 /etc/spawnwp/config.env
-cat > /srv/wp-dev/.env <<EOF
-COMPOSE_PROJECT_NAME=wp-dev
-DOMAIN=$DOMAIN
-PHP_VERSION=8.3
-WP_VERSION=latest
-WORDPRESS_SERIES=7
-WP_DEBUG=true
-SPAWNWP_BLUEPRINT=development
-SPAWNWP_BLUEPRINT_VERSION=1.0.0
-DB_NAME=wordpress
-DB_USER=wpuser
-DB_PASS=$DB_PASS
-DB_ROOT_PASS=$DB_ROOT_PASS
-DB_TABLE_PREFIX=wp_
-WP_ADMIN_USER=$WP_ADMIN_USER
-WP_ADMIN_EMAIL=$EMAIL
-WP_ADMIN_PASS=$WP_ADMIN_PASS
-WP_HOME=https://$DOMAIN
-WP_SITEURL=https://$DOMAIN
-WEB_PORT=8080
-ADMINER_PORT=9001
-MAILPIT_PORT=8025
-MAILPIT_WEBROOT=/wp-dev-mail
-REDIS_PASSWORD=$REDIS_PASSWORD
-EOF
-chmod 600 /srv/wp-dev/.env
-mkdir -p /srv/wp-dev/projects/primary/wp-content/plugins /srv/wp-dev/backups/{db,files} /srv/wp-dev/.spawnwp
-python3 /srv/wp-dev/scripts/blueprint.py resolve development --output /srv/wp-dev/.spawnwp/blueprint.json >/dev/null
-chown -R 33:33 /srv/wp-dev/projects/primary/wp-content
+mkdir -p /srv/wp-dev/.spawnwp
+touch /srv/wp-dev/.spawnwp/template-only
 
 log "Configuring TLS and nginx"
 install -d -m 0755 /var/www/letsencrypt /etc/nginx/snippets
@@ -243,14 +214,7 @@ install -m 0644 "$(src installer wp-cockpit.service)" /etc/systemd/system/wp-coc
 install -m 0644 "$(src installer docker-prune.service)" "$(src installer docker-prune.timer)" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now wp-cockpit docker-prune.timer
-
-log "Starting the primary WordPress development environment"
-(cd /srv/wp-dev && docker compose build --pull php && docker compose up -d php)
-for _ in $(seq 1 60); do
-  [ "$(docker inspect -f '{{.State.Health.Status}}' wp-dev-php-1 2>/dev/null || true)" = healthy ] && break
-  sleep 3
-done
-(cd /srv/wp-dev && docker compose up -d && make bootstrap && bash scripts/apply-blueprint.sh .spawnwp/blueprint.json)
+echo "Cockpit authentication is ready. The one-time activation procedure and code are shown in the final report below."
 
 printf '{"telemetry":false}\n' > /var/lib/spawnwp/features.json
 if [ "$ENABLE_TELEMETRY" = 1 ]; then
@@ -282,10 +246,9 @@ COCKPIT FIRST-TIME ACTIVATION
 5. Create a passkey when prompted by the browser.
 6. Save the ten recovery codes shown at the end.
 
-WordPress admin (primary environment)
-  URL: https://$DOMAIN/wp-admin/
-  user: $WP_ADMIN_USER
-  pass: $WP_ADMIN_PASS
+No WordPress environment was created automatically.
+After cockpit activation, create the first environment from the dashboard and
+choose the blueprint you want.
 
 This root-only report is stored at:
   $REPORT

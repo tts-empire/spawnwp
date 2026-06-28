@@ -6,6 +6,13 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.6
+
+- Fresh installations now start with an empty cockpit instead of automatically
+  building a `wp-dev` WordPress environment with the Development blueprint.
+- The installer now reaches the activation report immediately after control-plane
+  setup and explicitly introduces the one-time cockpit authentication flow.
+
 ## 0.3.5
 
 - Replaced the installer domain regular expression with label-by-label validation
@@ -103,7 +110,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/tts-empire/spawnwp/compare/v0.3.3...v0.3.4
 [0.2.2]: https://github.com/tts-empire/spawnwp/compare/v0.2.1...v0.2.2

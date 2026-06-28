@@ -26,7 +26,7 @@ normally handles this for you.
 
 ## A new site came up on an old WordPress version
 
-spawnwp always rebuilds the PHP image with `--pull` when spawning, so new sites get the
+SpawnWP always rebuilds the PHP image with `--pull` when spawning, so new sites get the
 latest WordPress. If you created sites with an older build, update in place:
 
 ```bash
@@ -37,7 +37,7 @@ docker compose exec -u www-data php wp theme update --all
 
 ## `/<site>/wp-admin` redirects to the main site
 
-Always use the trailing slash: `/<site>/wp-admin/`. spawnwp's nginx already rewrites the
+Always use the trailing slash: `/<site>/wp-admin/`. SpawnWP's nginx already rewrites the
 no-slash form, but if you customized the vhost, ensure the per-site `proxy_redirect` line
 is present.
 

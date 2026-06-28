@@ -29,7 +29,7 @@ Open **Deploy**, select a blueprint from the catalog, enter a name (lowercase le
 digits, hyphens), choose an allowed PHP version, then click **Create site**. Development
 is the default. See [Blueprints](blueprints.md) for the Clean, Demo and custom profiles.
 The page shows the resolved destination and streams creation output without reloading.
-spawnwp will:
+SpawnWP will:
 
 - allocate free internal ports,
 - write the site's config and a fresh `.env` with random secrets,

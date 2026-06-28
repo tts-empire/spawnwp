@@ -1,6 +1,6 @@
 # Installation
 
-With your [two hostnames pointing at the VPS](dns-setup.md), install spawnwp with a
+With your [two hostnames pointing at the VPS](dns-setup.md), install SpawnWP with a
 single command, run as **root**. The installer is meant to get you out of SSH and
 into the cockpit as quickly as possible.
 
@@ -131,7 +131,7 @@ after 90 days.
 
 ## Re-running / forcing
 
-The installer refuses to run if spawnwp is already installed, to avoid clobbering data.
+The installer refuses to run if SpawnWP is already installed, to avoid clobbering data.
 To reinstall from scratch, pass `--force` (this is destructive):
 
 ```bash

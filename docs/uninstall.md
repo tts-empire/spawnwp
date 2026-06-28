@@ -1,6 +1,6 @@
 # Uninstall
 
-spawnwp installs into `/srv`, the host nginx config and systemd. To remove it, work from
+SpawnWP installs into `/srv`, the host nginx config and systemd. To remove it, work from
 the outside in. **Back up anything you want to keep first** (snapshots,
 databases, `wp-content`).
 
@@ -35,7 +35,7 @@ systemctl daemon-reload
 
 ## 4. Remove nginx config
 
-Restore your own nginx `default` site (or remove spawnwp's server blocks for `DOMAIN` and
+Restore your own nginx `default` site (or remove SpawnWP's server blocks for `DOMAIN` and
 `COCKPIT_DOMAIN`), then:
 
 ```bash

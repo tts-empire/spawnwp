@@ -1,6 +1,6 @@
 # DNS setup
 
-spawnwp uses **two hostnames you choose**, both pointing at your VPS:
+SpawnWP uses **two hostnames you choose**, both pointing at your VPS:
 
 | Variable | Example | Serves |
 |---|---|---|
@@ -14,7 +14,7 @@ You can pick any names you control. Common patterns:
 - **Two unrelated names**, as long as both resolve to the same VPS.
 
 !!! warning "Both must resolve before you install"
-    During installation, spawnwp obtains a single Let's Encrypt certificate covering
+    During installation, SpawnWP obtains a single Let's Encrypt certificate covering
     **both** hostnames using HTTP validation on port 80. If either name does not yet
     point at the VPS, certificate issuance fails. Set up DNS first and let it propagate.
 

@@ -1,6 +1,6 @@
 # Operations
 
-Day-to-day running of a spawnwp host.
+Day-to-day running of a SpawnWP host.
 
 ## Where things live
 

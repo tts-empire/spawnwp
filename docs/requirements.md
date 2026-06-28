@@ -36,7 +36,7 @@ A cloud VPS (Hetzner, OCI, DigitalOcean, Vultr, …) is ideal. ARM instances wor
 
 ## Two hostnames
 
-spawnwp uses **two DNS names that you choose**, both pointing at the VPS:
+SpawnWP uses **two DNS names that you choose**, both pointing at the VPS:
 
 - one for your **WordPress content** (e.g. `dev.example.com`)
 - one for the **cockpit** and admin tools (e.g. `cockpit.example.com`)

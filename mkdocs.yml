@@ -1,11 +1,11 @@
-site_name: spawnwp
+site_name: SpawnWP
 site_description: >-
   Self-hosted WordPress lab that spawns isolated sites from
   a web cockpit — with a built-in WordPress.org QA toolchain. One curl | bash install.
 site_url: https://spawnwp.com/
 repo_url: https://github.com/tts-empire/spawnwp
 repo_name: tts-empire/spawnwp
-copyright: Copyright &copy; 2026 spawnwp contributors — MIT License
+copyright: Copyright &copy; 2026 SpawnWP contributors — MIT License
 
 theme:
   name: material

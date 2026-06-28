@@ -1,8 +1,8 @@
-# spawnwp
+# SpawnWP
 
 **A self-hosted WordPress lab for disposable dev environments.**
 
-spawnwp turns a fresh VPS into a WordPress lab for temporary, isolated and
+SpawnWP turns a fresh VPS into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
@@ -41,7 +41,7 @@ Query Monitor and Mailpit preinstalled.
 
 ## How it's laid out
 
-spawnwp uses **two hostnames** that you choose and point at your VPS:
+SpawnWP uses **two hostnames** that you choose and point at your VPS:
 
 | Hostname | Serves |
 |---|---|
@@ -66,7 +66,7 @@ The installer asks for the two hostnames and your Let's Encrypt email, then prin
 cockpit URL and login details.
 
 !!! note
-    spawnwp is built for test environments, demos and development labs. It is not
+    SpawnWP is built for test environments, demos and development labs. It is not
     managed hosting. See [Security](security.md) for the threat model and limits.
 
 ## License

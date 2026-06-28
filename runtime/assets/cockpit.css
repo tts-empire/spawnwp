@@ -165,6 +165,9 @@
   .deploy-form { display: grid; grid-template-columns: minmax(180px,1fr) minmax(140px,.45fr) auto; gap: 12px; align-items: end; }
   .deploy-form label > span,.deploy-summary > span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
   .deploy-form input,.deploy-form select { width: 100%; min-height: 38px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; }
+  .deploy-form .field-help { display:block; margin-top:6px; color:var(--muted); font-size:11px; line-height:1.35; text-transform:none; }
+  .deploy-form input.input-error { border-color:var(--red); }
+  .deploy-form .field-help.input-error { color:var(--red); }
   .deploy-summary { grid-column: 1 / -1; padding: 12px 0; border-top: 1px solid var(--border); }
   .deploy-form > button { grid-column: 1 / -1; }
   .deploy-summary strong { display: block; font-family: monospace; overflow-wrap: anywhere; }

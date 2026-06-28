@@ -26,7 +26,8 @@ updates every 30 seconds, and completed actions trigger an immediate refresh.
 ## Create a site
 
 Open **Deploy**, select a blueprint from the catalog, enter a name (lowercase letters,
-digits, hyphens), choose an allowed PHP version, then click **Create site**. Development
+digits and hyphens only; spaces are not valid in the generated URL), choose an allowed
+PHP version, then click **Create site**. Development
 is the default. See [Blueprints](blueprints.md) for the Clean, Demo and custom profiles.
 The page shows the resolved destination and streams creation output without reloading.
 SpawnWP will:

@@ -6,6 +6,13 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.7
+
+- Fixed first-environment creation by copying the packaged `env.example` template
+  to the new project's `.env.example` path.
+- Added explicit site-name guidance and inline validation for spaces and other URL-
+  unsafe characters on the Deploy page.
+
 ## 0.3.6
 
 - Fresh installations now start with an empty cockpit instead of automatically
@@ -110,7 +117,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/tts-empire/spawnwp/compare/v0.3.3...v0.3.4

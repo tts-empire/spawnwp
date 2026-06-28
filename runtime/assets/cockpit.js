@@ -36,6 +36,10 @@ function blockedIfBusy() {
 const newName = document.getElementById('new-name');
 if (newName) newName.addEventListener('input', e => {
   document.getElementById('name-preview').textContent = e.target.value || 'site-name';
+  e.target.classList.remove('input-error');
+  const help = document.getElementById('new-name-help');
+  help.classList.remove('input-error');
+  help.textContent = 'Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.';
 });
 
 async function loadBlueprints() {
@@ -576,10 +580,22 @@ function phpSwitch(project, version) {
 function createProject(e) {
   e.preventDefault();
   if (blockedIfBusy()) return;
-  const name = document.getElementById('new-name').value.trim();
+  const nameInput = document.getElementById('new-name');
+  const nameHelp = document.getElementById('new-name-help');
+  const name = nameInput.value.trim();
   const blueprint = document.getElementById('new-blueprint').value;
   const php_version = document.getElementById('new-php').value;
-  if (!name) return;
+  const validName = /^[a-z0-9][a-z0-9-]{0,30}$/.test(name);
+  nameInput.classList.toggle('input-error', !validName);
+  nameHelp.classList.toggle('input-error', !validName);
+  if (!validName) {
+    nameHelp.textContent = name.includes(' ')
+      ? 'Spaces are not allowed in site URLs. Use lowercase letters, numbers and hyphens, for example: primo-test.'
+      : 'Use lowercase letters, numbers and hyphens only. Start with a letter or number; maximum 31 characters.';
+    nameInput.focus();
+    return;
+  }
+  nameHelp.textContent = 'Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.';
   const btn = document.getElementById('btn-create');
   const result = document.getElementById('deploy-result');
   btn.disabled = true;

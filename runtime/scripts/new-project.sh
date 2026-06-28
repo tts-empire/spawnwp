@@ -130,7 +130,7 @@ ADMINER_PORT=${ADMINER_PORT}
 REDIS_PASSWORD=${REDIS_PASS}
 EOF
 
-cp .env.example "${PROJ_DIR}/.env.example"
+cp env.example "${PROJ_DIR}/.env.example"
 cp gitignore.template "${PROJ_DIR}/.gitignore"
 
 # Add Nginx location blocks using Python (handles multiline safely).

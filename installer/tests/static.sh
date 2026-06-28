@@ -26,3 +26,5 @@ if grep -Eq 'docker compose (build|up)|make bootstrap|apply-blueprint\.sh' "$ROO
   echo "installer must not create or bootstrap a WordPress environment" >&2
   exit 1
 fi
+grep -q 'cp env.example "${PROJ_DIR}/.env.example"' "$ROOT/runtime/scripts/new-project.sh"
+grep -q 'Spaces are not allowed in site URLs' "$ROOT/runtime/assets/cockpit.js"

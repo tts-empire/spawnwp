@@ -15,7 +15,7 @@
 
 ## 0.3.0
 
-- Removed HTTP Basic Auth while retaining optional, default-on port-knocking.
+- Removed HTTP Basic Auth while retaining mandatory application authentication.
 - Made SpawnWP passkey or password + TOTP authentication the sole cockpit login.
 - Clarified first enrollment with explicit steps, authenticator examples and copyable
   TOTP/recovery material.
@@ -51,7 +51,7 @@ All notable changes to this project are documented here. The format is based on
   provisioning and a root-only credentials report.
 - Mandatory passkey login with password + TOTP fallback, recovery codes, server-side
   sessions, CSRF protection and root recovery.
-- Optional port knocking and separate 90-day telemetry consent.
+- Separate, optional 90-day telemetry consent.
 
 ## [0.1.1] — 2026-06-27
 
@@ -71,13 +71,13 @@ First public release.
 - Initial public documentation (MkDocs + Material).
 - Web cockpit: spawn, start/stop/restart, snapshot/restore, destroy sites; live
   metrics; PHP-version switching; one-click Adminer and Mailpit.
-- Two-domain architecture: WordPress content on `DOMAIN`, knock-protected cockpit and
+- Two-domain architecture: WordPress content on `DOMAIN`, authenticated cockpit and
   admin tools on `COCKPIT_DOMAIN`, on a single SAN TLS certificate.
 - Built-in WordPress.org QA toolchain: Plugin Check, Theme Check, PHP_CodeSniffer
   (WPCS) + PHPCompatibilityWP, PHPStan + WP stubs, Query Monitor, WP Crontrol, User
   Switching; per-site Mailpit.
-- Security defaults: port-knocking with sliding sessions, HTTP Basic Auth, automatic
-  HTTPS, dropped Linux capabilities, no Docker socket exposure, loopback-only service
+- Security defaults: automatic HTTPS, dropped Linux capabilities, no Docker socket
+  exposure, loopback-only service
   ports, per-install random secrets.
 
 [Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.2.2...HEAD

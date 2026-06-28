@@ -34,7 +34,6 @@ PHPStan, Query Monitor, Mailpit and more, preinstalled.
 
 The cockpit lives on its own subdomain and is protected by HTTPS plus mandatory
 application authentication: passkey preferred, or password with TOTP and recovery codes.
-The installer also offers a strongly recommended port-knocking layer, enabled by default.
 
 ## Highlights
 
@@ -42,14 +41,13 @@ The installer also offers a strongly recommended port-knocking layer, enabled by
 - **Web cockpit first** — create environments, start/stop, snapshot, restore and
   destroy without memorizing commands.
 - **Two-domain design** — your content domain stays pure WordPress; all admin tooling
-  lives on a separate, application-authenticated cockpit subdomain, optionally hidden
-  behind port-knocking.
+  lives on a separate, application-authenticated cockpit subdomain.
 - **WordPress.org QA built in** — the exact checks the .org review runs, in-browser
   and on the CLI.
 - **Secure by default** — random per-install secrets, dropped Linux capabilities,
   no Docker socket exposure, loopback-only service ports, automatic TLS.
 - **Portable** — Ubuntu 22.04/24.04 and Debian 12/13, amd64 and arm64; web traffic uses
-  ports 80/443, plus three generated TCP knock ports when port-knocking is enabled.
+  ports 80/443.
 - **Not managed hosting** — built for test environments, demos and development
   labs, not production hosting or client control panels.
 
@@ -72,8 +70,7 @@ curl -fsSL https://spawnwp.com/install.sh \
 ```
 
 When it finishes, the installer prints (and saves to `/root/spawnwp-credentials.txt`)
-your URLs, the one-time cockpit activation code, the WordPress admin login and, when
-enabled, the generated knock sequence.
+your URLs, the one-time cockpit activation code and the WordPress admin login.
 
 Then the workflow is:
 
@@ -91,7 +88,7 @@ Then the workflow is:
 | [Requirements](docs/requirements.md) | What you need before installing |
 | [DNS setup](docs/dns-setup.md) | Point your two hostnames at the VPS |
 | [Installation](docs/installation.md) | The one-liner, explained |
-| [Accessing the cockpit](docs/accessing-the-cockpit.md) | Port-knocking, passkeys, TOTP and recovery access |
+| [Accessing the cockpit](docs/accessing-the-cockpit.md) | Passkeys, TOTP and recovery access |
 | [Using the cockpit](docs/using-the-cockpit.md) | Create, reset and destroy environments |
 | [WordPress development](docs/wordpress-development.md) | Plugins, themes, QA tools |
 | [Architecture](docs/architecture.md) · [Security](docs/security.md) | How it works & threat model |

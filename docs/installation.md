@@ -17,7 +17,6 @@ The installer prompts for the values it needs:
 | `DOMAIN` | yes | Hostname for your WordPress sites |
 | `COCKPIT_DOMAIN` | yes | Hostname for the cockpit + admin tools |
 | `EMAIL` | yes | Contact email for Let's Encrypt |
-| `ENABLE_PORT_KNOCKING` | no | `1` by default (recommended); explicitly set `0` to disable |
 | `ENABLE_TELEMETRY` | no | `0` (default) or explicit 90-day opt-in with `1` |
 
 For automated installs, pass the same values as environment variables:
@@ -44,10 +43,9 @@ curl -fsSL https://spawnwp.com/install.sh \
 3. Deploys the stack to `/srv` and the cockpit app, builds the WordPress/PHP image.
 4. Configures nginx for both hostnames and obtains a **single SAN TLS certificate**
    covering `DOMAIN` and `COCKPIT_DOMAIN`.
-5. Configures the optional, default-on port-knocking gate for the cockpit.
-6. Creates the application-auth database, encryption key and one-time activation code.
-7. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
-8. Prints a **credentials report**.
+5. Creates the application-auth database, encryption key and one-time activation code.
+6. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
+7. Prints a **credentials report**.
 
 It typically takes a few minutes (longer on the first image build).
 
@@ -55,7 +53,7 @@ It typically takes a few minutes (longer on the first image build).
 
 After the installer finishes, normal work moves to the browser:
 
-1. Send the knock sequence when enabled, then open the cockpit URL from the report.
+1. Open the cockpit URL from the report.
 2. Enter the one-time activation code, choose an administrator password, register a passkey and
    scan the TOTP QR code.
 3. Store the ten single-use recovery codes shown once by the cockpit.
@@ -92,10 +90,6 @@ COCKPIT FIRST-TIME ACTIVATION
 WordPress admin (primary site)
   user: admin-xxxxxx
   pass: ••••••••••••••••
-
-Port-knocking: enabled
-  open sequence: 12345 23456 34567
-  command: ./clients/knock.sh cockpit.example.com 12345 23456 34567
 
 This root-only report is stored at:
   /root/spawnwp-credentials.txt

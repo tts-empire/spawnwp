@@ -25,13 +25,9 @@ A cloud VPS (Hetzner, OCI, DigitalOcean, Vultr, …) is ideal. ARM instances wor
 
 - **Ports 80 and 443** reachable from the internet (80 is required for Let's Encrypt
   validation and the HTTP→HTTPS redirect; 443 serves everything).
-- When port-knocking is enabled, three random TCP ports in the `20000–60000` range
-  must also reach the VPS. Their values are generated during installation.
 !!! note "Cloud firewalls"
     If your provider has a cloud-level firewall (e.g. AWS Security Groups, OCI
     Security Lists or Hetzner Cloud Firewall), allow inbound TCP **80** and **443**.
-    For port-knocking, add the three generated ports after installation and restrict
-    them to trusted source IPs when practical.
     Do not expose Docker, database, Adminer or Mailpit container ports.
 
 ## Two hostnames

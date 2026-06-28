@@ -9,13 +9,13 @@ seven-day rollback. The plugin is a public preview and is not installed by defau
 
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
-application authentication. Optional port-knocking hides the cockpit network surface.
+application authentication.
 
 ## Access model
 
 | Surface | Protection |
 |---|---|
-| Cockpit | Port-knock when enabled, HTTPS, mandatory SpawnWP session, CSRF and rate limiting |
+| Cockpit | HTTPS, mandatory SpawnWP session, CSRF and rate limiting |
 | Adminer / Mailpit | HTTPS plus Nginx `auth_request` to the SpawnWP session |
 | WordPress sites | Public HTTPS, with normal WordPress authentication for `/wp-admin` |
 | Databases and container services | Bound to loopback or private Docker networks |
@@ -28,14 +28,9 @@ Nginx rate-limits enrollment and login ceremonies before requests reach the appl
 The application applies its own per-source attempt limits, challenge expiry, replay
 protection and audit logging.
 
-Port-knocking is strongly recommended and enabled by default. It uses a random sequence
-per installation and a sliding 30-minute source-IP allow-list. It reduces exposure to
-internet scanners but does not replace HTTPS or application authentication.
-
 ## Host and container boundaries
 
-- TCP ports 80 and 443 need public ingress. When port-knocking is enabled, the three
-  generated TCP knock ports must also reach the host.
+- TCP ports 80 and 443 need public ingress.
 - nginx terminates TLS and proxies to loopback-bound services.
 - Adminer, Mailpit, databases and PHP services are not public network endpoints.
 - Containers do not receive the Docker socket.

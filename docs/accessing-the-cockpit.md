@@ -1,38 +1,20 @@
 # Accessing the cockpit
 
 The cockpit is served over HTTPS at the `COCKPIT_DOMAIN` chosen during installation.
-Port-knocking is optional, strongly recommended and enabled by default. When enabled,
-send the generated sequence before opening the cockpit; every cockpit page, API and
-attached admin tool also requires a valid SpawnWP session.
+Every cockpit page, API and attached admin tool requires a valid SpawnWP session.
 
 ```mermaid
 flowchart LR
-    A[Port-knock<br/>when enabled] --> B[HTTPS]
-    B --> C[SpawnWP login]
+    A[HTTPS] --> C[SpawnWP login]
     C --> D[Passkey]
     C --> E[Password + TOTP]
     D --> F[Cockpit]
     E --> F
 ```
 
-## Port-knocking
-
-The credentials report contains three random TCP ports. Send them in order within ten
-seconds; refused connections are expected because no application listens on these ports.
-
-```bash
-./clients/knock.sh cockpit.example.com <p1> <p2> <p3>
-```
-
-The source IP remains allowed while the cockpit is active and expires after 30 minutes
-of inactivity. Send the ports in reverse order to close access immediately. Provider
-firewalls must allow the three generated ports to reach `knockd`, preferably restricted
-to trusted source IPs. If knocking was disabled during installation, open the cockpit
-URL directly.
-
 ## First enrollment
 
-After knocking when required, open the cockpit URL and use the one-time activation code from
+Open the cockpit URL and use the one-time activation code from
 `/root/spawnwp-credentials.txt`. The code expires after 24 hours and is consumed by a
 successful enrollment.
 
@@ -75,6 +57,5 @@ creates a new one-time activation code.
 - **TOTP rejected:** verify that the phone and server clocks are synchronized.
 - **Recovery code rejected:** recovery codes are single-use. Try an unused code.
 - **Too many attempts:** wait for the rate-limit window before retrying.
-- **Cockpit returns 403:** verify the knock order, current source IP and provider firewall.
 
 Next: [Using the cockpit](using-the-cockpit.md).

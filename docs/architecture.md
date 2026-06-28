@@ -15,7 +15,7 @@ flowchart TB
     subgraph edge[Host nginx · TLS edge · ports 80/443]
         direction TB
         develVH[server_name DOMAIN<br/>public HTTPS]
-        cockpitVH[server_name COCKPIT_DOMAIN<br/>port-knock + SpawnWP auth + HTTPS]
+        cockpitVH[server_name COCKPIT_DOMAIN<br/>SpawnWP auth + HTTPS]
     end
     user -->|https| develVH
     user -->|https| cockpitVH

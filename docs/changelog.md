@@ -6,6 +6,11 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.8
+
+- Removed the stale `cockpit-allowed.conf` include from per-environment Adminer and
+  Mailpit routes generated during deployment.
+
 ## 0.3.7
 
 - Fixed first-environment creation by copying the packaged `env.example` template
@@ -117,7 +122,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/tts-empire/spawnwp/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...v0.3.5

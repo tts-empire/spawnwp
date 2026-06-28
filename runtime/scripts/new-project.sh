@@ -135,8 +135,8 @@ cp gitignore.template "${PROJ_DIR}/.gitignore"
 
 # Add Nginx location blocks using Python (handles multiline safely).
 # Two server blocks now: the WordPress site goes on the devel vhost; Adminer +
-# Mailpit go on the cockpit subdomain vhost (knock- and session-protected, same origin as the
-# dashboard so the Adminer auto-login stays same-origin).
+# Mailpit go on the cockpit subdomain vhost (session-protected and same-origin as
+# the dashboard so the Adminer auto-login stays same-origin).
 python3 - <<PYEOF
 conf_path = "${NGINX_CONF}"
 with open(conf_path) as f:
@@ -176,14 +176,12 @@ conf = conf.replace("    location @wp_down {", wp_block + "    location @wp_down
 admin_block = """    # >>> SPAWNWP ADMIN ${NAME}
     # ── ${NAME} admin ──
     location /${NAME}-db/ {
-        include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
         error_page 401 = @spawnwp_login;
         proxy_pass http://127.0.0.1:${ADMINER_PORT}/;
         add_header Cache-Control "no-store" always;
     }
     location /${NAME}-mail/ {
-        include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
         error_page 401 = @spawnwp_login;
         include /etc/nginx/snippets/spawnwp-proxy.conf;

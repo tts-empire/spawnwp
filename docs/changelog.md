@@ -6,6 +6,18 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.4
+
+- Restored the missing runtime Nginx default server config so new environments can
+  start cleanly.
+- Accepted Ubuntu 26.04 in the installer compatibility check.
+- Installer reruns now reset any previous SpawnWP footprint before provisioning,
+  so partial attempts no longer leak state into the next bootstrap.
+- The installer restores missing Let’s Encrypt Nginx support files when certbot
+  leaves them absent on a reused host.
+- Aligned the public requirements, README and website copy with the updated support
+  matrix.
+
 ## 0.3.2
 
 - Added the refreshed public website with an accessible cockpit screenshot slider.
@@ -86,7 +98,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/tts-empire/spawnwp/compare/v0.3.3...v0.3.4
 [0.2.2]: https://github.com/tts-empire/spawnwp/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tts-empire/spawnwp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tts-empire/spawnwp/compare/v0.1.1...v0.2.0

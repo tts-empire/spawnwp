@@ -12,7 +12,7 @@ main interface.
 
 | | |
 |---|---|
-| **OS** | Ubuntu 22.04 / 24.04, or Debian 12 / 13 |
+| **OS** | Ubuntu 22.04 / 24.04 / 26.04, or Debian 12 / 13 |
 | **Architecture** | amd64 or arm64 |
 | **Access** | root (or sudo) |
 | **RAM** | 2 GB minimum; 4 GB+ recommended if you run several sites |

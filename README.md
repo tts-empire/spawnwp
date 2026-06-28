@@ -46,7 +46,7 @@ application authentication: passkey preferred, or password with TOTP and recover
   and on the CLI.
 - **Secure by default** — random per-install secrets, dropped Linux capabilities,
   no Docker socket exposure, loopback-only service ports, automatic TLS.
-- **Portable** — Ubuntu 22.04/24.04 and Debian 12/13, amd64 and arm64; web traffic uses
+- **Portable** — Ubuntu 22.04/24.04/26.04 and Debian 12/13, amd64 and arm64; web traffic uses
   ports 80/443.
 - **Not managed hosting** — built for test environments, demos and development
   labs, not production hosting or client control panels.

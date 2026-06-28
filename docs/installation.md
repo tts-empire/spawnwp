@@ -125,11 +125,13 @@ after 90 days.
 
 ## Re-running / forcing
 
-The installer refuses to run if SpawnWP is already installed, to avoid clobbering data.
-To reinstall from scratch, pass `--force` (this is destructive):
+The installer resets any previous SpawnWP footprint before provisioning, so reruns
+start clean and do not depend on leftover state from an earlier partial attempt.
+`--force` is still accepted for compatibility, but it is no longer required for a
+fresh reinstall:
 
 ```bash
-… bash -s -- --force
+… bash
 ```
 
 ## Next

@@ -10,7 +10,7 @@ services:
     volumes:
       - wp_data:/var/www/html:ro
       - ./projects/primary/wp-content:/var/www/html/wp-content
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx:/etc/nginx/conf.d:ro
     depends_on:
       php:
         condition: service_healthy

@@ -14,6 +14,7 @@
     "compose.yaml",
     "env.example",
     "gitignore.template",
+    "docker/nginx/default.conf",
     "blueprints/clean.json",
     "blueprints/demo.json",
     "blueprints/development.json",

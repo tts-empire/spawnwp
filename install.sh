@@ -43,11 +43,21 @@ render() {
 }
 
 [ "$(id -u)" = 0 ] || die "Run the installer as root (sudo bash)."
-[ ! -e "$MARKER" ] || [ "$FORCE" = 1 ] || die "SpawnWP is already installed. Use --force only for a destructive reinstall."
 . /etc/os-release
 [[ "$ID" =~ ^(ubuntu|debian)$ ]] || die "Supported OS: Ubuntu or Debian"
-case "$ID:$VERSION_ID" in ubuntu:22.04|ubuntu:24.04|debian:12|debian:13) ;; *) die "Unsupported release: $PRETTY_NAME" ;; esac
+case "$ID:$VERSION_ID" in ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debian:13) ;; *) die "Unsupported release: $PRETTY_NAME" ;; esac
 [[ "$(dpkg --print-architecture)" =~ ^(amd64|arm64)$ ]] || die "Supported architectures: amd64 or arm64"
+
+cleanup_previous_install() {
+  if [ -f /srv/wp-dev/compose.yaml ] || [ -d /srv/wp-cockpit ] || [ -d /etc/spawnwp ] || [ -d /var/lib/spawnwp ] || [ -d /opt/spawnwp ]; then
+    log "Resetting any previous SpawnWP footprint"
+    [ ! -f /srv/wp-dev/compose.yaml ] || (cd /srv/wp-dev && docker compose down -v --remove-orphans) || true
+    systemctl disable --now wp-cockpit spawnwp-telemetry.timer 2>/dev/null || true
+    rm -rf /srv/wp-dev /srv/wp-cockpit /etc/spawnwp /var/lib/spawnwp /opt/spawnwp
+  fi
+}
+
+cleanup_previous_install
 
 prompt DOMAIN "WordPress sites hostname"
 prompt COCKPIT_DOMAIN "Cockpit hostname"
@@ -64,18 +74,19 @@ for host in "$DOMAIN" "$COCKPIT_DOMAIN"; do
   getent ahosts "$host" >/dev/null || die "$host does not resolve yet. Configure DNS before installing."
 done
 
-if [ "$FORCE" = 1 ]; then
-  log "Removing the previous SpawnWP control plane"
-  [ ! -f /srv/wp-dev/compose.yaml ] || (cd /srv/wp-dev && docker compose down -v --remove-orphans) || true
-  systemctl disable --now wp-cockpit spawnwp-telemetry.timer 2>/dev/null || true
-  rm -rf /srv/wp-dev /srv/wp-cockpit /etc/spawnwp /var/lib/spawnwp /opt/spawnwp
-fi
-
 log "Installing host prerequisites"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y ca-certificates curl gnupg jq openssl nginx certbot python3-certbot-nginx \
   python3 python3-venv python3-pip rsync unzip git cron iproute2
+ensure_certbot_nginx_defaults() {
+  [ -f /etc/letsencrypt/options-ssl-nginx.conf ] || install -D -m 0644 \
+    /usr/lib/python3/dist-packages/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
+    /etc/letsencrypt/options-ssl-nginx.conf
+  [ -f /etc/letsencrypt/ssl-dhparams.pem ] || install -D -m 0644 \
+    /usr/lib/python3/dist-packages/certbot/ssl-dhparams.pem \
+    /etc/letsencrypt/ssl-dhparams.pem
+}
 if ! command -v docker >/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL "https://download.docker.com/linux/$ID/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -85,6 +96,7 @@ if ! command -v docker >/dev/null; then
   apt-get update -qq
   apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
+ensure_certbot_nginx_defaults
 systemctl enable --now docker nginx
 
 WORK=$(mktemp -d)
@@ -202,6 +214,7 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 certbot certonly --webroot -w /var/www/letsencrypt --non-interactive --agree-tos \
   --email "$EMAIL" --cert-name "$DOMAIN" -d "$DOMAIN" -d "$COCKPIT_DOMAIN"
+ensure_certbot_nginx_defaults
 
 render "$(src installer nginx.conf.tpl)" /etc/nginx/sites-available/spawnwp
 nginx -t && systemctl reload nginx

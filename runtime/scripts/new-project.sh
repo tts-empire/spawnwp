@@ -18,6 +18,9 @@ fi
 
 PROJ_DIR="/srv/${NAME}"
 NGINX_CONF="/etc/nginx/sites-available/spawnwp"
+if [ ! -e /etc/nginx/sites-enabled/spawnwp ] && [ -e /etc/nginx/sites-enabled/default ]; then
+  NGINX_CONF=$(readlink -f /etc/nginx/sites-enabled/default)
+fi
 
 RESOLVE_ARGS=(resolve "$BLUEPRINT" --output /tmp/spawnwp-blueprint-$$.json --shell)
 if [ -n "$PHP_OVERRIDE" ]; then
@@ -132,7 +135,7 @@ cp gitignore.template "${PROJ_DIR}/.gitignore"
 
 # Add Nginx location blocks using Python (handles multiline safely).
 # Two server blocks now: the WordPress site goes on the devel vhost; Adminer +
-# Mailpit go on the cockpit subdomain vhost (knock-protected, same origin as the
+# Mailpit go on the cockpit subdomain vhost (knock- and session-protected, same origin as the
 # dashboard so the Adminer auto-login stays same-origin).
 python3 - <<PYEOF
 conf_path = "${NGINX_CONF}"
@@ -142,10 +145,8 @@ with open(conf_path) as f:
 # WordPress site → devel vhost (before @wp_down)
 wp_block = """
     # >>> SPAWNWP SITE ${NAME}
-    # SpawnWP Deploy transport. Basic Auth is disabled only for this namespace;
-    # the plugin authenticates requests with signed keys, timestamps and nonces.
+    # The deploy plugin authenticates requests with signed keys, timestamps and nonces.
     location /${NAME}/wp-json/spawnwp-deploy/v1/ {
-        auth_basic off;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/wp-json/spawnwp-deploy/v1/;
@@ -177,14 +178,14 @@ admin_block = """    # >>> SPAWNWP ADMIN ${NAME}
     location /${NAME}-db/ {
         include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
-        error_page 401 =303 /login;
+        error_page 401 = @spawnwp_login;
         proxy_pass http://127.0.0.1:${ADMINER_PORT}/;
         add_header Cache-Control "no-store" always;
     }
     location /${NAME}-mail/ {
         include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
-        error_page 401 =303 /login;
+        error_page 401 = @spawnwp_login;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_pass http://127.0.0.1:${MAILPIT_PORT};
         add_header Cache-Control "no-store" always;

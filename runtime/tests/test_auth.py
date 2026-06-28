@@ -97,6 +97,16 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(client.get("/api/projects").status_code, 401)
             self.assertEqual(client.get("/api/version").status_code, 200)
 
+    def test_enrollment_page_explains_authenticator_and_recovery(self):
+        page = self.auth.LOGIN_HTML
+        self.assertIn("Step 1 of 3", page)
+        self.assertIn("One-time activation code", page)
+        self.assertNotIn("fallback password", page.lower())
+        self.assertIn("any TOTP authenticator", page)
+        self.assertIn("Google Authenticator", page)
+        self.assertIn("Verify code and create passkey", page)
+        self.assertIn("Copy all recovery codes", page)
+
 
 if __name__ == "__main__":
     unittest.main()

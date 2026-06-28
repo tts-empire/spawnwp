@@ -53,24 +53,21 @@ async def application_authentication(request: Request, call_next):
         response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'")
     return response
 
-# ── Sliding-window session keep-alive ───────────────────────────────────────────
-# The port-knock authorizes the IP; the reaper (cockpit-reaper.timer) revokes it
-# after 30 min of inactivity. Every request refreshes the session file timestamp
-# so, as long as the cockpit tab is open (auto-refresh every 30s), the IP stays
-# authorized. We only touch files that already exist (sessions opened by a knock).
+# Keep an existing port-knock allow-list entry alive while the cockpit is in use.
+# This is a no-op when port-knocking is disabled or the source IP has not knocked.
 SESSIONS_DIR = Path("/run/cockpit-sessions")
 
 @app.middleware("http")
-async def keepalive_session(request: Request, call_next):
+async def keepalive_knock_session(request: Request, call_next):
     ip = request.headers.get("x-real-ip")
     if not ip:
-        fwd = request.headers.get("x-forwarded-for", "")
-        ip = fwd.split(",")[0].strip() if fwd else None
+        forwarded = request.headers.get("x-forwarded-for", "")
+        ip = forwarded.split(",")[0].strip() if forwarded else None
     if ip:
         try:
-            f = SESSIONS_DIR / ip
-            if f.exists():
-                f.touch()
+            session = SESSIONS_DIR / ip
+            if session.exists():
+                session.touch()
         except OSError:
             pass
     return await call_next(request)
@@ -581,7 +578,7 @@ def db_info(project: str):
 @app.get("/api/db/{project}/secret")
 def db_secret(project: str):
     """Project DB password (for the 'copy' button → Adminer login).
-    Behind the 3 layers (knock+BasicAuth+HTTPS); whoever reaches this endpoint
+    Behind HTTPS and the mandatory application login; whoever reaches this endpoint
     already has full control of the cockpit."""
     proj = resolve_project(project)
     env_file = proj / ".env"

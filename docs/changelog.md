@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Removed HTTP Basic Auth while retaining optional, default-on port-knocking.
+- Made SpawnWP passkey or password + TOTP authentication the sole cockpit login.
+- Clarified first enrollment with explicit steps, authenticator examples and copyable
+  TOTP/recovery material.
+- Replaced ambiguous fallback-password terminology and expanded the installer's
+  first-time activation instructions.
+- Added Nginx rate limiting to authentication ceremonies.
+- Added an idempotent host migration that validates Nginx before removing Basic Auth state.
+
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

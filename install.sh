@@ -52,12 +52,10 @@ case "$ID:$VERSION_ID" in ubuntu:22.04|ubuntu:24.04|debian:12|debian:13) ;; *) d
 prompt DOMAIN "WordPress sites hostname"
 prompt COCKPIT_DOMAIN "Cockpit hostname"
 prompt EMAIL "Let's Encrypt email"
-prompt BASIC_AUTH_USER "HTTP Basic Auth username" "admin"
 validate_domain "$DOMAIN" || die "Invalid DOMAIN"
 validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN"
 [ "$DOMAIN" != "$COCKPIT_DOMAIN" ] || die "DOMAIN and COCKPIT_DOMAIN must differ"
 [[ "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid EMAIL"
-[[ "$BASIC_AUTH_USER" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] || die "Invalid BASIC_AUTH_USER"
 confirm ENABLE_PORT_KNOCKING "Enable port-knocking? Strongly recommended." 1
 echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs."
 echo "Privacy notice: https://spawnwp.com/privacy/telemetry"
@@ -77,7 +75,7 @@ fi
 log "Installing host prerequisites"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y ca-certificates curl gnupg jq openssl nginx certbot python3-certbot-nginx apache2-utils \
+apt-get install -y ca-certificates curl gnupg jq openssl nginx certbot python3-certbot-nginx \
   python3 python3-venv python3-pip rsync unzip git cron iproute2
 if ! command -v docker >/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
@@ -157,7 +155,6 @@ echo "$VERSION" > /var/lib/spawnwp/VERSION
 python3 -m venv /srv/wp-cockpit/venv
 /srv/wp-cockpit/venv/bin/pip install --disable-pip-version-check -q -r /srv/wp-cockpit/requirements.txt
 
-BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-$(random_secret 28)}
 DB_PASS=$(random_secret 32); DB_ROOT_PASS=$(random_secret 32); WP_ADMIN_PASS=$(random_secret 32); REDIS_PASSWORD=$(random_secret 32)
 WP_ADMIN_USER="spawnwp-$(openssl rand -hex 3)"
 cat > /etc/spawnwp/config.env <<EOF
@@ -201,7 +198,6 @@ chown -R 33:33 /srv/wp-dev/projects/primary/wp-content
 log "Configuring TLS and nginx"
 install -d -m 0755 /var/www/letsencrypt /etc/nginx/snippets
 install -m 0644 "$(src installer spawnwp-proxy.conf)" /etc/nginx/snippets/spawnwp-proxy.conf
-htpasswd -bBc /etc/nginx/.spawnwp-htpasswd "$BASIC_AUTH_USER" "$BASIC_AUTH_PASSWORD" >/dev/null
 render "$(src installer nginx-http.conf.tpl)" /etc/nginx/sites-available/spawnwp
 ln -sfn /etc/nginx/sites-available/spawnwp /etc/nginx/sites-enabled/spawnwp
 rm -f /etc/nginx/sites-enabled/default
@@ -229,7 +225,6 @@ if [ "$ENABLE_PORT_KNOCKING" = 1 ]; then
     command = /usr/local/lib/spawnwp/knock-session close %IP%
     tcpflags = syn
 EOF
-  sed -i 's/^START_KNOCKD=.*/START_KNOCKD=1/' /etc/default/knockd 2>/dev/null || echo 'START_KNOCKD=1' > /etc/default/knockd
   interface=$(ip route show default | awk 'NR==1 {print $5}')
   printf 'START_KNOCKD=1\nKNOCKD_OPTS="-i %s"\n' "$interface" > /etc/default/knockd
   echo 'deny all;' > /etc/nginx/cockpit-allowed.conf
@@ -279,11 +274,19 @@ SpawnWP $VERSION - installation complete
 Sites: https://$DOMAIN/
 Cockpit: https://$COCKPIT_DOMAIN/
 
-HTTP Basic Auth
-  user: $BASIC_AUTH_USER
-  pass: $BASIC_AUTH_PASSWORD
+COCKPIT FIRST-TIME ACTIVATION
 
-Application setup code (expires in 24h): $APP_SETUP_CODE
+1. Open: https://$COCKPIT_DOMAIN/
+2. Enter this one-time activation code:
+
+   $APP_SETUP_CODE
+
+   Valid for 24 hours and usable once. This is not your password.
+
+3. Create the administrator username and password.
+4. Scan the QR code with a TOTP authenticator app.
+5. Create a passkey when prompted by the browser.
+6. Save the ten recovery codes shown at the end.
 
 WordPress admin (primary environment)
   URL: https://$DOMAIN/wp-admin/
@@ -297,11 +300,15 @@ if [ "$ENABLE_PORT_KNOCKING" = 1 ]; then
   open sequence: $KNOCK_OPEN
   command: ./clients/knock.sh $COCKPIT_DOMAIN $KNOCK_OPEN
 EOF
-else
-  cat >> "$REPORT" <<EOF
-  WARNING: the Basic Auth endpoint is publicly reachable. Application login remains mandatory.
-EOF
 fi
+cat >> "$REPORT" <<EOF
+
+This root-only report is stored at:
+  $REPORT
+
+Read it again with:
+  sudo cat $REPORT
+EOF
 chmod 600 "$REPORT"
 cat "$REPORT"
-echo "Next: knock if enabled, open the cockpit, pass Basic Auth, then complete passkey + TOTP setup."
+echo "Next: knock if enabled, then follow the COCKPIT FIRST-TIME ACTIVATION steps above."

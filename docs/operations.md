@@ -9,23 +9,19 @@ Day-to-day running of a spawnwp host.
 | `/srv/wp-dev/` | The primary site (and the stack template scripts) |
 | `/srv/<name>/` | Each spawned site (Compose project, `.env`, backups, `wp-content`) |
 | `/srv/wp-cockpit/` | The cockpit app |
-| `/etc/nginx/sites-available/default` | Both vhosts (content + cockpit) |
-| `/etc/knockd.conf`, `/etc/knockd/` | Port-knock daemon + scripts (only when enabled) |
+| `/etc/nginx/sites-available/spawnwp` | Both vhosts (content + cockpit) |
 | `/root/spawnwp-credentials.txt` | Your install secrets (`600`) |
 
 ## systemd services
 
 ```bash
 systemctl status wp-cockpit            # the dashboard app
-systemctl status knockd                # port-knock daemon, when enabled
-systemctl list-timers | grep -E 'cockpit-reaper|docker-prune'
+systemctl list-timers | grep docker-prune
 ```
 
 | Unit | Role |
 |---|---|
 | `wp-cockpit.service` | Runs the cockpit (uvicorn on `127.0.0.1:9393`) |
-| `knockd.service` | Listens for the knock sequence, when enabled |
-| `cockpit-reaper.timer` | Revokes idle knock sessions, when enabled |
 | `docker-prune.timer` | Weekly Docker build-cache prune (safe; never touches volumes) |
 
 ## Updating SpawnWP
@@ -91,8 +87,6 @@ cd /srv/<site> && make logs-wp
 # Cockpit app
 journalctl -u wp-cockpit -f
 
-# Knock events
-journalctl -t knockd
 ```
 
 ## Backups

@@ -17,14 +17,8 @@ The installer prompts for the values it needs:
 | `DOMAIN` | yes | Hostname for your WordPress sites |
 | `COCKPIT_DOMAIN` | yes | Hostname for the cockpit + admin tools |
 | `EMAIL` | yes | Contact email for Let's Encrypt |
-| `BASIC_AUTH_USER` | no | HTTP Basic Auth username (default: `admin`) |
-| `ENABLE_PORT_KNOCKING` | no | `1` (default, strongly recommended) or `0` |
+| `ENABLE_PORT_KNOCKING` | no | `1` by default (recommended); explicitly set `0` to disable |
 | `ENABLE_TELEMETRY` | no | `0` (default) or explicit 90-day opt-in with `1` |
-
-Interactive installs ask whether to enable port-knocking. Press **Enter** to accept the
-recommended default (`Y`). If you disable it, the cockpit remains protected by HTTPS
-and HTTP Basic Auth, but its login endpoint is publicly reachable and easier to scan or
-brute-force.
 
 For automated installs, pass the same values as environment variables:
 
@@ -44,15 +38,14 @@ curl -fsSL https://spawnwp.com/install.sh \
 ## What the installer does
 
 1. Detects the OS (Ubuntu/Debian) and installs prerequisites: Docker Engine + Compose,
-   nginx, certbot, supporting tools and, when selected, knockd.
+   nginx, certbot and supporting tools.
 2. Generates **fresh random secrets** for this install (databases, WordPress admin,
-   Basic Auth password if not provided, and, when enabled, the port-knock sequence).
+   WordPress and application authentication).
 3. Deploys the stack to `/srv` and the cockpit app, builds the WordPress/PHP image.
 4. Configures nginx for both hostnames and obtains a **single SAN TLS certificate**
    covering `DOMAIN` and `COCKPIT_DOMAIN`.
-5. When selected, sets up **port-knocking** (knockd) and its idle-session reaper. This
-   protection is enabled and strongly recommended by default.
-6. Creates the application-auth database, encryption key and expiring setup code.
+5. Configures the optional, default-on port-knocking gate for the cockpit.
+6. Creates the application-auth database, encryption key and one-time activation code.
 7. Provisions the **primary WordPress site**, including the dev toolkit and QA plugins.
 8. Prints a **credentials report**.
 
@@ -62,12 +55,11 @@ It typically takes a few minutes (longer on the first image build).
 
 After the installer finishes, normal work moves to the browser:
 
-1. Open the cockpit URL from the credentials report.
-2. Pass the outer HTTP Basic Auth prompt.
-3. Enter the one-time setup code, choose a fallback passphrase, register a passkey and
+1. Send the knock sequence when enabled, then open the cockpit URL from the report.
+2. Enter the one-time activation code, choose an administrator password, register a passkey and
    scan the TOTP QR code.
-4. Store the ten single-use recovery codes shown once by the cockpit.
-5. Click **Create site**.
+3. Store the ten single-use recovery codes shown once by the cockpit.
+4. Click **Create site**.
 
 You can still use the CLI when you want to, but it should not be required for the
 daily create/test/reset loop.
@@ -83,29 +75,39 @@ spawnwp — installation complete
 Sites:    https://dev.example.com/
 Cockpit:  https://cockpit.example.com/
 
-HTTP Basic Auth
-  user: admin
-  pass: ••••••••••••••••
+COCKPIT FIRST-TIME ACTIVATION
 
-Application setup code (expires in 24h): ••••••••••••••••
+1. Open: https://cockpit.example.com/
+2. Enter this one-time activation code:
+
+   ••••••••••••••••
+
+   Valid for 24 hours and usable once. This is not your password.
+
+3. Create the administrator username and password.
+4. Scan the QR code with a TOTP authenticator app.
+5. Create a passkey when prompted by the browser.
+6. Save the ten recovery codes shown at the end.
 
 WordPress admin (primary site)
   user: admin-xxxxxx
   pass: ••••••••••••••••
 
-Port-knock sequence (open):  <p1>, <p2>, <p3>
-  Open the cockpit with:
-    ./clients/knock.sh cockpit.example.com <p1> <p2> <p3>
+Port-knocking: enabled
+  open sequence: 12345 23456 34567
+  command: ./clients/knock.sh cockpit.example.com 12345 23456 34567
+
+This root-only report is stored at:
+  /root/spawnwp-credentials.txt
+
+Read it again with:
+  sudo cat /root/spawnwp-credentials.txt
 ```
 
-When port-knocking is disabled, the report instead states `Port-knocking: disabled`,
-prints a security warning, and gives the direct cockpit URL. No knock sequence or extra
-TCP ports are required in that mode.
-
 !!! danger "Save these now"
-    The secrets are shown once and are not recoverable elsewhere (only stored in the
-    `600`-mode file on the server). Copy them to your password manager. Never commit or
-    share the report or your `.env` files.
+    The report is root-readable with mode `600`; the activation code expires after 24
+    hours and is invalidated after use. Store credentials and recovery codes in your
+    password manager. Never commit or share the report or your `.env` files.
 
 ## Optional telemetry
 
@@ -134,4 +136,4 @@ To reinstall from scratch, pass `--force` (this is destructive):
 
 ## Next
 
-→ [Accessing the cockpit](accessing-the-cockpit.md) — knock when enabled, then log in.
+→ [Accessing the cockpit](accessing-the-cockpit.md) — enroll and log in securely.

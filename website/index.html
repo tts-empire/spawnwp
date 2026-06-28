@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpawnWP — Disposable WordPress labs on your VPS</title>
+  <meta name="description" content="SpawnWP turns a Debian or Ubuntu VPS into a self-hosted WordPress lab for isolated, disposable development environments.">
+  <link rel="canonical" href="https://spawnwp.com/">
+  <meta property="og:title" content="SpawnWP — Modular. Replicable. Self-hosted.">
+  <meta property="og:description" content="A self-hosted WordPress lab for disposable development environments.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://spawnwp.com/">
+  <meta property="og:image" content="https://spawnwp.com/assets/og-image.svg">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="SpawnWP home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span>Spawn<strong>WP</strong></span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/tts-empire/spawnwp">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="eyebrow">Self-hosted WordPress lab</div>
+      <h1>Modular.<br>Replicable.<br><em>Self-hosted.</em></h1>
+      <p class="lede">Turn a fresh VPS into a focused lab for temporary, isolated WordPress development environments. Your server, your data, your rules.</p>
+      <div class="actions">
+        <a class="button primary" href="#install">Install SpawnWP</a>
+        <a class="button secondary" href="/docs/">Read the docs</a>
+      </div>
+      <div class="terminal" aria-label="Installation command">
+        <span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code>
+      </div>
+    </section>
+
+    <section class="principles" aria-label="Product principles">
+      <article><span>01</span><h2>Disposable by design</h2><p>Create an environment for a task. Reset it, snapshot it or destroy it when the work is done.</p></article>
+      <article><span>02</span><h2>Self-hosted first</h2><p>Run on your own Debian or Ubuntu VPS without a hosted control plane or SaaS dependency.</p></article>
+      <article><span>03</span><h2>Simple operations</h2><p>Use the web cockpit for routine work and clear logs when you need to inspect the system.</p></article>
+    </section>
+
+    <section id="how" class="section split">
+      <div>
+        <div class="eyebrow">A short path to a clean lab</div>
+        <h2>From fresh VPS to WordPress environments.</h2>
+      </div>
+      <ol class="steps">
+        <li><span>1</span><div><h3>Point two hostnames</h3><p>One hostname serves WordPress sites; the other keeps the authenticated cockpit separate.</p></div></li>
+        <li><span>2</span><div><h3>Run one guided installer</h3><p>SpawnWP configures Docker, Nginx, TLS and the cockpit on supported Debian and Ubuntu systems.</p></div></li>
+        <li><span>3</span><div><h3>Spawn and discard</h3><p>Create isolated sites from the cockpit, work locally on the VPS, and remove them without keeping fragile shared state.</p></div></li>
+      </ol>
+    </section>
+
+    <section id="features" class="section">
+      <div class="eyebrow">Built for development work</div>
+      <h2>A small control plane with practical defaults.</h2>
+      <div class="feature-grid">
+        <article><div class="mini-mark">01</div><h3>Isolated stacks</h3><p>Each environment gets its own Nginx, PHP-FPM, MariaDB, Mailpit and Adminer containers.</p></article>
+        <article><div class="mini-mark">02</div><h3>Web cockpit</h3><p>Create, start, stop, restart, snapshot, restore and destroy environments from one focused interface.</p></article>
+        <article><div class="mini-mark">03</div><h3>WordPress QA</h3><p>The development blueprint includes Plugin Check, Theme Check, PHPCS, PHPStan and Query Monitor.</p></article>
+        <article><div class="mini-mark">04</div><h3>Secure defaults</h3><p>HTTPS, isolated admin tooling, random secrets, loopback-only service ports and optional port-knocking.</p></article>
+        <article><div class="mini-mark">05</div><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
+        <article><div class="mini-mark">06</div><h3>No SaaS lock-in</h3><p>The runtime lives on your VPS and the project is distributed under the MIT License.</p></article>
+      </div>
+    </section>
+
+    <section id="install" class="section install">
+      <div>
+        <div class="eyebrow">Get started</div>
+        <h2>Bring a fresh VPS and two hostnames.</h2>
+        <p>Supported on Ubuntu 22.04/24.04 and Debian 12/13, on amd64 or arm64. Review requirements and DNS setup before running the installer.</p>
+      </div>
+      <div>
+        <div class="terminal"><span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code></div>
+        <div class="actions"><a class="button primary" href="/docs/installation/">Installation guide</a><a class="button secondary" href="https://github.com/tts-empire/spawnwp">View source</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>Spawn<strong>WP</strong></span></a>
+    <p>Self-hosted tooling for disposable WordPress development environments.</p>
+    <div><a href="/docs/">Documentation</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a><a href="https://github.com/tts-empire/spawnwp/blob/main/LICENSE">MIT License</a></div>
+  </footer>
+</body>
+</html>

@@ -1,76 +1,53 @@
 # Security
 
-spawnwp is a **WordPress development lab** with sensible, layered defaults. This
-page describes the protection model and, just as importantly, its limits.
+SpawnWP is a self-hosted development lab, not a production hosting control panel. The
+security model keeps services private, encrypts browser traffic and requires strong
+application authentication. Optional port-knocking hides the cockpit network surface.
 
-## Access layers
+## Access model
 
 | Surface | Protection |
 |---|---|
-| `COCKPIT_DOMAIN` (default/recommended) | **Port-knock** → **HTTP Basic Auth** → **application login** → **HTTPS** |
-| `COCKPIT_DOMAIN` (knocking disabled) | **HTTP Basic Auth** → **application login** → **HTTPS** |
-| `DOMAIN` (WordPress sites) | **HTTP Basic Auth** → **HTTPS** |
+| Cockpit | Port-knock when enabled, HTTPS, mandatory SpawnWP session, CSRF and rate limiting |
+| Adminer / Mailpit | HTTPS plus Nginx `auth_request` to the SpawnWP session |
+| WordPress sites | Public HTTPS, with normal WordPress authentication for `/wp-admin` |
+| Databases and container services | Bound to loopback or private Docker networks |
 
-- **Port-knocking** keeps the admin surface dark: the cockpit returns `403` until your IP
-  sends the secret sequence ([details](accessing-the-cockpit.md)). The sequence is random
-  per install. Sessions slide for 30 minutes of inactivity, then a reaper revokes the IP.
-  It is optional in the installer, strongly recommended, and enabled by default.
-- **HTTP Basic Auth** guards both hostnames with a username and a random password.
-- **Application login** is mandatory for cockpit and admin tools. A user-verifying
-  passkey is preferred; fallback requires an Argon2id password plus TOTP or a single-use
-  recovery code. Sessions have 30-minute idle and 12-hour absolute limits.
-- **HTTPS** everywhere via Let's Encrypt; HTTP is redirected to HTTPS.
+The cockpit supports passkeys as the preferred login. Signing in without one requires a
+strong password plus TOTP or a single-use recovery code. Authentication state is server-side;
+credentials, TOTP secrets and recovery material are never stored in plaintext.
 
-## Container hardening
+Nginx rate-limits enrollment and login ceremonies before requests reach the application.
+The application applies its own per-source attempt limits, challenge expiry, replay
+protection and audit logging.
 
-Every container runs with:
+Port-knocking is strongly recommended and enabled by default. It uses a random sequence
+per installation and a sliding 30-minute source-IP allow-list. It reduces exposure to
+internet scanners but does not replace HTTPS or application authentication.
 
-- `cap_drop: ALL`, adding back only the few capabilities each service needs,
-- `security_opt: no-new-privileges`,
-- **no** privileged mode,
-- **no** Docker socket mounted (the cockpit shells out to `docker compose` on the host,
-  never inside a container),
-- resource limits (CPU/memory) per service.
+## Host and container boundaries
 
-All service ports (PHP-FPM, MariaDB, Mailpit, Adminer, Redis, the cockpit app) bind to
-**127.0.0.1 only**. The host nginx is the single public web entry point on 80/443.
-When enabled, `knockd` also observes the three generated TCP knock ports, where no
-application service is listening.
+- TCP ports 80 and 443 need public ingress. When port-knocking is enabled, the three
+  generated TCP knock ports must also reach the host.
+- nginx terminates TLS and proxies to loopback-bound services.
+- Adminer, Mailpit, databases and PHP services are not public network endpoints.
+- Containers do not receive the Docker socket.
+- Generated database and WordPress credentials are unique per environment.
+- Cockpit destructive actions require recent authentication.
 
-## Secrets
+The cockpit service runs as root because it orchestrates host Docker and Nginx state.
+This makes cockpit compromise equivalent to host compromise: keep SpawnWP updated,
+protect the administrator factors and do not install it on a server containing unrelated
+production workloads.
 
-- All secrets are **generated fresh per install**: database passwords, the WordPress
-  admin password, the Basic Auth password (unless you supply a username), and the knock
-  sequence.
-- They are shown once in the install report and saved to `/root/spawnwp-credentials.txt`
-  (mode `600`).
-- Per-site secrets live in each site's `.env`, which is git-ignored and never leaves the
-  server.
-- The WordPress admin username is randomized (e.g. `admin-1a2b3c`), not the predictable
-  `admin`.
+## Operational requirements
 
-## WordPress hardening
+- Keep automatic OS security updates enabled or patch the host regularly.
+- Keep the provider firewall limited to 80, 443 and administrative SSH sources.
+- Store recovery codes and the credentials report in a password manager.
+- Remove expired or revoked access credentials promptly.
+- Review authentication audit events after unexpected login failures.
 
-- `DISALLOW_FILE_EDIT` is enabled (no in-dashboard file editor).
-- The default `akismet` and `hello` plugins are removed on every site.
-- Xdebug is **off** by default.
-
-## What spawnwp is — and is not
-
-!!! warning "Intended use"
-    spawnwp is built for **test environments, demos and development labs** run by a
-    trusted operator (you). It is a way to create disposable WordPress environments
-    on your own VPS without turning that VPS into a managed hosting platform.
-
-!!! danger "Not a hardened multi-tenant production host"
-    It is **not** designed to host untrusted users or production traffic at scale.
-    Notably: all sites on a server share the host and the same Basic Auth realm; the
-    cockpit operator has full control of every site; and WordPress/PHP run with broad
-    in-container permissions suitable for development. If you put real production sites
-    here, treat the whole VPS as a single trust boundary, keep it updated, and restrict
-    who has the knock sequence and credentials.
-
-## Reporting a vulnerability
-
-Please report security issues privately to the maintainers rather than in a public
-issue. Do not include real secrets, domains or knock sequences in any report.
+SpawnWP deliberately does not provide email hosting, DNS management, tenant isolation or
+managed-hosting guarantees. WordPress environments are intended to be disposable and
+must not be treated as the only copy of valuable data.

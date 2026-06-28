@@ -39,6 +39,7 @@
     "docker-prune.service",
     "docker-prune.timer",
     "knock-session",
+    "migrations/remove-legacy-access.py",
     "nginx-http.conf.tpl",
     "nginx.conf.tpl",
     "spawnwp-proxy.conf",

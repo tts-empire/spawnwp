@@ -1,0 +1,30 @@
+INHERIT: ../mkdocs.yml
+site_url: https://spawnwp.com/docs/
+docs_dir: ../docs
+repo_url: ""
+repo_name: ""
+extra_css:
+  - assets/brand/public.css
+theme:
+  name: material
+  language: en
+  font: false
+  logo: assets/brand/favicon.svg
+  favicon: assets/brand/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - scheme: slate
+      primary: black
+      accent: amber
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link

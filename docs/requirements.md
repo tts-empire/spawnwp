@@ -1,7 +1,7 @@
 # Requirements
 
 You need a fresh server and two hostnames. The installer handles everything else:
-Docker, nginx, certificates, the cockpit, optional port-knocking and the first WordPress
+Docker, nginx, certificates, the cockpit and the first WordPress
 environment.
 
 You do **not** need to preinstall Docker, write nginx config, open custom admin
@@ -25,17 +25,14 @@ A cloud VPS (Hetzner, OCI, DigitalOcean, Vultr, …) is ideal. ARM instances wor
 
 - **Ports 80 and 443** reachable from the internet (80 is required for Let's Encrypt
   validation and the HTTP→HTTPS redirect; 443 serves everything).
-- With the recommended port-knocking option enabled, **three high TCP ports** generated
-  during installation must also reach `knockd` for the cockpit's secret knock sequence.
-  They do not expose applications; Adminer, Mailpit and the cockpit itself are still
-  served only over HTTPS on port 443.
-
+- When port-knocking is enabled, three random TCP ports in the `20000–60000` range
+  must also reach the VPS. Their values are generated during installation.
 !!! note "Cloud firewalls"
     If your provider has a cloud-level firewall (e.g. AWS Security Groups, OCI
-    Security Lists, Hetzner Cloud Firewall), allow **80**, **443**, and the three TCP
-    knock ports printed in `/root/spawnwp-credentials.txt`. Restrict the knock-port
-    rules to your own source IP when possible. If you explicitly disable port-knocking
-    during installation, only 80 and 443 are required.
+    Security Lists or Hetzner Cloud Firewall), allow inbound TCP **80** and **443**.
+    For port-knocking, add the three generated ports after installation and restrict
+    them to trusted source IPs when practical.
+    Do not expose Docker, database, Adminer or Mailpit container ports.
 
 ## Two hostnames
 

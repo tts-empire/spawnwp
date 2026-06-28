@@ -24,7 +24,7 @@ class TelemetryTests(unittest.TestCase):
         self.module.ROOT.mkdir()
         self.module.ENVIRONMENTS_ROOT.mkdir()
         self.module.VERSION_FILE.write_text("0.2.0\n")
-        self.module.FEATURES_FILE.write_text('{"port_knocking":true,"telemetry":true}\n')
+        self.module.FEATURES_FILE.write_text('{"telemetry":true}\n')
         (self.module.ROOT / "installation-id").write_text("random-id\n")
 
     def tearDown(self):

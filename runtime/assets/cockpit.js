@@ -133,7 +133,8 @@ async function loadUpdateStatus() {
     document.getElementById('installed-version').textContent = status.current || 'Unknown';
     document.getElementById('latest-version').textContent = status.version || 'Unavailable';
     document.getElementById('update-state').textContent = status.error
-      ? 'Check failed' : status.update_available ? 'Update available' : 'Up to date';
+      ? 'Check failed' : status.update_available ? 'Update available'
+        : status.version_status === 'ahead' ? 'Development build' : 'Up to date';
     if (status.error) {
       const error = document.getElementById('update-error');
       error.textContent = status.error;
@@ -185,12 +186,12 @@ async function loadProjects() {
   try {
     const res = await fetch(`${BASE}/projects`, { cache: 'no-store' });
     if (!res.ok) {
-      el.innerHTML = `<p style="color:var(--red)">Error ${res.status} while loading.${res.status === 403 ? ' Session expired: knock again.' : ''}</p>`;
+      el.innerHTML = `<p style="color:var(--red)">Error ${res.status} while loading.${res.status === 401 ? ' Sign in again.' : ''}</p>`;
       return;
     }
     projects = await res.json();
   } catch (e) {
-    el.innerHTML = `<p style="color:var(--red)">Network error: ${e.message}. Knock again if the session expired.</p>`;
+    el.innerHTML = `<p style="color:var(--red)">Network error: ${e.message}.</p>`;
     return;
   }
 
@@ -415,6 +416,12 @@ function appendLine(body, line, isErr) {
 
 function streamSSE(url, payload, boxId, onDone) {
   const body = getOutputBox(boxId);
+  let completed = false;
+  const finish = ok => {
+    if (completed) return;
+    completed = true;
+    if (onDone) onDone(ok);
+  };
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -423,7 +430,7 @@ function streamSSE(url, payload, boxId, onDone) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
       appendLine(body, '❌ ' + (err.detail || res.statusText), true);
-      if (onDone) onDone(false);
+      finish(false);
       return;
     }
     const reader = res.body.getReader();
@@ -442,24 +449,41 @@ function streamSSE(url, payload, boxId, onDone) {
         if (line.startsWith('__EXIT__')) {
           const rc = parseInt(line.replace('__EXIT__', ''));
           appendLine(body, rc === 0 ? '✅ Done.' : `❌ Exited with code ${rc}`, rc !== 0);
-          if (onDone) onDone(rc === 0);
+          finish(rc === 0);
           return;
         }
         appendLine(body, line, line.toLowerCase().includes('error'));
       }
     }
+    appendLine(body, '⚠️ Connection closed before the final status. Refreshing state.', true);
+    finish(false);
   }).catch(e => {
     appendLine(body, '❌ ' + e.message, true);
-    if (onDone) onDone(false);
+    finish(false);
   });
+}
+
+function monitorProjectRefresh() {
+  loadProjects();
+  const timer = setInterval(loadProjects, 1500);
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    loadProjects();
+    setTimeout(loadProjects, 750);
+  };
 }
 
 function runAction(project, action, service) {
   if (!['logs', 'disk'].includes(action) && blockedIfBusy()) return;
   const payload = { project, action };
   if (service) payload.service = service;
+  const lifecycle = ['up', 'down', 'restart'].includes(action);
+  const stopRefresh = lifecycle ? monitorProjectRefresh() : null;
   streamSSE(`${BASE}/run`, payload, `out-${project}`, ok => {
-    if (ok && (action === 'up' || action === 'down' || action === 'restart')) setTimeout(loadProjects, 2000);
+    if (stopRefresh) stopRefresh();
   });
   if (action === 'disk') loadDiskVisual(project);
 }
@@ -564,7 +588,7 @@ async function showWpAdmin(name) {
   try {
     const res = await fetch(`${BASE}/wp/${name}/admin`, { cache: 'no-store' });
     if (!res.ok) {
-      appendLine(body, `❌ Error ${res.status}` + (res.status === 403 ? ' — knock again' : ''), true);
+      appendLine(body, `❌ Error ${res.status}` + (res.status === 401 ? ' — sign in again' : ''), true);
       return;
     }
     const d = await res.json();
@@ -600,7 +624,7 @@ async function showSnapshots(name) {
   appendLine(body, '🕘 Loading snapshots…');
   try {
     const res = await fetch(`${BASE}/snapshots/${name}`, { cache: 'no-store' });
-    if (!res.ok) { appendLine(body, `❌ Error ${res.status}` + (res.status === 403 ? ' — knock again' : ''), true); return; }
+    if (!res.ok) { appendLine(body, `❌ Error ${res.status}` + (res.status === 401 ? ' — sign in again' : ''), true); return; }
     renderSnapshots(name, body, await res.json());
   } catch (e) { appendLine(body, '❌ ' + e.message, true); }
 }
@@ -654,8 +678,10 @@ function destroyProject(name) {
   const typed = prompt(`Final confirmation: type the site name “${name}” exactly to destroy it.`);
   if (typed === null) return;
   if (typed.trim() !== name) { showToast('Name mismatch: destruction cancelled', true); return; }
+  const stopRefresh = monitorProjectRefresh();
   streamSSE(`${BASE}/destroy`, { name, confirm: name }, `out-${name}`, ok => {
-    if (ok) { showToast(`Site "${name}" destroyed`); setTimeout(() => loadProjects(true), 1500); }
+    stopRefresh();
+    if (ok) showToast(`Site "${name}" destroyed`);
   });
 }
 

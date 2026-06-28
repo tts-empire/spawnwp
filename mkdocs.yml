@@ -1,6 +1,6 @@
 site_name: spawnwp
 site_description: >-
-  Self-hosted WordPress lab with optional port-knocking that spawns isolated sites from
+  Self-hosted WordPress lab that spawns isolated sites from
   a web cockpit — with a built-in WordPress.org QA toolchain. One curl | bash install.
 site_url: https://spawnwp.com/
 repo_url: https://github.com/tts-empire/spawnwp

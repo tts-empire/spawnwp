@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://spawnwp.com/sitemap.xml

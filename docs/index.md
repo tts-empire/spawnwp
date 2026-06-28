@@ -20,9 +20,8 @@ Plugin Check, Theme Check, PHP_CodeSniffer (WordPress Coding Standards), PHPStan
 Query Monitor and Mailpit preinstalled.
 
 !!! tip "Protected cockpit"
-    The cockpit lives on its own subdomain, behind **HTTP Basic Auth + HTTPS**.
-    Strongly recommended port-knocking is enabled by default but can be turned off.
-    Your content domain stays pure WordPress.
+    The cockpit lives on its own subdomain behind **HTTPS and mandatory application
+    authentication**. Passkeys are preferred; password + TOTP is the alternative.
 
 ## What you get
 
@@ -43,18 +42,17 @@ spawnwp uses **two hostnames** that you choose and point at your VPS:
 | Hostname | Serves |
 |---|---|
 | `DOMAIN` (e.g. `dev.example.com`) | The primary WordPress site (`/`) and every spawned site (`/<site>/`) — content only |
-| `COCKPIT_DOMAIN` (e.g. `cockpit.example.com`) | The cockpit dashboard and each site's Adminer / Mailpit; port-knocking is optional and enabled by default |
+| `COCKPIT_DOMAIN` (e.g. `cockpit.example.com`) | The authenticated cockpit dashboard and each site's Adminer / Mailpit |
 
 Keeping admin tooling on its own subdomain means there is no conflict between
-WordPress URLs and the cockpit. Every web interface uses 80/443; when port-knocking is
-enabled, its three generated TCP ports must additionally pass any provider-level firewall.
+WordPress URLs and the cockpit. Every web interface uses ports 80/443.
 
 ## Get started
 
 1. [Requirements](requirements.md) — a fresh VPS and two hostnames.
 2. [DNS setup](dns-setup.md) — point your two hostnames at the VPS.
 3. [Installation](installation.md) — run the one-liner.
-4. [Accessing the cockpit](accessing-the-cockpit.md) — knock, log in, create a site.
+4. [Accessing the cockpit](accessing-the-cockpit.md) — enroll, log in, create a site.
 
 ```bash
 curl -fsSL https://spawnwp.com/install.sh | sudo bash

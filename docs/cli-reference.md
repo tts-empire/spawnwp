@@ -9,7 +9,7 @@
 | `sudo spawnwp update` | Verify, install and activate the latest stable release |
 | `sudo spawnwp update --version X.Y.Z` | Install a specific stable release |
 | `sudo spawnwp rollback` | Restore the previous installed SpawnWP release |
-| `sudo spawnwp auth reset` | Revoke cockpit sessions and issue a new 24-hour setup code |
+| `sudo spawnwp auth reset` | Reset cockpit access and issue a new 24-hour activation code |
 | `spawnwp telemetry status` | Show local telemetry consent and expiry |
 | `spawnwp telemetry payload` | Print exactly what the next heartbeat would send |
 | `sudo spawnwp telemetry disable` | Revoke consent and delete telemetry identity/queue |

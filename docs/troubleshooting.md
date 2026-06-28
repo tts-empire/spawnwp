@@ -1,10 +1,9 @@
 # Troubleshooting
 
-## The cockpit returns 403
+## The cockpit redirects to login
 
-That's by design — you need to [knock](accessing-the-cockpit.md) first. If you knocked
-and still get 403, check the sequence, the order, and that your IP hasn't changed. See
-the [knock troubleshooting](accessing-the-cockpit.md#troubleshooting) section.
+The cockpit, Adminer and Mailpit require an active SpawnWP session. Sign in again. If
+the account factors are unavailable, use `sudo spawnwp auth reset` from the server.
 
 ## Installation fails at the certificate step
 
@@ -53,13 +52,11 @@ Check the services came back:
 
 ```bash
 systemctl status docker wp-cockpit nginx
-# Only when port-knocking was enabled:
-systemctl status knockd cockpit-reaper.timer
 ```
 
 Start any that are down with `systemctl start <unit>`.
 
 ## Where are my credentials?
 
-`/root/spawnwp-credentials.txt` (root-readable). It contains the URLs, Basic Auth, the
-WordPress admin login and your knock sequence.
+`/root/spawnwp-credentials.txt` (root-readable). It contains the URLs, initial application
+activation code and WordPress admin login.

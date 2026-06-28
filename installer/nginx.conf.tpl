@@ -1,4 +1,5 @@
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+limit_req_zone $binary_remote_addr zone=spawnwp_auth:10m rate=30r/m;
 
 server {
     listen 80 default_server;
@@ -17,12 +18,9 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 64M;
-    auth_basic "SpawnWP sites";
-    auth_basic_user_file /etc/nginx/.spawnwp-htpasswd;
     include /etc/nginx/snippets/spawnwp-proxy.conf;
 
     location /wp-json/spawnwp-deploy/v1/ {
-        auth_basic off;
         proxy_pass http://127.0.0.1:8080;
     }
     location / {
@@ -46,9 +44,6 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 64M;
-    auth_basic "SpawnWP cockpit";
-    auth_basic_user_file /etc/nginx/.spawnwp-htpasswd;
-
     location = /_spawnwp_auth {
         internal;
         proxy_pass http://127.0.0.1:9393/api/auth/check;
@@ -57,17 +52,18 @@ server {
         proxy_set_header Cookie $http_cookie;
         proxy_set_header X-Real-IP $remote_addr;
     }
+    location @spawnwp_login { return 303 /login; }
     location /wp-dev-db/ {
         include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
-        error_page 401 =303 /login;
+        error_page 401 = @spawnwp_login;
         proxy_pass http://127.0.0.1:9001/;
         add_header Cache-Control "no-store" always;
     }
     location /wp-dev-mail/ {
         include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
-        error_page 401 =303 /login;
+        error_page 401 = @spawnwp_login;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_pass http://127.0.0.1:8025;
         add_header Cache-Control "no-store" always;
@@ -78,6 +74,14 @@ server {
         proxy_pass http://127.0.0.1:9393/assets/;
         proxy_buffering on;
         add_header Cache-Control "public, max-age=604800, immutable" always;
+    }
+    location ~ ^/api/auth/(setup/(start|finish)|passkey/(start|finish)|fallback)$ {
+        include /etc/nginx/cockpit-allowed.conf;
+        limit_req zone=spawnwp_auth burst=10 nodelay;
+        include /etc/nginx/snippets/spawnwp-proxy.conf;
+        proxy_pass http://127.0.0.1:9393;
+        proxy_buffering off;
+        add_header Cache-Control "no-store" always;
     }
     location / {
         include /etc/nginx/cockpit-allowed.conf;

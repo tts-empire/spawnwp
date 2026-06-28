@@ -270,6 +270,16 @@ def health_check() -> None:
     raise UpdateError(f"Cockpit HTTP health check failed: {last_error}")
 
 
+def run_migrations(release: Path, manifest: dict) -> None:
+    for relative in manifest.get("migrations", []):
+        path = release / "payload/lib" / relative
+        if not path.is_file():
+            raise UpdateError(f"Release migration not found: {relative}")
+        result = subprocess.run([str(path)], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise UpdateError((result.stderr or result.stdout or f"Migration failed: {relative}").strip())
+
+
 def activate(release: Path, *, rollback: bool = False) -> None:
     manifest = json.loads((release / "manifest.json").read_text())
     current_manifest = {}
@@ -293,6 +303,7 @@ def activate(release: Path, *, rollback: bool = False) -> None:
             if (entry["target_root"], entry["target"]) not in new_targets:
                 (TARGETS[entry["target_root"]] / entry["target"]).unlink(missing_ok=True)
         health_check()
+        run_migrations(release, manifest)
     except Exception:
         restore_targets(all_entries, backup)
         subprocess.run(["systemctl", "restart", "wp-cockpit"], capture_output=True)
@@ -322,10 +333,14 @@ def update_lock():
 def status_payload(version: str | None = None) -> dict:
     info = release_info(version)
     installed = current_version()
+    latest_tuple = version_tuple(info["version"])
+    installed_tuple = version_tuple(installed)
     return {
         **{key: info[key] for key in ("version", "name", "notes", "published_at")},
         "current": installed,
-        "update_available": version_tuple(info["version"]) > version_tuple(installed),
+        "update_available": latest_tuple > installed_tuple,
+        "version_status": "behind" if latest_tuple > installed_tuple else
+                          "ahead" if latest_tuple < installed_tuple else "current",
     }
 
 
@@ -355,7 +370,7 @@ def main() -> int:
             if not args.yes:
                 if not sys.stdin.isatty():
                     raise UpdateError("Run this command from an interactive root terminal")
-                answer = input("Revoke all cockpit sessions and create a new setup code? [y/N] ")
+                answer = input("Reset cockpit authentication and create a new activation code? [y/N] ")
                 if answer.lower() != "y":
                     print("Cancelled")
                     return 0
@@ -369,9 +384,10 @@ def main() -> int:
             value = code.stdout.strip()
             report = Path("/root/spawnwp-credentials.txt")
             with report.open("a") as stream:
-                stream.write(f"\nApplication setup code (reset): {value}\n")
+                stream.write(f"\nOne-time activation code (reset; valid for 24 hours):\n{value}\n")
             os.chmod(report, 0o600)
-            print(f"Application setup code (expires in 24h): {value}")
+            print("One-time activation code (valid for 24 hours and usable once):")
+            print(value)
             return 0
         if args.command == "telemetry":
             consent_path = Path("/var/lib/spawnwp/telemetry/consent.json")

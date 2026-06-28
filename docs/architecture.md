@@ -10,8 +10,8 @@ flowchart TB
     user([Browser])
     subgraph edge[Host nginx · TLS edge · ports 80/443]
         direction TB
-        develVH[server_name DOMAIN<br/>Basic Auth + HTTPS]
-        cockpitVH[server_name COCKPIT_DOMAIN<br/>knock + Basic Auth + HTTPS]
+        develVH[server_name DOMAIN<br/>public HTTPS]
+        cockpitVH[server_name COCKPIT_DOMAIN<br/>port-knock + SpawnWP auth + HTTPS]
     end
     user -->|https| develVH
     user -->|https| cockpitVH
@@ -25,15 +25,14 @@ flowchart TB
 ```
 
 - **`DOMAIN`** serves only WordPress: the primary site at `/` and each spawned site
-  at `/<site>/`. Behind HTTP Basic Auth + HTTPS.
+  at `/<site>/`, over public HTTPS.
 - **`COCKPIT_DOMAIN`** serves the cockpit at `/` and each site's Adminer (`/<site>-db/`)
-  and Mailpit (`/<site>-mail/`). Behind port-knock + Basic Auth + HTTPS.
+  and Mailpit (`/<site>-mail/`). Cockpit sessions protect all admin tooling.
 
 Both hostnames share **one SAN Let's Encrypt certificate**. Putting the admin tools on
 their own subdomain removes any conflict between a WordPress page slug and an admin path,
 keeps the cockpit's Adminer auto-login same-origin, and serves every web interface over
-80/443. When port-knocking is enabled, the three high TCP ports in its sequence must also
-reach `knockd`, but no application listens on them.
+80/443.
 
 ## Per-site container stack
 
@@ -77,9 +76,8 @@ matching nginx blocks: the WordPress block on `DOMAIN`, the Adminer/Mailpit bloc
 |---|---|
 | `nginx` | TLS edge + reverse proxy for both hostnames |
 | `certbot` | Let's Encrypt issuance + automatic renewal |
-| `knockd` | Optional port-knock daemon that gates the cockpit allow-list |
 | `wp-cockpit` (systemd) | The cockpit app |
-| `cockpit-reaper.timer` | Revokes idle knock sessions (sliding 30 min) |
+| `knockd` + `cockpit-reaper.timer` | Optional source-IP gate with idle expiry |
 | `docker-prune.timer` | Weekly Docker build-cache cleanup |
 
 See [Security](security.md) for the full protection model.

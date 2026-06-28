@@ -6,6 +6,7 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 def load_updater():
@@ -27,6 +28,14 @@ class UpdaterTests(unittest.TestCase):
     def test_semver_rejects_prerelease(self):
         with self.assertRaises(updater.UpdateError):
             updater.version_tuple("1.2.3-beta.1")
+
+    def test_status_marks_installed_version_ahead_of_stable(self):
+        with mock.patch.object(updater, "release_info", return_value={
+            "version": "0.2.2", "name": "SpawnWP 0.2.2", "notes": "", "published_at": ""
+        }), mock.patch.object(updater, "current_version", return_value="0.3.0"):
+            payload = updater.status_payload()
+        self.assertFalse(payload["update_available"])
+        self.assertEqual("ahead", payload["version_status"])
 
     def test_safe_extract_rejects_path_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -78,6 +87,23 @@ class UpdaterTests(unittest.TestCase):
                 self.assertFalse(target.exists())
             finally:
                 updater.TARGETS = old_targets
+
+    def test_release_migrations_run_in_manifest_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp)
+            migration = release / "payload/lib/installer/migrations/access.py"
+            migration.parent.mkdir(parents=True)
+            migration.write_text("#!/bin/sh\nexit 0\n")
+            migration.chmod(0o755)
+            with mock.patch.object(updater.subprocess, "run") as run:
+                run.return_value.returncode = 0
+                updater.run_migrations(release, {"migrations": ["installer/migrations/access.py"]})
+            run.assert_called_once_with([str(migration)], capture_output=True, text=True)
+
+    def test_missing_release_migration_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(updater.UpdateError):
+                updater.run_migrations(Path(tmp), {"migrations": ["missing.py"]})
 
 
 if __name__ == "__main__":

@@ -1,134 +1,80 @@
 # Accessing the cockpit
 
-By default, the cockpit is protected by layered authentication. To open it you first **knock**,
-then authenticate.
+The cockpit is served over HTTPS at the `COCKPIT_DOMAIN` chosen during installation.
+Port-knocking is optional, strongly recommended and enabled by default. When enabled,
+send the generated sequence before opening the cockpit; every cockpit page, API and
+attached admin tool also requires a valid SpawnWP session.
 
 ```mermaid
 flowchart LR
-    A[1 · Port-knock<br/>opens your IP] --> B[2 · HTTP Basic Auth<br/>outer prompt] --> C[3 · Application login<br/>passkey or password + TOTP] --> D[4 · Cockpit]
+    A[Port-knock<br/>when enabled] --> B[HTTPS]
+    B --> C[SpawnWP login]
+    C --> D[Passkey]
+    C --> E[Password + TOTP]
+    D --> F[Cockpit]
+    E --> F
 ```
 
-Port-knocking is optional during installation, but **strongly recommended**. If you
-disabled it, skip the knock step and open `https://COCKPIT_DOMAIN/` directly. HTTPS and
-HTTP Basic Auth and application login still protect the cockpit, but its endpoint is visible to
-internet scanners and brute-force attempts.
+## Port-knocking
 
-## What is port-knocking, and why?
-
-The cockpit controls your whole lab, so it should not be openly reachable. With
-port-knocking, `https://COCKPIT_DOMAIN/` returns **403 Forbidden** to everyone by
-default. Only after your machine sends a secret **sequence of connection attempts** to
-specific ports — the "knock" — does the server add *your* IP to an allow-list and let
-you through.
-
-This hides the admin surface from scanners and bots: without the correct sequence, the
-cockpit simply isn't accessible — and there's no login form to brute-force.
-
-!!! info "Your sequence is unique"
-    The knock sequence is **randomly generated for your install** and printed in your
-    [credentials report](installation.md#the-credentials-report)
-    (`/root/spawnwp-credentials.txt`). The examples below use placeholder numbers
-    `<p1> <p2> <p3>` — always substitute your own.
-
-## Step 1 — Knock
-
-Send the **open** sequence to `COCKPIT_DOMAIN`. Use whichever method you have.
-The three TCP attempts must arrive in the exact order within **10 seconds**. A refused
-connection or timeout is normal: no application is listening on the knock ports; the
-server only observes the connection attempts.
-
-!!! warning "Cloud firewall"
-    If your VPS provider has a firewall or security group outside the server, allow TCP
-    ingress to your three knock ports. Restrict the rule to your source IP when practical.
-    The packets must reach `knockd`, even though those ports expose no network service.
-
-=== "knock.sh (bundled)"
-
-    The repo ships a portable client at `clients/knock.sh`:
-
-    ```bash
-    ./clients/knock.sh cockpit.example.com <p1> <p2> <p3>
-    ```
-
-=== "knockd's knock tool"
-
-    On Linux/macOS, install the `knockd` package (which provides the `knock` client):
-
-    ```bash
-    # Debian/Ubuntu: apt install knockd   ·   macOS: brew install knock
-    knock cockpit.example.com <p1> <p2> <p3>
-    ```
-
-=== "netcat one-liner"
-
-    No client needed — just `nc`:
-
-    ```bash
-    for p in <p1> <p2> <p3>; do nc -w1 cockpit.example.com "$p"; done
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    foreach ($p in <p1>,<p2>,<p3>) {
-      $client = [Net.Sockets.TcpClient]::new()
-      try { $null = $client.ConnectAsync("cockpit.example.com", $p).Wait(700) } catch {}
-      $client.Dispose()
-      Start-Sleep -Milliseconds 500
-    }
-    ```
-
-## Step 2 — Open the cockpit
-
-Within a few seconds of a successful knock, browse to:
-
-```text
-https://cockpit.example.com/
-```
-
-Your browser first prompts for **HTTP Basic Auth**. On the first visit, enter the
-one-time setup code and enroll a passkey plus TOTP. Later visits use the passkey, or the
-password + TOTP fallback.
-
-If every authenticator and recovery code is lost, root can revoke application sessions
-and generate a new setup code without changing any WordPress environment:
+The credentials report contains three random TCP ports. Send them in order within ten
+seconds; refused connections are expected because no application listens on these ports.
 
 ```bash
-sudo spawnwp auth reset
+./clients/knock.sh cockpit.example.com <p1> <p2> <p3>
 ```
 
-## Sessions: sliding 30-minute window
+The source IP remains allowed while the cockpit is active and expires after 30 minutes
+of inactivity. Send the ports in reverse order to close access immediately. Provider
+firewalls must allow the three generated ports to reach `knockd`, preferably restricted
+to trusted source IPs. If knocking was disabled during installation, open the cockpit
+URL directly.
 
-Once you've knocked, your IP stays allowed as long as you keep using the cockpit. The
-dashboard auto-refreshes, and each request renews your session. After **30 minutes of
-inactivity** the session is revoked automatically and you'll need to knock again.
+## First enrollment
 
-To revoke access immediately, send the **close** sequence — the same ports in reverse
-order:
+After knocking when required, open the cockpit URL and use the one-time activation code from
+`/root/spawnwp-credentials.txt`. The code expires after 24 hours and is consumed by a
+successful enrollment.
 
-```bash
-./clients/knock.sh cockpit.example.com <p3> <p2> <p1>
-```
+1. Choose the administrator name and a strong password. This password is used only
+   when signing in without a passkey and always requires TOTP or a recovery code.
+2. Scan the QR code with any TOTP authenticator, such as 2FAS, Aegis (Android),
+   Google Authenticator, Microsoft Authenticator, 1Password or Bitwarden, then enter
+   its six-digit code. The manual secret is available when scanning is not possible.
+3. Let the browser create a passkey using the device PIN or biometrics, a hardware
+   security key, or a compatible password manager.
+4. Store the ten single-use recovery codes outside the server.
 
-## Troubleshooting
+Passkeys are the preferred daily login. Signing in with a password always requires a second factor:
+either a current TOTP code or one unused recovery code.
 
-!!! failure "Still getting 403 after knocking"
-    - **Wrong/old sequence** — re-check the numbers in your credentials report.
-    - **Order matters** — the open sequence must be sent in the exact order shown.
-    - **Your IP changed** — mobile networks, VPNs and some ISPs rotate your IP; the
-      knock authorizes the IP you knocked *from*. Knock again from the current network.
-    - **Outbound ports blocked** — a restrictive network may block the knock ports
-      outbound. Try from another network or a phone hotspot.
-    - **Cloud firewall** — allow TCP ingress to all three knock ports in the provider's
-      firewall/security group. A host firewall rule alone cannot admit packets discarded
-      before they reach the VPS.
-    - **Timing** — send the ports promptly; long pauses between them can exceed the
-      sequence timeout. The bundled `knock.sh` paces them correctly.
+## Protected tools
 
-!!! failure "401 Unauthorized"
-    The knock worked (you got past 403) but the Basic Auth credentials are wrong. Use
-    the `user`/`pass` from the credentials report.
+Adminer and Mailpit are routed through the cockpit hostname. Nginx uses an internal
+authentication check against the SpawnWP session before proxying either tool. An
+anonymous request is redirected to `/login`; their loopback container ports must never
+be exposed publicly.
 
-!!! question "I lost my knock sequence"
-    It's in `/root/spawnwp-credentials.txt` on the server (readable as root). Keep a copy
-    in your password manager.
+## Session behavior
+
+- Cookies are `Secure`, `HttpOnly` where applicable and `SameSite=Strict`.
+- Sessions have idle and absolute expiration limits.
+- State-changing requests require a CSRF token.
+- Destructive operations require recent authentication.
+- Authentication endpoints have both Nginx and application rate limits.
+
+Signing out revokes the current server-side session. Use `sudo spawnwp auth reset` from
+an interactive root shell only for account recovery; it revokes every session and
+creates a new one-time activation code.
+
+## Problems signing in
+
+- **Activation code rejected:** check that it was copied completely and has not expired or
+  already been consumed. Run `sudo spawnwp auth reset` if recovery is required.
+- **Passkey unavailable:** sign in with the password plus TOTP.
+- **TOTP rejected:** verify that the phone and server clocks are synchronized.
+- **Recovery code rejected:** recovery codes are single-use. Try an unused code.
+- **Too many attempts:** wait for the rate-limit window before retrying.
+- **Cockpit returns 403:** verify the knock order, current source IP and provider firewall.
+
+Next: [Using the cockpit](using-the-cockpit.md).

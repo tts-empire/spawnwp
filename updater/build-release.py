@@ -73,7 +73,7 @@ def main() -> int:
             add_entry(entries, package, ROOT / "runtime" / relative,
                       f"payload/runtime/{relative}", "runtime", relative, mode)
         for relative in managed["installer"]:
-            mode = "0755" if relative in {"knock-session", "telemetry.py"} else "0644"
+            mode = "0755" if relative in {"knock-session", "migrations/remove-legacy-access.py", "telemetry.py"} else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
                       f"payload/lib/installer/{relative}", "lib", f"installer/{relative}", mode)
         add_entry(entries, package, ROOT / "install.sh", "payload/lib/installer/install.sh",
@@ -96,7 +96,7 @@ def main() -> int:
             "min_updater_version": "0.1.0",
             "archive": archive.name,
             "archive_sha256": sha256(archive),
-            "migrations": [],
+            "migrations": ["installer/migrations/remove-legacy-access.py"],
             "files": entries,
         }
         manifest_path = args.output / f"{prefix}.manifest.json"

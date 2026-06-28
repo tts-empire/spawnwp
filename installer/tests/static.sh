@@ -2,11 +2,19 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 bash -n "$ROOT/install.sh"
-python3 -m py_compile "$ROOT/installer/knock-session" "$ROOT/installer/telemetry.py"
+python3 -m py_compile "$ROOT/installer/telemetry.py"
 if grep -RIE --exclude-dir=tests 'presenzaweb|maurizio\.savoni' "$ROOT/runtime" "$ROOT/installer" "$ROOT/install.sh"; then
   echo "ERROR: deployment-specific value found" >&2
   exit 1
 fi
-grep -q 'Enable port-knocking' "$ROOT/install.sh"
+if grep -qE 'auth_basic|htpasswd' "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then
+  echo "ERROR: legacy HTTP Basic Auth found" >&2
+  exit 1
+fi
+grep -q 'confirm ENABLE_PORT_KNOCKING .* 1' "$ROOT/install.sh"
+grep -q 'include /etc/nginx/cockpit-allowed.conf' "$ROOT/installer/nginx.conf.tpl"
 grep -q 'Share anonymous usage statistics for 90 days' "$ROOT/install.sh"
+grep -q 'COCKPIT FIRST-TIME ACTIVATION' "$ROOT/install.sh"
+grep -q 'Valid for 24 hours and usable once' "$ROOT/install.sh"
+grep -q 'sudo cat \$REPORT' "$ROOT/install.sh"
 grep -q 'pkeyutl -verify' "$ROOT/install.sh"

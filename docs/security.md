@@ -35,7 +35,9 @@ protection and audit logging.
 - Adminer, Mailpit, databases and PHP services are not public network endpoints.
 - Containers do not receive the Docker socket.
 - Generated database and WordPress credentials are unique per environment.
-- Cockpit destructive actions require recent authentication.
+- PHP switching, restore, destroy and control-plane updates require authentication
+  within the previous ten minutes. When that window expires, the cockpit requests an
+  inline Passkey confirmation and resumes the action only after successful verification.
 
 The cockpit service runs as root because it orchestrates host Docker and Nginx state.
 This makes cockpit compromise equivalent to host compromise: keep SpawnWP updated,

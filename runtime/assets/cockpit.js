@@ -17,6 +17,101 @@ let SYS_BUSY = false; // true when a build is running / high load (guardrail)
 let DEPLOY_ACTIVE = false;
 let PLATFORM = {};
 let UPDATE_RUNNING = false;
+let REAUTH_PROMISE = null;
+
+function webauthnB64(value) {
+  const encoded = btoa(String.fromCharCode(...new Uint8Array(value)));
+  return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function webauthnBytes(value) {
+  value = value.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(value), character => character.charCodeAt(0));
+}
+function preparePublicKey(options) {
+  options.challenge = webauthnBytes(options.challenge);
+  if (options.allowCredentials) options.allowCredentials.forEach(item => { item.id = webauthnBytes(item.id); });
+  return options;
+}
+function serializeCredential(value) {
+  return {
+    id: value.id, rawId: webauthnB64(value.rawId), type: value.type,
+    authenticatorAttachment: value.authenticatorAttachment,
+    clientExtensionResults: value.getClientExtensionResults(),
+    response: {
+      clientDataJSON: webauthnB64(value.response.clientDataJSON),
+      authenticatorData: webauthnB64(value.response.authenticatorData),
+      signature: webauthnB64(value.response.signature),
+      userHandle: value.response.userHandle ? webauthnB64(value.response.userHandle) : null,
+    },
+  };
+}
+
+function reauthDialog() {
+  let dialog = document.getElementById('reauth-dialog');
+  if (dialog) return dialog;
+  dialog = document.createElement('dialog');
+  dialog.id = 'reauth-dialog';
+  dialog.innerHTML = `<div class="reauth-card"><div class="section-title">Security confirmation</div><h2>Confirm your identity</h2><p>This sensitive action requires a recent sign-in. Confirm with your Passkey; the action will resume automatically.</p><p class="reauth-error" id="reauth-error" aria-live="polite"></p><div class="reauth-actions"><button class="btn-primary" id="reauth-passkey" type="button">Confirm with Passkey</button><button class="btn-neutral" id="reauth-cancel" type="button">Cancel</button></div><button class="reauth-login" id="reauth-login" type="button">Sign out and use password + authenticator</button></div>`;
+  document.body.appendChild(dialog);
+  return dialog;
+}
+
+function requestRecentAuthentication() {
+  if (REAUTH_PROMISE) return REAUTH_PROMISE;
+  REAUTH_PROMISE = new Promise((resolve, reject) => {
+    const dialog = reauthDialog();
+    const passkey = document.getElementById('reauth-passkey');
+    const error = document.getElementById('reauth-error');
+    const finish = failure => {
+      dialog.close();
+      REAUTH_PROMISE = null;
+      failure ? reject(failure) : resolve();
+    };
+    error.textContent = '';
+    passkey.disabled = false;
+    passkey.textContent = 'Confirm with Passkey';
+    document.getElementById('reauth-cancel').onclick = () => finish(new Error('Action cancelled'));
+    document.getElementById('reauth-login').onclick = async () => { await logoutCockpit(); };
+    passkey.onclick = async () => {
+      if (!window.PublicKeyCredential) {
+        error.textContent = 'This browser cannot use Passkeys. Sign out and use password + authenticator.';
+        return;
+      }
+      passkey.disabled = true;
+      passkey.textContent = 'Waiting for Passkey…';
+      try {
+        const startResponse = await fetch(`${BASE}/auth/reauth/start`, { method: 'POST' });
+        const start = await startResponse.json();
+        if (!startResponse.ok) throw new Error(start.detail || 'Unable to start identity confirmation');
+        const credential = await navigator.credentials.get({ publicKey: preparePublicKey(start.publicKey) });
+        if (!credential) throw new Error('Passkey confirmation was cancelled');
+        const endResponse = await fetch(`${BASE}/auth/reauth/finish`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ceremony: start.ceremony, credential: serializeCredential(credential) }),
+        });
+        const end = await endResponse.json();
+        if (!endResponse.ok) throw new Error(end.detail || 'Identity confirmation failed');
+        finish();
+      } catch (failure) {
+        error.textContent = failure.message || String(failure);
+        passkey.disabled = false;
+        passkey.textContent = 'Try Passkey again';
+      }
+    };
+    dialog.oncancel = event => { event.preventDefault(); finish(new Error('Action cancelled')); };
+    dialog.showModal();
+  });
+  return REAUTH_PROMISE;
+}
+
+async function sensitiveFetch(url, options) {
+  let response = await fetch(url, options);
+  if (response.status !== 403) return response;
+  const payload = await response.clone().json().catch(() => ({}));
+  if (!String(payload.detail || '').startsWith('Recent authentication required')) return response;
+  await requestRecentAuthentication();
+  return fetch(url, options);
+}
 
 async function loadPlatform() {
   try {
@@ -177,7 +272,7 @@ async function applyDashboardUpdate() {
   progress.textContent = 'Starting signed update…';
   document.getElementById('update-state').textContent = 'Updating';
   try {
-    const response = await fetch(`${BASE}/update/apply`, { method: 'POST' });
+    const response = await sensitiveFetch(`${BASE}/update/apply`, { method: 'POST' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
     monitorDashboardUpdate(current, 0);
@@ -503,7 +598,7 @@ function streamSSE(url, payload, boxId, onDone) {
     completed = true;
     if (onDone) onDone(ok);
   };
-  fetch(url, {
+  sensitiveFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

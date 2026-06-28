@@ -106,6 +106,14 @@
 
   #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--green); color: var(--green); border-radius: 4px; padding: 12px 18px; font-size: 13px; display: none; z-index: 99; box-shadow: 0 8px 30px rgba(0,0,0,.55); }
   #toast.err { border-color: var(--red); color: var(--red); }
+  #reauth-dialog { width:min(480px,calc(100% - 28px)); padding:0; border:1px solid var(--border-strong); border-top:2px solid var(--accent); border-radius:var(--radius); background:var(--surface); color:var(--text); }
+  #reauth-dialog::backdrop { background:rgba(0,0,0,.78); backdrop-filter:blur(2px); }
+  .reauth-card { padding:24px; }
+  .reauth-card h2 { margin-bottom:9px; font-size:20px; }
+  .reauth-card p { color:var(--muted); line-height:1.55; }
+  .reauth-card .reauth-error { min-height:20px; margin-top:12px; color:var(--red); }
+  .reauth-actions { display:flex; gap:8px; margin-top:10px; }
+  .reauth-login { margin-top:14px; padding:0; border:0; background:transparent; color:var(--muted); font-size:11px; text-decoration:underline; }
   /* Guardrail: banner + disabling sensitive actions under load */
   .sys-banner { display: none; align-items: center; gap: 8px; background: #251f10;
     border: 1px solid var(--yellow); color: var(--yellow); border-radius: 4px;

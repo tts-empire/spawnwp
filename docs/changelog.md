@@ -6,6 +6,14 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.10
+
+- Added inline Passkey reauthentication for sensitive cockpit actions after the
+  ten-minute recent-login window expires.
+- Sensitive actions now resume automatically after identity confirmation, while
+  logout plus password/TOTP remains available as a fallback.
+- Documented a mandatory clean-VPS release acceptance gate.
+
 ## 0.3.9
 
 - Moved Docker Buildx state out of read-only `/root` when deployments are started
@@ -129,7 +137,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.10...HEAD
+[0.3.10]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/tts-empire/spawnwp/compare/v0.3.6...v0.3.7

@@ -32,6 +32,23 @@ The publishing script refuses to replace an existing release. Verify the release
 installed server with `spawnwp update --check`; then test update and rollback on a staging
 VPS before announcing it.
 
+## Clean-VPS acceptance gate
+
+A release is not stable until its public installer and signed assets pass on a separate,
+fresh VPS. The development/origin host is not an acceptable substitute. Verify:
+
+- installation, one-time activation, Passkey, TOTP and recovery codes;
+- an initially empty cockpit and deployment with every built-in blueprint;
+- WordPress, WP Admin, Adminer, Mailpit and generated credentials;
+- full-stack and per-container lifecycle actions;
+- PHP switching, including expired recent-authentication and inline confirmation;
+- snapshot/restore, complete destroy and Nginx rollback after a failed deployment;
+- telemetry enable/disable, dashboard update, reboot persistence and rollback;
+- `nginx -t`, `certbot renew --dry-run`, and public exposure limited to ports 80/443.
+
+Do not repair the staging VPS manually. Fix the repository, publish a new signed release,
+update the staging VPS through the product, and repeat the failed test.
+
 ## Repository transition
 
 While the repository is private, update checks use the server's GitHub CLI credentials.

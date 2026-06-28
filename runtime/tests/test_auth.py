@@ -5,10 +5,11 @@ import time
 import unittest
 from http.cookies import SimpleCookie
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 from cryptography.fernet import Fernet
-from fastapi import Response
-from fastapi.testclient import TestClient
+from fastapi import HTTPException, Response
 from starlette.requests import Request
 
 
@@ -88,7 +89,106 @@ class AuthenticationTests(unittest.TestCase):
             bootstrap = connection.execute("SELECT * FROM bootstrap").fetchone()
             self.assertEqual(bootstrap["code_hash"], self.auth._digest(code))
 
+    def reauth_fixture(self):
+        now = int(time.time())
+        with self.auth.db() as connection:
+            admin_id = connection.execute(
+                "INSERT INTO admins(user_id,username,password_hash,totp_secret,created_at) VALUES(?,?,?,?,?)",
+                (b"reauth-user", "reauth-admin", "hash", self.auth._encrypt("secret"), now),
+            ).lastrowid
+            connection.execute(
+                "INSERT INTO passkeys(admin_id,credential_id,public_key,sign_count,transports,name,created_at) VALUES(?,?,?,?,?,?,?)",
+                (admin_id, b"credential", b"public-key", 1, "[]", "Primary", now),
+            )
+        response = Response()
+        self.auth._set_session(response, admin_id)
+        cookies = SimpleCookie()
+        for value in response.headers.getlist("set-cookie"):
+            cookies.load(value)
+        token = cookies[self.auth.COOKIE].value
+        csrf = cookies[self.auth.CSRF_COOKIE].value
+        with self.auth.db() as connection:
+            connection.execute(
+                "UPDATE sessions SET recent_auth=? WHERE id_hash=?",
+                (now - 900, self.auth._digest(token)),
+            )
+        request = self.request(
+            f"{self.auth.COOKIE}={token}; {self.auth.CSRF_COOKIE}={csrf}", csrf
+        )
+        return admin_id, token, request
+
+    def test_passkey_reauthentication_refreshes_only_current_session(self):
+        admin_id, token, request = self.reauth_fixture()
+        other = Response()
+        self.auth._set_session(other, admin_id)
+        ceremony = "reauth-ceremony"
+        with self.auth.db() as connection:
+            other_recent = connection.execute(
+                "SELECT recent_auth FROM sessions WHERE id_hash<>?", (self.auth._digest(token),)
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO challenges VALUES(?,?,?,?,?)",
+                (self.auth._digest(ceremony), "reauth", b"challenge",
+                 __import__("json").dumps({"admin_id": admin_id, "session_hash": self.auth._digest(token)}),
+                 int(time.time()) + 300),
+            )
+        body = self.auth.PasskeyFinish(ceremony=ceremony, credential={"id": "credential"})
+        with mock.patch.object(self.auth, "base64url_to_bytes", return_value=b"credential"), \
+             mock.patch.object(self.auth, "verify_authentication_response",
+                               return_value=SimpleNamespace(new_sign_count=2)):
+            result = self.auth.reauth_finish(body, request)
+        self.assertTrue(result["ok"])
+        with self.auth.db() as connection:
+            current = connection.execute(
+                "SELECT recent_auth FROM sessions WHERE id_hash=?", (self.auth._digest(token),)
+            ).fetchone()[0]
+            unchanged = connection.execute(
+                "SELECT recent_auth FROM sessions WHERE id_hash<>?", (self.auth._digest(token),)
+            ).fetchone()[0]
+        self.assertGreater(current, int(time.time()) - 5)
+        self.assertEqual(other_recent, unchanged)
+        with mock.patch.object(self.auth, "base64url_to_bytes", return_value=b"credential"):
+            with self.assertRaises(HTTPException) as reused:
+                self.auth.reauth_finish(body, request)
+        self.assertEqual(400, reused.exception.status_code)
+
+    def test_reauthentication_rejects_challenge_from_another_session(self):
+        admin_id, _token, request = self.reauth_fixture()
+        ceremony = "wrong-session"
+        with self.auth.db() as connection:
+            connection.execute(
+                "INSERT INTO challenges VALUES(?,?,?,?,?)",
+                (self.auth._digest(ceremony), "reauth", b"challenge",
+                 __import__("json").dumps({"admin_id": admin_id, "session_hash": "wrong"}),
+                 int(time.time()) + 300),
+            )
+        body = self.auth.PasskeyFinish(ceremony=ceremony, credential={"id": "credential"})
+        with mock.patch.object(self.auth, "base64url_to_bytes", return_value=b"credential"):
+            with self.assertRaises(HTTPException) as raised:
+                self.auth.reauth_finish(body, request)
+        self.assertEqual(400, raised.exception.status_code)
+
+    def test_reauthentication_rejects_expired_challenge(self):
+        admin_id, token, request = self.reauth_fixture()
+        ceremony = "expired-reauth"
+        with self.auth.db() as connection:
+            connection.execute(
+                "INSERT INTO challenges VALUES(?,?,?,?,?)",
+                (self.auth._digest(ceremony), "reauth", b"challenge",
+                 __import__("json").dumps({"admin_id": admin_id, "session_hash": self.auth._digest(token)}),
+                 int(time.time()) - 1),
+            )
+        body = self.auth.PasskeyFinish(ceremony=ceremony, credential={"id": "credential"})
+        with mock.patch.object(self.auth, "base64url_to_bytes", return_value=b"credential"):
+            with self.assertRaises(HTTPException) as raised:
+                self.auth.reauth_finish(body, request)
+        self.assertEqual(400, raised.exception.status_code)
+
     def test_cockpit_and_api_fail_closed_without_session(self):
+        try:
+            from fastapi.testclient import TestClient
+        except (ImportError, RuntimeError) as exc:
+            self.skipTest(f"FastAPI test client unavailable: {exc}")
         app_module = importlib.import_module("app")
         with TestClient(app_module.app, base_url="https://cockpit.example.com",
                         follow_redirects=False) as client:

@@ -401,6 +401,81 @@ def passkey_finish(body: PasskeyFinish, request: Request, response: Response):
     return {"ok": True}
 
 
+@router.post("/reauth/start")
+def reauth_start(request: Request):
+    active = session(request, touch=False)
+    if not active:
+        raise HTTPException(401, "Authentication required")
+    with db() as connection:
+        rows = connection.execute(
+            "SELECT credential_id FROM passkeys WHERE admin_id=?", (active["admin_id"],)
+        ).fetchall()
+    if not rows:
+        raise HTTPException(400, "No passkey is registered for this administrator")
+    rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
+    options = generate_authentication_options(
+        rp_id=rp_id,
+        allow_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in rows],
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+    token = request.cookies.get(COOKIE, "")
+    payload = {"admin_id": active["admin_id"], "session_hash": _digest(token)}
+    return {
+        "ceremony": _challenge("reauth", options.challenge, payload),
+        "publicKey": json.loads(options_to_json(options)),
+    }
+
+
+@router.post("/reauth/finish")
+def reauth_finish(body: PasskeyFinish, request: Request):
+    active = session(request, touch=False)
+    if not active:
+        raise HTTPException(401, "Authentication required")
+    token = request.cookies.get(COOKIE, "")
+    session_hash = _digest(token)
+    credential_id = base64url_to_bytes(body.credential.get("id", ""))
+    with db(immediate=True) as connection:
+        _rate_limit(connection, request, "reauth")
+        challenge = _consume_challenge(connection, body.ceremony, "reauth")
+    payload = json.loads(challenge["payload"])
+    if payload.get("admin_id") != active["admin_id"] or not hmac.compare_digest(
+        payload.get("session_hash", ""), session_hash
+    ):
+        with db(immediate=True) as connection:
+            _audit(connection, "reauth_rejected", request, "session mismatch")
+        raise HTTPException(400, "Authentication ceremony does not belong to this session")
+    with db(immediate=True) as connection:
+        key = connection.execute(
+            "SELECT * FROM passkeys WHERE credential_id=? AND admin_id=?",
+            (credential_id, active["admin_id"]),
+        ).fetchone()
+        if not key:
+            raise HTTPException(400, "Authentication failed")
+        rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
+        try:
+            verified = verify_authentication_response(
+                credential=body.credential,
+                expected_challenge=challenge["challenge"],
+                expected_rp_id=rp_id,
+                expected_origin=f"https://{rp_id}",
+                credential_public_key=key["public_key"],
+                credential_current_sign_count=key["sign_count"],
+                require_user_verification=True,
+            )
+        except Exception as exc:
+            _audit(connection, "reauth_rejected", request, "passkey")
+            raise HTTPException(400, "Authentication failed") from exc
+        now = int(time.time())
+        connection.execute(
+            "UPDATE passkeys SET sign_count=? WHERE id=?", (verified.new_sign_count, key["id"])
+        )
+        connection.execute(
+            "UPDATE sessions SET recent_auth=? WHERE id_hash=?", (now, session_hash)
+        )
+        _audit(connection, "reauth_success", request, "passkey")
+    return {"ok": True, "recent_auth": now}
+
+
 @router.post("/fallback")
 def fallback_login(body: FallbackLogin, request: Request, response: Response):
     with db(immediate=True) as connection:

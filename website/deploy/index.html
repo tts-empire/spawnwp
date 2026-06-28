@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpawnWP Deploy — Optional one-time WordPress publication</title>
+  <meta name="description" content="Publish a SpawnWP project once to a fresh, empty WordPress installation with the optional SpawnWP Deploy plugin.">
+  <link rel="canonical" href="https://spawnwp.com/deploy/"><meta name="theme-color" content="#000000">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header"><a class="brand" href="/" aria-label="SpawnWP home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>Spawn<strong>WP</strong></span></a><nav aria-label="Primary navigation"><a href="/">Home</a><a href="/docs/deploying-a-site/">Guide</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a></nav></header>
+  <main id="main">
+    <section class="section deploy-intro"><div><div class="eyebrow">Optional plugin · Public preview</div><h1>Publish once.<br><em>Keep your options.</em></h1></div><div><p class="lede">SpawnWP Deploy moves a project once from your lab to a fresh, empty WordPress installation. Use it when it fits; use any other deployment strategy when it does not.</p><div class="actions"><a class="button primary" href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip" download>Download 0.1.0-dev</a><a class="button secondary" href="/docs/deploying-a-site/">Read the guide</a></div><p class="preview-note"><strong>Public preview:</strong> test with disposable sites and keep an independent backup.</p></div></section>
+    <section class="section"><div class="eyebrow">Workflow</div><h2>A guarded initial publication.</h2><ol class="deploy-steps"><li><span>1</span><div><h3>Install on both sites</h3><p>Upload and activate the same plugin ZIP on the SpawnWP source and the fresh target.</p></div></li><li><span>2</span><div><h3>Connect for 15 minutes</h3><p>Generate a short-lived key on the target, paste it into the source and run preflight checks.</p></div></li><li><span>3</span><div><h3>Review and confirm</h3><p>The source transfers checksummed chunks. The target stages, verifies and activates only after confirmation.</p></div></li><li><span>4</span><div><h3>Health check or rollback</h3><p>The target preserves its URL and administrators, checks the result and automatically rolls back on failure.</p></div></li></ol></section>
+    <section class="section split"><div><div class="eyebrow">Compatibility</div><h2>Deliberately narrow.</h2></div><div class="prose"><p>Both sites must be WordPress single-site on the exact same core version and PHP major/minor version. PHP 8.1+, sodium, ZIP, trusted HTTPS, a reachable REST API, local uploads and direct filesystem writes are required.</p><p>The package limit is 2 GiB. WordPress core, users, <code>wp-config.php</code>, MU plugins, drop-ins and SpawnWP development tools are not copied.</p><p><strong>Not supported:</strong> existing or live targets, repeated pushes, data merging, selective sync, Multisite or object-storage uploads.</p></div></section>
+    <section class="section download-details"><div><div class="eyebrow">Verify the download</div><h2>Signed release files.</h2></div><div class="terminal-list"><a href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip.sha256">SHA-256 checksum</a><a href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip.sig">Ed25519 signature</a><a href="/downloads/spawnwp-deploy/release-public.pem">Public key</a><code>6fa5bd8e8ae669d4f8775279c8a05636f24162c62c011e1e7a7d274f0b4fee74</code></div></section>
+  </main>
+  <aside class="boundary"><strong>Clear boundary:</strong> SpawnWP Deploy is an optional convenience, not a managed deployment service.</aside>
+  <footer><a class="brand" href="/"><span>Spawn<strong>WP</strong></span></a><p>Self-hosted tooling for disposable WordPress development environments.</p><div><a href="/docs/deploying-a-site/">Documentation</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a></div></footer>
+</body>
+</html>

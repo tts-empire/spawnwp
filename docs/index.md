@@ -7,6 +7,10 @@ sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
 
+For an initial publication, the optional [SpawnWP Deploy plugin](deploying-a-site.md)
+can transfer a project once to a fresh, empty WordPress installation. Other deployment
+strategies remain fully supported.
+
 ```text
 install -> open cockpit -> create site -> done
 ```

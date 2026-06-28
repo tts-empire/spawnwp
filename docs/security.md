@@ -1,5 +1,12 @@
 # Security
 
+## Optional deployment plugin
+
+[SpawnWP Deploy](deploying-a-site.md) uses per-connection Ed25519 keys, signed requests,
+timestamps, nonces, body hashes and checksummed chunks. Connection keys expire after
+15 minutes. The target stages and verifies the package before activation and retains a
+seven-day rollback. The plugin is a public preview and is not installed by default.
+
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
 application authentication. Optional port-knocking hides the cockpit network surface.

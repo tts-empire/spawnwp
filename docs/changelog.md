@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- Added the refreshed public website with an accessible cockpit screenshot slider.
+- Published SpawnWP Deploy `0.1.0-dev` as an optional public preview with signed
+  downloads and a focused user guide.
+- Clarified SpawnWP's self-hosted lab positioning and managed-hosting boundary.
+
 ## 0.3.1
 
 - Added explicit 90-day telemetry enable/disable controls to the Updates page.

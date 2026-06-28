@@ -1,9 +1,12 @@
 # SpawnWP Deploy
 
-Development status: **unreleased**.
+Development status: **public preview**.
 
 SpawnWP Deploy publishes a SpawnWP site once to a fresh, empty WordPress installation.
 It is deliberately not a staging/synchronization engine.
+
+Download the preview package and verification files from
+<https://spawnwp.com/deploy/>. The plugin is optional and is not installed by SpawnWP.
 
 ## Requirements
 

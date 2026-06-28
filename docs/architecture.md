@@ -1,5 +1,9 @@
 # Architecture
 
+The optional [SpawnWP Deploy plugin](deploying-a-site.md) is separate from the host
+control plane. It runs inside WordPress on the source and target and communicates over
+the WordPress REST API; SpawnWP itself does not proxy, store or coordinate transfers.
+
 spawnwp is built around two ideas: **one host nginx as the TLS edge**, and **two
 hostnames** that cleanly separate WordPress content from admin tooling.
 

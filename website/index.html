@@ -14,6 +14,7 @@
   <meta name="theme-color" content="#000000">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/site.css">
+  <script src="/assets/site.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -25,6 +26,7 @@
     <nav aria-label="Primary navigation">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
+      <a href="/deploy/">Deploy</a>
       <a href="/docs/">Docs</a>
       <a href="https://github.com/tts-empire/spawnwp">GitHub</a>
     </nav>
@@ -32,16 +34,49 @@
 
   <main id="main">
     <section class="hero">
-      <div class="eyebrow">Self-hosted WordPress lab</div>
-      <h1>Modular.<br>Replicable.<br><em>Self-hosted.</em></h1>
-      <p class="lede">Turn a fresh VPS into a focused lab for temporary, isolated WordPress development environments. Your server, your data, your rules.</p>
-      <div class="actions">
-        <a class="button primary" href="#install">Install SpawnWP</a>
-        <a class="button secondary" href="/docs/">Read the docs</a>
+      <div class="hero-copy">
+        <div class="eyebrow">Free, self-hosted WordPress lab</div>
+        <h1>Your WordPress lab.<br>Your server.<br><em>Your rules.</em></h1>
+        <p class="lede">Turn a fresh VPS into your own disposable WordPress lab. Create isolated environments for plugins, themes, demos and experiments — without cloud sandbox limits, subscriptions or lock-in.</p>
+        <div class="actions">
+          <a class="button primary" href="#install">Install SpawnWP</a>
+          <a class="button secondary" href="/docs/">Read the docs</a>
+        </div>
+        <div class="terminal" aria-label="Installation command">
+          <span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code>
+        </div>
       </div>
-      <div class="terminal" aria-label="Installation command">
-        <span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code>
+      <div class="product-slider" data-slider aria-roledescription="carousel" aria-label="SpawnWP cockpit">
+        <div class="slides" aria-live="off">
+          <figure class="slide is-active" data-slide>
+            <picture><source srcset="/assets/screens/manage.webp" type="image/webp"><img src="/assets/screens/manage.png" width="1400" height="1125" alt="Manage view showing two isolated WordPress environments and their container health" fetchpriority="high"></picture>
+            <figcaption><strong>Manage</strong><span>Run each environment as an isolated stack.</span></figcaption>
+          </figure>
+          <figure class="slide" data-slide hidden>
+            <picture><source srcset="/assets/screens/deploy.webp" type="image/webp"><img src="/assets/screens/deploy.png" width="1536" height="1024" alt="Deploy view for choosing a blueprint and creating a WordPress environment" loading="lazy"></picture>
+            <figcaption><strong>Create</strong><span>Choose a blueprint, PHP runtime and site name.</span></figcaption>
+          </figure>
+          <figure class="slide" data-slide hidden>
+            <picture><source srcset="/assets/screens/updates.webp" type="image/webp"><img src="/assets/screens/updates.png" width="1417" height="876" alt="Updates view showing release status and optional anonymous telemetry control" loading="lazy"></picture>
+            <figcaption><strong>Stay in control</strong><span>See updates and choose whether to share anonymous usage.</span></figcaption>
+          </figure>
+        </div>
+        <div class="slider-controls">
+          <button type="button" data-prev aria-label="Previous screenshot">←</button>
+          <div class="slider-dots" role="group" aria-label="Choose screenshot">
+            <button type="button" data-dot="0" class="is-active" aria-label="Show Manage screenshot" aria-current="true"></button>
+            <button type="button" data-dot="1" aria-label="Show Create screenshot"></button>
+            <button type="button" data-dot="2" aria-label="Show Updates screenshot"></button>
+          </div>
+          <button type="button" data-next aria-label="Next screenshot">→</button>
+        </div>
       </div>
+    </section>
+
+    <section class="manifesto section-narrow">
+      <div class="eyebrow">A lab without the sandbox tax</div>
+      <p>Cloud WordPress sandboxes are useful — until the limits, expirations and recurring costs start getting in the way. SpawnWP gives you the same freedom to experiment, but on infrastructure you control.</p>
+      <strong>No monthly sandbox tax. No artificial limits. No lock-in.</strong>
     </section>
 
     <section class="principles" aria-label="Product principles">
@@ -64,7 +99,7 @@
 
     <section id="features" class="section">
       <div class="eyebrow">Built for development work</div>
-      <h2>A small control plane with practical defaults.</h2>
+      <h2>Everything needed for a focused WordPress lab.</h2>
       <div class="feature-grid">
         <article><div class="mini-mark">01</div><h3>Isolated stacks</h3><p>Each environment gets its own Nginx, PHP-FPM, MariaDB, Mailpit and Adminer containers.</p></article>
         <article><div class="mini-mark">02</div><h3>Web cockpit</h3><p>Create, start, stop, restart, snapshot, restore and destroy environments from one focused interface.</p></article>
@@ -72,13 +107,14 @@
         <article><div class="mini-mark">04</div><h3>Secure defaults</h3><p>HTTPS, isolated admin tooling, random secrets, loopback-only service ports and optional port-knocking.</p></article>
         <article><div class="mini-mark">05</div><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
         <article><div class="mini-mark">06</div><h3>No SaaS lock-in</h3><p>The runtime lives on your VPS and the project is distributed under the MIT License.</p></article>
+        <article class="feature-wide"><div class="mini-mark">Optional tool</div><h3>Publish once with SpawnWP Deploy</h3><p>Move a project to a fresh, empty WordPress installation with our optional plugin, or use any deployment workflow you prefer.</p><a href="/deploy/">Explore the public preview →</a></article>
       </div>
     </section>
 
     <section id="install" class="section install">
       <div>
         <div class="eyebrow">Get started</div>
-        <h2>Bring a fresh VPS and two hostnames.</h2>
+        <h2>Bring a fresh VPS. Spawn everything else.</h2>
         <p>Supported on Ubuntu 22.04/24.04 and Debian 12/13, on amd64 or arm64. Review requirements and DNS setup before running the installer.</p>
       </div>
       <div>
@@ -87,6 +123,8 @@
       </div>
     </section>
   </main>
+
+  <aside class="boundary"><strong>Clear boundary:</strong> built for test environments, demos and development labs. Not a managed hosting platform.</aside>
 
   <footer>
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>Spawn<strong>WP</strong></span></a>

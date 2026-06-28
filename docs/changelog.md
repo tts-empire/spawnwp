@@ -6,6 +6,13 @@
 - Added an upgrade migration that removes its services, package, configuration and
   installation metadata from existing hosts.
 
+## 0.3.11
+
+- Replaced raw PHP-switch build output in the cockpit with structured phases, a
+  progress bar and an explicit first-download notice.
+- Kept technical BuildKit output behind an expandable details control.
+- Added `.env` rollback and recovery of the previous PHP service when a switch fails.
+
 ## 0.3.10
 
 - Added inline Passkey reauthentication for sensitive cockpit actions after the
@@ -137,7 +144,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.10...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.11...HEAD
+[0.3.11]: https://github.com/tts-empire/spawnwp/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/tts-empire/spawnwp/compare/v0.3.7...v0.3.8

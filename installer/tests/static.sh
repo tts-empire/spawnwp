@@ -33,6 +33,9 @@ grep -q 'ExecStart=/usr/local/bin/spawnwp update' "$ROOT/installer/spawnwp-updat
 grep -q 'Install update' "$ROOT/runtime/updates.html"
 grep -q '/auth/reauth/start' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'UPDATE sessions SET recent_auth' "$ROOT/runtime/auth.py"
+grep -q 'php-switch-progress.py' "$ROOT/updater/managed-files.json"
+grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
+grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then
   echo "active runtime must not reference the removed cockpit network allow-list" >&2
   exit 1

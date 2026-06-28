@@ -85,6 +85,21 @@
   .output-head .out-label { font-size: 11px; color: var(--muted); font-family: monospace; }
   .output-body { padding: 12px; font-family: monospace; font-size: 12px; line-height: 1.6; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
   .output-line-err { color: var(--red); }
+  .php-progress { padding:16px; }
+  .php-progress-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+  .php-progress-head strong,.php-progress-head span { display:block; }
+  .php-progress-head strong { font-size:14px; }
+  .php-progress-head span { color:var(--muted); font-size:12px; margin-top:4px; }
+  .php-progress-head b { color:var(--accent); font-size:13px; font-variant-numeric:tabular-nums; }
+  .php-progress-track { height:9px; margin:14px 0 10px; overflow:hidden; border-radius:5px; background:var(--surface3); }
+  .php-progress-track > div { width:0; height:100%; border-radius:inherit; background:var(--accent); transition:width .25s ease; }
+  .php-progress-track > div.complete { background:var(--green); }
+  .php-progress-track > div.failed { background:var(--red); }
+  .php-progress-track > div.indeterminate { width:35% !important; animation:php-progress-indeterminate 1.2s ease-in-out infinite; }
+  @keyframes php-progress-indeterminate { from { transform:translateX(-110%); } to { transform:translateX(300%); } }
+  .php-first-notice { margin:10px 0; padding:9px 11px; border-left:3px solid var(--yellow); background:#251f10; color:var(--yellow); font-size:12px; line-height:1.45; }
+  .php-first-notice.cached { border-color:var(--green); background:#101d16; color:var(--green); }
+  .php-details { padding:3px 0; border:0; background:transparent; color:var(--muted); font-size:11px; text-decoration:underline; }
 
   .disk-visual { padding: 12px; border-bottom: 1px solid var(--border); display: none; }
   .disk-visual .dv-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0; color: var(--muted); margin-bottom: 6px; }

@@ -29,6 +29,7 @@
     "scripts/devkit.php",
     "scripts/destroy-project.sh",
     "scripts/new-project.sh",
+    "scripts/php-switch-progress.py",
     "scripts/reset.sh",
     "scripts/restore.sh",
     "scripts/snapshot.sh",

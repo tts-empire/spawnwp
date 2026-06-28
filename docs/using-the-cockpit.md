@@ -72,6 +72,10 @@ Use these controls to restart PHP after a configuration change, inspect a failin
 database health check, or read Mailpit/nginx errors. The larger **Up**, **Down** and
 **Restart** buttons below the table act on the site's entire container stack.
 
+The first switch to a PHP version downloads and compiles its image and can take several
+minutes. The cockpit shows structured progress and keeps the verbose BuildKit log under
+**Show technical details**. Cached PHP versions switch substantially faster.
+
 ### Snapshots & restore
 
 **Snapshot** saves a gzipped database dump plus a tar of `wp-content/uploads`. The last

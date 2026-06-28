@@ -59,6 +59,7 @@ PROJECTS_ROOT = Path("/srv")
 PRIMARY_PROJECT = PROJECTS_ROOT / "wp-dev"
 TEMPLATE_MARKER = PRIMARY_PROJECT / ".spawnwp" / "template-only"
 BLUEPRINT_TOOL = PRIMARY_PROJECT / "scripts" / "blueprint.py"
+PHP_SWITCH_TOOL = PRIMARY_PROJECT / "scripts" / "php-switch-progress.py"
 SPAWNWP_CLI = Path("/usr/local/bin/spawnwp")
 SPAWNWP_VERSION = Path("/var/lib/spawnwp/VERSION")
 UPDATE_SERVICE = "spawnwp-update.service"
@@ -116,7 +117,15 @@ async def stream_command(cmd: list[str], cwd: Path) -> AsyncIterator[str]:
         line = await proc.stdout.readline()
         if not line:
             break
-        yield f"data: {json.dumps(line.decode(errors='replace').rstrip())}\n\n"
+        decoded = line.decode(errors="replace").rstrip()
+        if decoded.startswith("::spawnwp-event::"):
+            try:
+                event = json.loads(decoded.removeprefix("::spawnwp-event::"))
+            except json.JSONDecodeError:
+                event = {"type": "log", "line": decoded}
+            yield f"data: {json.dumps(event)}\n\n"
+        else:
+            yield f"data: {json.dumps(decoded)}\n\n"
     await proc.wait()
     rc = proc.returncode
     yield f"data: {json.dumps(f'__EXIT__{rc}')}\n\n"
@@ -469,7 +478,9 @@ def php_switch(body: PhpSwitch):
         raise HTTPException(400, "Invalid PHP version")
     guard_not_busy()
     proj = resolve_project(body.project)
-    return sse_response(["make", "-s", "php-switch", f"VER={body.version}"], proj)
+    return sse_response([
+        "python3", str(PHP_SWITCH_TOOL), "--project", str(proj), "--version", body.version,
+    ], proj)
 
 
 @app.get("/api/blueprints")

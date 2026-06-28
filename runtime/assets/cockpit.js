@@ -18,6 +18,7 @@ let DEPLOY_ACTIVE = false;
 let PLATFORM = {};
 let UPDATE_RUNNING = false;
 let REAUTH_PROMISE = null;
+const PHP_SWITCH_ACTIVE = new Set();
 
 function webauthnB64(value) {
   const encoded = btoa(String.fromCharCode(...new Uint8Array(value)));
@@ -479,7 +480,7 @@ function renderTop(p) {
       <button class="btn-db btn-sm" onclick="openAdminer('${p.name}')">🗄 DB ▸</button>
       ${p.mail_url ? `<button class="btn-db btn-sm" onclick="window.open('${esc(p.mail_url)}','_blank','noopener')" title="Open Mailpit (captured mail)">✉️ Mailpit ▸</button>` : ''}
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
-      <select class="sensitive" onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
+      <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
         <option value="">PHP ${esc(p.php)} ▾</option>
         <option value="7.4">→ PHP 7.4 (legacy)</option>
         <option value="8.2">→ PHP 8.2</option>
@@ -575,6 +576,7 @@ function getOutputBox(id) {
   if (vis) { vis.style.display = 'none'; vis.innerHTML = ''; }
   const body = document.getElementById(id + '-body');
   body.textContent = '';
+  body.style.display = '';
   return body;
 }
 function closeBox(id) { document.getElementById(id).classList.remove('visible'); }
@@ -590,7 +592,7 @@ function appendLine(body, line, isErr) {
   body.scrollTop = body.scrollHeight;
 }
 
-function streamSSE(url, payload, boxId, onDone) {
+function streamSSE(url, payload, boxId, onDone, options = {}) {
   const body = getOutputBox(boxId);
   let completed = false;
   const finish = ok => {
@@ -605,7 +607,8 @@ function streamSSE(url, payload, boxId, onDone) {
   }).then(async res => {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
-      appendLine(body, '❌ ' + (err.detail || res.statusText), true);
+      if (options.onError) options.onError(new Error(err.detail || res.statusText), body);
+      else appendLine(body, '❌ ' + (err.detail || res.statusText), true);
       finish(false);
       return;
     }
@@ -622,9 +625,14 @@ function streamSSE(url, payload, boxId, onDone) {
         const match = part.match(/^data: (.+)$/m);
         if (!match) continue;
         const line = JSON.parse(match[1]);
+        if (line && typeof line === 'object') {
+          if (options.onEvent) options.onEvent(line, body);
+          continue;
+        }
         if (line.startsWith('__EXIT__')) {
           const rc = parseInt(line.replace('__EXIT__', ''));
-          appendLine(body, rc === 0 ? '✅ Done.' : `❌ Exited with code ${rc}`, rc !== 0);
+          if (options.onExit) options.onExit(rc, body);
+          else appendLine(body, rc === 0 ? '✅ Done.' : `❌ Exited with code ${rc}`, rc !== 0);
           finish(rc === 0);
           return;
         }
@@ -634,9 +642,76 @@ function streamSSE(url, payload, boxId, onDone) {
     appendLine(body, '⚠️ Connection closed before the final status. Refreshing state.', true);
     finish(false);
   }).catch(e => {
-    appendLine(body, '❌ ' + e.message, true);
+    if (options.onError) options.onError(e, body);
+    else appendLine(body, '❌ ' + e.message, true);
     finish(false);
   });
+}
+
+function initPhpProgress(project, target) {
+  const box = document.getElementById(`out-${project}`);
+  const visual = document.getElementById(`out-${project}-visual`);
+  const body = document.getElementById(`out-${project}-body`);
+  box.querySelector('.out-label').textContent = `PHP switch → ${target}`;
+  visual.style.display = 'block';
+  visual.className = 'disk-visual php-progress';
+  visual.innerHTML = `<div class="php-progress-head"><div><strong>Preparing PHP ${esc(target)}</strong><span id="php-phase-${project}">Checking image cache…</span></div><b id="php-percent-${project}">0%</b></div><div class="php-progress-track"><div id="php-bar-${project}"></div></div><div class="php-first-notice" id="php-notice-${project}" hidden></div><button class="php-details" type="button">Show technical details</button>`;
+  body.style.display = 'none';
+  visual.querySelector('.php-details').onclick = event => {
+    const opening = body.style.display === 'none';
+    body.style.display = opening ? 'block' : 'none';
+    event.target.textContent = opening ? 'Hide technical details' : 'Show technical details';
+  };
+}
+
+function phpProgressEvent(project, event, body) {
+  const phase = document.getElementById(`php-phase-${project}`);
+  const percent = document.getElementById(`php-percent-${project}`);
+  const bar = document.getElementById(`php-bar-${project}`);
+  const notice = document.getElementById(`php-notice-${project}`);
+  if (event.type === 'log') {
+    appendLine(body, event.line || '');
+    while (body.childElementCount > 500) body.firstElementChild.remove();
+    return;
+  }
+  if (event.type === 'start') {
+    if (event.first_download) {
+      notice.hidden = false;
+      notice.textContent = `First use of PHP ${event.target}: downloading and compiling the image may take several minutes.`;
+    } else {
+      notice.hidden = false;
+      notice.classList.add('cached');
+      notice.textContent = `PHP ${event.target} is already cached. This switch should be quick.`;
+    }
+    phase.textContent = `PHP ${event.previous} → PHP ${event.target}`;
+    return;
+  }
+  if (event.type === 'progress') {
+    phase.textContent = event.message || event.phase || 'Working…';
+    bar.classList.toggle('indeterminate', !!event.indeterminate);
+    if (event.percent != null) {
+      bar.style.width = `${Math.max(0, Math.min(100, event.percent))}%`;
+      percent.textContent = `${event.percent}%`;
+    } else {
+      percent.textContent = 'Working';
+    }
+    return;
+  }
+  if (event.type === 'complete') {
+    phase.textContent = event.message || 'PHP switch complete';
+    percent.textContent = '100%';
+    bar.classList.remove('indeterminate', 'failed');
+    bar.classList.add('complete');
+    bar.style.width = '100%';
+    return;
+  }
+  if (event.type === 'error') {
+    phase.textContent = event.message || 'PHP switch failed';
+    percent.textContent = 'Failed';
+    bar.classList.remove('indeterminate');
+    bar.classList.add('failed');
+    appendLine(body, `ERROR: ${event.message || 'PHP switch failed'}`, true);
+  }
 }
 
 function monitorProjectRefresh() {
@@ -724,9 +799,27 @@ function renderDiskVisual(vis, d) {
 
 function phpSwitch(project, version) {
   if (blockedIfBusy()) return;
+  if (PHP_SWITCH_ACTIVE.has(project)) {
+    showToast('A PHP switch is already running for this environment', true);
+    return;
+  }
+  PHP_SWITCH_ACTIVE.add(project);
+  delete projectSignatures[project];
+  loadProjects();
   streamSSE(`${BASE}/php-switch`, { project, version }, `out-${project}`, ok => {
-    if (ok) setTimeout(loadProjects, 2000);
+    PHP_SWITCH_ACTIVE.delete(project);
+    delete projectSignatures[project];
+    setTimeout(loadProjects, ok ? 1500 : 0);
+  }, {
+    onEvent: (event, body) => phpProgressEvent(project, event, body),
+    onExit: (code, body) => {
+      if (code !== 0 && !body.querySelector('.output-line-err')) {
+        appendLine(body, `Process exited with code ${code}`, true);
+      }
+    },
+    onError: (error, body) => phpProgressEvent(project, { type: 'error', message: error.message }, body),
   });
+  initPhpProgress(project, version);
 }
 
 function createProject(e) {

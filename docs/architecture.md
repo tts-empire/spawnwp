@@ -81,7 +81,6 @@ matching nginx blocks: the WordPress block on `DOMAIN`, the Adminer/Mailpit bloc
 | `nginx` | TLS edge + reverse proxy for both hostnames |
 | `certbot` | Let's Encrypt issuance + automatic renewal |
 | `wp-cockpit` (systemd) | The cockpit app |
-| `knockd` + `cockpit-reaper.timer` | Optional source-IP gate with idle expiry |
 | `docker-prune.timer` | Weekly Docker build-cache cleanup |
 
 See [Security](security.md) for the full protection model.

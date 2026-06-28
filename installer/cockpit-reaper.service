@@ -1,6 +1,0 @@
-[Unit]
-Description=Expire inactive SpawnWP knock sessions
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/lib/spawnwp/knock-session reap

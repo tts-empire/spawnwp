@@ -53,25 +53,6 @@ async def application_authentication(request: Request, call_next):
         response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'")
     return response
 
-# Keep an existing port-knock allow-list entry alive while the cockpit is in use.
-# This is a no-op when port-knocking is disabled or the source IP has not knocked.
-SESSIONS_DIR = Path("/run/cockpit-sessions")
-
-@app.middleware("http")
-async def keepalive_knock_session(request: Request, call_next):
-    ip = request.headers.get("x-real-ip")
-    if not ip:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        ip = forwarded.split(",")[0].strip() if forwarded else None
-    if ip:
-        try:
-            session = SESSIONS_DIR / ip
-            if session.exists():
-                session.touch()
-        except OSError:
-            pass
-    return await call_next(request)
-
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 PROJECTS_ROOT = Path("/srv")

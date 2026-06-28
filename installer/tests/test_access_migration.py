@@ -10,7 +10,7 @@ spec.loader.exec_module(migration)
 
 
 class AccessMigrationTests(unittest.TestCase):
-    def test_rewrite_removes_basic_auth_preserves_knocking_and_adds_rate_limit(self):
+    def test_rewrite_removes_legacy_access_and_adds_rate_limit(self):
         original = """map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 server {
     auth_basic "SpawnWP cockpit";
@@ -24,7 +24,7 @@ server {
 """
         updated = migration.rewrite_nginx(original)
         self.assertNotIn("auth_basic", updated)
-        self.assertIn("cockpit-allowed", updated)
+        self.assertNotIn("cockpit-allowed", updated)
         self.assertIn("limit_req_zone", updated)
         self.assertIn("limit_req zone=spawnwp_auth", updated)
         self.assertIn("location = /_spawnwp_auth", updated)

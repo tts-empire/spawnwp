@@ -56,7 +56,6 @@ validate_domain "$DOMAIN" || die "Invalid DOMAIN"
 validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN"
 [ "$DOMAIN" != "$COCKPIT_DOMAIN" ] || die "DOMAIN and COCKPIT_DOMAIN must differ"
 [[ "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid EMAIL"
-confirm ENABLE_PORT_KNOCKING "Enable port-knocking? Strongly recommended." 1
 echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs."
 echo "Privacy notice: https://spawnwp.com/privacy/telemetry"
 confirm ENABLE_TELEMETRY "Share anonymous usage statistics for 90 days?" 0
@@ -68,7 +67,7 @@ done
 if [ "$FORCE" = 1 ]; then
   log "Removing the previous SpawnWP control plane"
   [ ! -f /srv/wp-dev/compose.yaml ] || (cd /srv/wp-dev && docker compose down -v --remove-orphans) || true
-  systemctl disable --now wp-cockpit cockpit-reaper.timer spawnwp-telemetry.timer 2>/dev/null || true
+  systemctl disable --now wp-cockpit spawnwp-telemetry.timer 2>/dev/null || true
   rm -rf /srv/wp-dev /srv/wp-cockpit /etc/spawnwp /var/lib/spawnwp /opt/spawnwp
 fi
 
@@ -161,7 +160,6 @@ cat > /etc/spawnwp/config.env <<EOF
 DOMAIN=$DOMAIN
 COCKPIT_DOMAIN=$COCKPIT_DOMAIN
 EMAIL=$EMAIL
-ENABLE_PORT_KNOCKING=$ENABLE_PORT_KNOCKING
 ENABLE_TELEMETRY=$ENABLE_TELEMETRY
 EOF
 chmod 600 /etc/spawnwp/config.env
@@ -205,33 +203,6 @@ nginx -t && systemctl reload nginx
 certbot certonly --webroot -w /var/www/letsencrypt --non-interactive --agree-tos \
   --email "$EMAIL" --cert-name "$DOMAIN" -d "$DOMAIN" -d "$COCKPIT_DOMAIN"
 
-KNOCK_OPEN=""
-if [ "$ENABLE_PORT_KNOCKING" = 1 ]; then
-  apt-get install -y knockd
-  mapfile -t KNOCK_PORTS < <(shuf -i 20000-60000 -n 3)
-  KNOCK_OPEN="${KNOCK_PORTS[*]}"
-  install -m 0755 "$(src installer knock-session)" /usr/local/lib/spawnwp/knock-session
-  cat > /etc/knockd.conf <<EOF
-[options]
-    UseSyslog
-[openSpawnWP]
-    sequence = ${KNOCK_PORTS[0]},${KNOCK_PORTS[1]},${KNOCK_PORTS[2]}
-    seq_timeout = 10
-    command = /usr/local/lib/spawnwp/knock-session open %IP%
-    tcpflags = syn
-[closeSpawnWP]
-    sequence = ${KNOCK_PORTS[2]},${KNOCK_PORTS[1]},${KNOCK_PORTS[0]}
-    seq_timeout = 10
-    command = /usr/local/lib/spawnwp/knock-session close %IP%
-    tcpflags = syn
-EOF
-  interface=$(ip route show default | awk 'NR==1 {print $5}')
-  printf 'START_KNOCKD=1\nKNOCKD_OPTS="-i %s"\n' "$interface" > /etc/default/knockd
-  echo 'deny all;' > /etc/nginx/cockpit-allowed.conf
-  install -m 0644 "$(src installer cockpit-reaper.service)" "$(src installer cockpit-reaper.timer)" /etc/systemd/system/
-else
-  echo 'allow all;' > /etc/nginx/cockpit-allowed.conf
-fi
 render "$(src installer nginx.conf.tpl)" /etc/nginx/sites-available/spawnwp
 nginx -t && systemctl reload nginx
 
@@ -244,7 +215,6 @@ install -m 0644 "$(src installer wp-cockpit.service)" /etc/systemd/system/wp-coc
 install -m 0644 "$(src installer docker-prune.service)" "$(src installer docker-prune.timer)" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now wp-cockpit docker-prune.timer
-[ "$ENABLE_PORT_KNOCKING" != 1 ] || systemctl enable --now knockd cockpit-reaper.timer
 
 log "Starting the primary WordPress development environment"
 (cd /srv/wp-dev && docker compose build --pull php && docker compose up -d php)
@@ -254,7 +224,7 @@ for _ in $(seq 1 60); do
 done
 (cd /srv/wp-dev && docker compose up -d && make bootstrap && bash scripts/apply-blueprint.sh .spawnwp/blueprint.json)
 
-printf '{"port_knocking":%s,"telemetry":false}\n' "$([ "$ENABLE_PORT_KNOCKING" = 1 ] && echo true || echo false)" > /var/lib/spawnwp/features.json
+printf '{"telemetry":false}\n' > /var/lib/spawnwp/features.json
 if [ "$ENABLE_TELEMETRY" = 1 ]; then
   install -d -m 0700 /var/lib/spawnwp/telemetry
   install -m 0755 "$(src installer telemetry.py)" /usr/local/lib/spawnwp/telemetry.py
@@ -289,16 +259,6 @@ WordPress admin (primary environment)
   user: $WP_ADMIN_USER
   pass: $WP_ADMIN_PASS
 
-Port-knocking: $([ "$ENABLE_PORT_KNOCKING" = 1 ] && echo enabled || echo disabled)
-EOF
-if [ "$ENABLE_PORT_KNOCKING" = 1 ]; then
-  cat >> "$REPORT" <<EOF
-  open sequence: $KNOCK_OPEN
-  command: ./clients/knock.sh $COCKPIT_DOMAIN $KNOCK_OPEN
-EOF
-fi
-cat >> "$REPORT" <<EOF
-
 This root-only report is stored at:
   $REPORT
 
@@ -307,4 +267,4 @@ Read it again with:
 EOF
 chmod 600 "$REPORT"
 cat "$REPORT"
-echo "Next: knock if enabled, then follow the COCKPIT FIRST-TIME ACTIVATION steps above."
+echo "Next: follow the COCKPIT FIRST-TIME ACTIVATION steps above."

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- Removed the obsolete source-IP network gate from the installer and cockpit runtime.
+- Added an upgrade migration that removes its services, package, configuration and
+  installation metadata from existing hosts.
+
 ## 0.3.2
 
 - Added the refreshed public website with an accessible cockpit screenshot slider.

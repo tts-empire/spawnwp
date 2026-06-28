@@ -11,8 +11,10 @@ if grep -qE 'auth_basic|htpasswd' "$ROOT/install.sh" "$ROOT/installer/nginx.conf
   echo "ERROR: legacy HTTP Basic Auth found" >&2
   exit 1
 fi
-grep -q 'confirm ENABLE_PORT_KNOCKING .* 1' "$ROOT/install.sh"
-grep -q 'include /etc/nginx/cockpit-allowed.conf' "$ROOT/installer/nginx.conf.tpl"
+if grep -RIE 'port[-_ ]?knock|knockd|knock-session|cockpit-reaper' "$ROOT/install.sh" "$ROOT/runtime" "$ROOT/installer/nginx.conf.tpl"; then
+  echo "ERROR: obsolete network gate found" >&2
+  exit 1
+fi
 grep -q 'Share anonymous usage statistics for 90 days' "$ROOT/install.sh"
 grep -q 'telemetry.py enable' "$ROOT/install.sh"
 grep -q 'COCKPIT FIRST-TIME ACTIVATION' "$ROOT/install.sh"

@@ -54,14 +54,12 @@ server {
     }
     location @spawnwp_login { return 303 /login; }
     location /wp-dev-db/ {
-        include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
         error_page 401 = @spawnwp_login;
         proxy_pass http://127.0.0.1:9001/;
         add_header Cache-Control "no-store" always;
     }
     location /wp-dev-mail/ {
-        include /etc/nginx/cockpit-allowed.conf;
         auth_request /_spawnwp_auth;
         error_page 401 = @spawnwp_login;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
@@ -70,13 +68,11 @@ server {
     }
     # __COCKPIT_PER_SITE__
     location /assets/ {
-        include /etc/nginx/cockpit-allowed.conf;
         proxy_pass http://127.0.0.1:9393/assets/;
         proxy_buffering on;
         add_header Cache-Control "public, max-age=604800, immutable" always;
     }
     location ~ ^/api/auth/(setup/(start|finish)|passkey/(start|finish)|fallback)$ {
-        include /etc/nginx/cockpit-allowed.conf;
         limit_req zone=spawnwp_auth burst=10 nodelay;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_pass http://127.0.0.1:9393;
@@ -84,7 +80,6 @@ server {
         add_header Cache-Control "no-store" always;
     }
     location / {
-        include /etc/nginx/cockpit-allowed.conf;
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_pass http://127.0.0.1:9393/;
         proxy_read_timeout 300s;

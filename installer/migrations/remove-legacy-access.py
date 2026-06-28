@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Remove legacy HTTP Basic Auth while preserving optional port-knocking."""
+"""Remove legacy HTTP Basic Auth."""
 
 import os
 import re
@@ -13,7 +13,6 @@ CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG", "/etc/spawnwp/config.env"))
 REPORT = Path(os.environ.get("SPAWNWP_REPORT", "/root/spawnwp-credentials.txt"))
 
 AUTH_LOCATION = """    location ~ ^/api/auth/(setup/(start|finish)|passkey/(start|finish)|fallback)$ {
-        include /etc/nginx/cockpit-allowed.conf;
         limit_req zone=spawnwp_auth burst=10 nodelay;
         proxy_pass http://127.0.0.1:9393;
         proxy_set_header Host $host;
@@ -39,6 +38,7 @@ LOGIN_LOCATION = "    location @spawnwp_login { return 303 /login; }\n"
 
 
 def rewrite_nginx(content: str) -> str:
+    content = re.sub(r"^\s*include /etc/nginx/cockpit-allowed\.conf;\s*\n", "", content, flags=re.MULTILINE)
     content = re.sub(
         r"^\s*auth_basic(?:_user_file)?\s+[^;]+;\s*\n",
         "", content, flags=re.MULTILINE,

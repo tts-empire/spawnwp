@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {% set social_title = config.site_name if page.is_homepage else (page.title | striptags ~ " — " ~ config.site_name) %}
+  {% set social_description = page.meta.description if page.meta and page.meta.description else config.site_description %}
+  <meta property="og:title" content="{{ social_title }}">
+  <meta property="og:description" content="{{ social_description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:site_name" content="SpawnWP">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://spawnwp.com/assets/og-image.png">
+  <meta property="og:image:secure_url" content="https://spawnwp.com/assets/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SpawnWP — Modular. Replicable. Self-hosted.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ social_title }}">
+  <meta name="twitter:description" content="{{ social_description }}">
+  <meta name="twitter:image" content="https://spawnwp.com/assets/og-image.png">
+  <meta name="twitter:image:alt" content="SpawnWP — Modular. Replicable. Self-hosted.">
+{% endblock %}

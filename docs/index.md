@@ -8,9 +8,10 @@ sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
 
-For an initial publication, the optional [SpawnWP Deploy plugin](deploying-a-site.md)
-can transfer a project once to a fresh, empty WordPress installation. Other deployment
-strategies remain fully supported.
+When work is finished, you choose how to back it up, export it or publish it. The
+[optional SpawnWP Deploy WordPress plugin](deploying-a-site.md) is one narrowly scoped
+way to transfer a site once to a separate, fresh WordPress installation; SpawnWP does
+not require it.
 
 ```text
 install -> open cockpit -> create site -> done
@@ -67,8 +68,9 @@ The installer asks for the two hostnames and your Let's Encrypt email, then star
 empty cockpit and prints its one-time activation procedure.
 
 !!! note
-    SpawnWP is built for test environments, demos and development labs. It is not
-    managed hosting. See [Security](security.md) for the threat model and limits.
+    SpawnWP provides a self-hosted lab for development, testing and demos. You control
+    the server and choose how finished sites are backed up, exported or published. See
+    [Security](security.md) for the threat model and limits.
 
 ## License
 

@@ -13,6 +13,8 @@ MariaDB, Mailpit and Adminer services.
 | **Demo** | Presentable starter with Home, About and Contact pages, a static homepage and a Primary menu |
 
 Choose the blueprint and PHP version from the catalog on the cockpit's **Deploy** page.
+Here, Deploy means creating a local environment inside the SpawnWP lab, not publishing
+a finished site elsewhere.
 The blueprint controls
 which PHP versions it permits. WordPress is `latest` in schema v1.
 

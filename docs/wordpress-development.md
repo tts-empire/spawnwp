@@ -1,9 +1,9 @@
 # WordPress development
 
-When a project is ready for an initial publication, the optional
-[SpawnWP Deploy plugin](deploying-a-site.md) can copy it once to a fresh, empty
-WordPress installation. It is a convenience, not a required workflow or a continuous
-staging synchronization tool.
+When a project is finished, use any backup, export, migration or publishing workflow
+you prefer. The [optional SpawnWP Deploy WordPress plugin](deploying-a-site.md) is one
+way to copy a site once to a separate, fresh WordPress installation; it is not required
+by SpawnWP and is not a continuous staging synchronization tool.
 
 Every spawned site is a ready-to-use environment for building WordPress plugins and
 themes — especially ones headed for the **WordPress.org** directory.

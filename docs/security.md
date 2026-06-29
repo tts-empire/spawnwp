@@ -1,8 +1,11 @@
 # Security
 
-## Optional deployment plugin
+## Optional WordPress transfer plugin
 
-[SpawnWP Deploy](deploying-a-site.md) uses per-connection Ed25519 keys, signed requests,
+[SpawnWP Deploy](deploying-a-site.md) is an optional WordPress plugin for a one-time
+transfer to a separate, fresh WordPress installation. It is not part of environment
+creation and is never installed automatically. When explicitly installed, it uses
+per-connection Ed25519 keys, signed requests,
 timestamps, nonces, body hashes and checksummed chunks. Connection keys expire after
 15 minutes. The target stages and verifies the package before activation and retains a
 seven-day rollback. The plugin is a public preview and is not installed by default.

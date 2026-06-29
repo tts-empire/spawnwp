@@ -38,7 +38,7 @@ curl -fsSL https://spawnwp.com/install.sh \
 
 1. Detects the OS (Ubuntu/Debian) and installs prerequisites: Docker Engine + Compose,
    nginx, certbot and supporting tools.
-2. Deploys the generic environment template and the cockpit app, without creating
+2. Installs the generic environment template and the cockpit app, without creating
    a WordPress environment or starting application containers.
 3. Generates fresh application-authentication secrets for this install.
 4. Configures nginx for both hostnames and obtains a **single SAN TLS certificate**

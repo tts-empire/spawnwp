@@ -49,8 +49,8 @@ application authentication: passkey preferred, or password with TOTP and recover
   no Docker socket exposure, loopback-only service ports, automatic TLS.
 - **Portable** — Ubuntu 22.04/24.04/26.04 and Debian 12/13, amd64 and arm64; web traffic uses
   ports 80/443.
-- **Not managed hosting** — built for test environments, demos and development
-  labs, not production hosting or client control panels.
+- **A lab, not a hosting panel** — use it for development, testing and demos on
+  infrastructure you control, not for production hosting or client accounts.
 
 ## Quickstart
 

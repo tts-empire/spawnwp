@@ -7,6 +7,9 @@ focused pages:
   controls. It is the default page.
 - **Deploy** (`/deploy`) creates local environments from blueprints.
 
+In the cockpit, **Deploy** always means “create an environment inside this SpawnWP
+lab.” It does not publish that environment to another server or WordPress installation.
+
 Both pages show the same live host summary: circular RAM, disk and normalized load KPIs,
 plus numeric uptime.
 

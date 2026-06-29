@@ -22,3 +22,11 @@
   <meta name="twitter:image" content="https://spawnwp.com/assets/og-spawnwp-wordpress-lab.png">
   <meta name="twitter:image:alt" content="SpawnWP: create isolated WordPress sites on your own server">
 {% endblock %}
+
+{% block footer %}
+  {{ super() }}
+  <a class="support-fab" href="https://buymeacoffee.com/spawnwp.com" target="_blank" rel="noopener noreferrer" aria-label="Support SpawnWP — buy me a coffee">
+    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 3.5v2M10.5 3.5v2M14 3.5v2"/></svg>
+    <span>Buy me a coffee</span>
+  </a>
+{% endblock %}

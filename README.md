@@ -3,7 +3,7 @@
 
 <p align="center">
   <strong>A self-hosted WordPress lab for disposable dev environments.</strong><br>
-  Bring your VPS. Spawn temporary WordPress projects without server babysitting.
+  Bring your server. Spawn temporary WordPress projects without server babysitting.
 </p>
 
 <p align="center">
@@ -15,7 +15,8 @@
 
 ---
 
-SpawnWP turns a fresh VPS into a WordPress lab for temporary, isolated and
+SpawnWP turns a fresh Debian or Ubuntu server — cloud VM/VPS, dedicated or bare
+metal — into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
@@ -53,8 +54,8 @@ application authentication: passkey preferred, or password with TOTP and recover
 
 ## Quickstart
 
-You need a fresh VPS (root) and **two hostnames you control**, both pointing at the
-VPS — one for your sites, one for the cockpit. The installer handles the server
+You need a fresh supported server (root) and **two hostnames you control**, both
+pointing at it — one for your sites, one for the cockpit. The installer handles the server
 setup; after that, day-to-day work happens in the browser.
 
 ```bash
@@ -87,7 +88,7 @@ Then the workflow is:
 | Guide | |
 |---|---|
 | [Requirements](docs/requirements.md) | What you need before installing |
-| [DNS setup](docs/dns-setup.md) | Point your two hostnames at the VPS |
+| [DNS setup](docs/dns-setup.md) | Point your two hostnames at the server |
 | [Installation](docs/installation.md) | The one-liner, explained |
 | [Accessing the cockpit](docs/accessing-the-cockpit.md) | Passkeys, TOTP and recovery access |
 | [Using the cockpit](docs/using-the-cockpit.md) | Create, reset and destroy environments |

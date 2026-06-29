@@ -29,13 +29,13 @@ SPAWNWP_RELEASE_KEY=/secure/path/release-private.pem \
 ```
 
 The publishing script refuses to replace an existing release. Verify the release from an
-installed server with `spawnwp update --check`; then test update and rollback on a staging
-VPS before announcing it.
+installed server with `spawnwp update --check`; then test update and rollback on a clean
+staging server before announcing it.
 
-## Clean-VPS acceptance gate
+## Clean-server acceptance gate
 
 A release is not stable until its public installer and signed assets pass on a separate,
-fresh VPS. The development/origin host is not an acceptable substitute. Verify:
+fresh server. The development/origin host is not an acceptable substitute. Verify:
 
 - installation, one-time activation, Passkey, TOTP and recovery codes;
 - an initially empty cockpit and deployment with every built-in blueprint;
@@ -46,8 +46,8 @@ fresh VPS. The development/origin host is not an acceptable substitute. Verify:
 - telemetry enable/disable, dashboard update, reboot persistence and rollback;
 - `nginx -t`, `certbot renew --dry-run`, and public exposure limited to ports 80/443.
 
-Do not repair the staging VPS manually. Fix the repository, publish a new signed release,
-update the staging VPS through the product, and repeat the failed test.
+Do not repair the staging server manually. Fix the repository, publish a new signed release,
+update the staging server through the product, and repeat the failed test.
 
 ## Repository transition
 

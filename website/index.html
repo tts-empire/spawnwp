@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SpawnWP — Disposable WordPress labs on your VPS</title>
-  <meta name="description" content="SpawnWP turns a Debian or Ubuntu VPS into a self-hosted WordPress lab for isolated, disposable development environments.">
+  <title>SpawnWP — Disposable WordPress labs on your server</title>
+  <meta name="description" content="SpawnWP turns a Debian or Ubuntu server — cloud VM, VPS, dedicated or bare metal — into a self-hosted WordPress lab for isolated, disposable development environments.">
   <link rel="canonical" href="https://spawnwp.com/">
   <meta property="og:title" content="SpawnWP — Modular. Replicable. Self-hosted.">
   <meta property="og:description" content="A self-hosted WordPress lab for disposable development environments.">
@@ -37,13 +37,14 @@
       <div class="hero-copy">
         <div class="eyebrow">Free, self-hosted WordPress lab</div>
         <h1>Your WordPress lab.<br>Your server.<br><em>Your rules.</em></h1>
-        <p class="lede">Turn a fresh VPS into your own disposable WordPress lab. Create isolated environments for plugins, themes, demos and experiments — without cloud sandbox limits, subscriptions or lock-in.</p>
+        <p class="lede">Turn a fresh Debian or Ubuntu server into your own disposable WordPress lab — whether it is a cloud VM, VPS, dedicated server or bare metal. Create isolated environments without sandbox limits, subscriptions or lock-in.</p>
         <div class="actions">
           <a class="button primary" href="#install">Install SpawnWP</a>
           <a class="button secondary" href="/docs/">Read the docs</a>
         </div>
         <div class="terminal" aria-label="Installation command">
           <span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code>
+          <button class="copy-command" type="button" data-copy-command aria-label="Copy installation command" title="Copy command"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg></button>
         </div>
       </div>
       <div class="product-slider" data-slider aria-roledescription="carousel" aria-label="SpawnWP cockpit">
@@ -81,19 +82,19 @@
 
     <section class="principles" aria-label="Product principles">
       <article><span>01</span><h2>Disposable by design</h2><p>Create an environment for a task. Reset it, snapshot it or destroy it when the work is done.</p></article>
-      <article><span>02</span><h2>Self-hosted first</h2><p>Run on your own Debian or Ubuntu VPS without a hosted control plane or SaaS dependency.</p></article>
+      <article><span>02</span><h2>Self-hosted first</h2><p>Run on your own Debian or Ubuntu server without a hosted control plane or SaaS dependency.</p></article>
       <article><span>03</span><h2>Simple operations</h2><p>Use the web cockpit for routine work and clear logs when you need to inspect the system.</p></article>
     </section>
 
     <section id="how" class="section split">
       <div>
         <div class="eyebrow">A short path to a clean lab</div>
-        <h2>From fresh VPS to WordPress environments.</h2>
+        <h2>From a fresh server to WordPress environments.</h2>
       </div>
       <ol class="steps">
         <li><span>1</span><div><h3>Point two hostnames</h3><p>One hostname serves WordPress sites; the other keeps the authenticated cockpit separate.</p></div></li>
         <li><span>2</span><div><h3>Run one guided installer</h3><p>SpawnWP configures Docker, Nginx, TLS and the cockpit on supported Debian and Ubuntu systems.</p></div></li>
-        <li><span>3</span><div><h3>Spawn and discard</h3><p>Create isolated sites from the cockpit, work locally on the VPS, and remove them without keeping fragile shared state.</p></div></li>
+        <li><span>3</span><div><h3>Spawn and discard</h3><p>Create isolated sites from the cockpit, work on infrastructure you control, and remove them without keeping fragile shared state.</p></div></li>
       </ol>
     </section>
 
@@ -106,7 +107,7 @@
         <article><div class="mini-mark">03</div><h3>WordPress QA</h3><p>The development blueprint includes Plugin Check, Theme Check, PHPCS, PHPStan and Query Monitor.</p></article>
         <article><div class="mini-mark">04</div><h3>Secure defaults</h3><p>HTTPS, mandatory cockpit authentication, random secrets and loopback-only service ports.</p></article>
         <article><div class="mini-mark">05</div><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
-        <article><div class="mini-mark">06</div><h3>No SaaS lock-in</h3><p>The runtime lives on your VPS and the project is distributed under the MIT License.</p></article>
+        <article><div class="mini-mark">06</div><h3>No SaaS lock-in</h3><p>The runtime lives on your server and the project is distributed under the MIT License.</p></article>
         <article class="feature-wide"><div class="mini-mark">Optional tool</div><h3>Publish once with SpawnWP Deploy</h3><p>Move a project to a fresh, empty WordPress installation with our optional plugin, or use any deployment workflow you prefer.</p><a href="/deploy/">Explore the public preview →</a></article>
       </div>
     </section>
@@ -114,11 +115,11 @@
     <section id="install" class="section install">
       <div>
         <div class="eyebrow">Get started</div>
-        <h2>Bring a fresh VPS. Spawn everything else.</h2>
+        <h2>Bring a fresh server. Spawn everything else.</h2>
         <p>Supported on Ubuntu 22.04/24.04/26.04 and Debian 12/13, on amd64 or arm64. Review requirements and DNS setup before running the installer.</p>
       </div>
       <div>
-        <div class="terminal"><span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code></div>
+        <div class="terminal" aria-label="Installation command"><span>$</span><code>curl -fsSL https://spawnwp.com/install.sh | sudo bash</code><button class="copy-command" type="button" data-copy-command aria-label="Copy installation command" title="Copy command"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg></button></div>
         <div class="actions"><a class="button primary" href="/docs/installation/">Installation guide</a><a class="button secondary" href="https://github.com/tts-empire/spawnwp">View source</a></div>
       </div>
     </section>

@@ -19,7 +19,8 @@ main interface.
 | **Disk** | 20 GB+ (WordPress images, databases, snapshots) |
 | **State** | a **fresh** machine — the installer expects to own `/srv` and the nginx config |
 
-A cloud VPS (Hetzner, OCI, DigitalOcean, Vultr, …) is ideal. ARM instances work great.
+A cloud VM or VPS, a dedicated server, or bare-metal hardware all work. ARM servers
+are supported as long as the operating system and architecture requirements above are met.
 
 ## Network
 
@@ -32,13 +33,13 @@ A cloud VPS (Hetzner, OCI, DigitalOcean, Vultr, …) is ideal. ARM instances wor
 
 ## Two hostnames
 
-SpawnWP uses **two DNS names that you choose**, both pointing at the VPS:
+SpawnWP uses **two DNS names that you choose**, both pointing at the server:
 
 - one for your **WordPress content** (e.g. `dev.example.com`)
 - one for the **cockpit** and admin tools (e.g. `cockpit.example.com`)
 
 They can be any names you control. See [DNS setup](dns-setup.md) for how to configure
-them — and note that **both must resolve to the VPS before you install**, because the
+them — and note that **both must resolve to the server before you install**, because the
 installer obtains a TLS certificate for both during setup.
 
 ## Email

@@ -1,6 +1,6 @@
 # Installation
 
-With your [two hostnames pointing at the VPS](dns-setup.md), install SpawnWP with a
+With your [two hostnames pointing at the server](dns-setup.md), install SpawnWP with a
 single command, run as **root**. The installer is meant to get you out of SSH and
 into the cockpit as quickly as possible.
 

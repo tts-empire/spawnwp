@@ -10,7 +10,7 @@ the account factors are unavailable, use `sudo spawnwp auth reset` from the serv
 Let's Encrypt validates over HTTP on port 80 for **both** hostnames. Common causes:
 
 - **DNS not propagated** — `dig +short DOMAIN` and `dig +short COCKPIT_DOMAIN` must both
-  return the VPS IP *before* installing. See [DNS setup](dns-setup.md).
+  return the server IP *before* installing. See [DNS setup](dns-setup.md).
 - **Port 80 blocked** — open 80 (and 443) in any cloud firewall/security group.
 - **Cloudflare proxy on** — set the records to "DNS only" (grey cloud) for the install.
 

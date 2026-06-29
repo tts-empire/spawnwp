@@ -1,4 +1,42 @@
 (() => {
+  const fallbackCopy = (text) => {
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    input.select();
+    const copied = document.execCommand('copy');
+    input.remove();
+    if (!copied) throw new Error('Copy is not available');
+  };
+
+  document.querySelectorAll('[data-copy-command]').forEach((button) => {
+    const original = button.innerHTML;
+    button.addEventListener('click', async () => {
+      const command = button.closest('.terminal')?.querySelector('code')?.textContent.trim();
+      if (!command) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(command);
+        else fallbackCopy(command);
+        button.classList.add('is-copied');
+        button.setAttribute('aria-label', 'Installation command copied');
+        button.setAttribute('title', 'Copied');
+        button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>';
+        window.setTimeout(() => {
+          button.classList.remove('is-copied');
+          button.setAttribute('aria-label', 'Copy installation command');
+          button.setAttribute('title', 'Copy command');
+          button.innerHTML = original;
+        }, 1600);
+      } catch (_error) {
+        button.setAttribute('aria-label', 'Unable to copy; select the command manually');
+        button.setAttribute('title', 'Unable to copy');
+      }
+    });
+  });
+
   const slider = document.querySelector('[data-slider]');
   if (!slider) return;
 

@@ -2,7 +2,8 @@
 
 **A self-hosted WordPress lab for disposable dev environments.**
 
-SpawnWP turns a fresh VPS into a WordPress lab for temporary, isolated and
+SpawnWP turns a fresh Debian or Ubuntu server — cloud VM/VPS, dedicated or bare
+metal — into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
@@ -41,7 +42,7 @@ Query Monitor and Mailpit preinstalled.
 
 ## How it's laid out
 
-SpawnWP uses **two hostnames** that you choose and point at your VPS:
+SpawnWP uses **two hostnames** that you choose and point at your server:
 
 | Hostname | Serves |
 |---|---|
@@ -53,8 +54,8 @@ WordPress URLs and the cockpit. Every web interface uses ports 80/443.
 
 ## Get started
 
-1. [Requirements](requirements.md) — a fresh VPS and two hostnames.
-2. [DNS setup](dns-setup.md) — point your two hostnames at the VPS.
+1. [Requirements](requirements.md) — a fresh server and two hostnames.
+2. [DNS setup](dns-setup.md) — point your two hostnames at the server.
 3. [Installation](installation.md) — run the one-liner.
 4. [Accessing the cockpit](accessing-the-cockpit.md) — enroll, log in, create a site.
 

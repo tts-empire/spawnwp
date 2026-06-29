@@ -1,0 +1,4 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 8 * * * root flock -n /run/lock/spawnwp-telemetry-email.lock /usr/local/sbin/spawnwp-telemetry-email-report 2>&1 | logger -t spawnwp-telemetry-email

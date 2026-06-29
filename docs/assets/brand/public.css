@@ -28,3 +28,50 @@ body {
 .md-typeset code {
   border-radius: 4px;
 }
+
+/* Floating "Buy me a coffee" — self-contained (docs do not load site.css) */
+.support-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #f6b269;
+  border: 1px solid #f6b269;
+  color: #111;
+  font: 700 14px/1 Inter, Satoshi, "Helvetica Neue", Arial, sans-serif;
+  text-decoration: none;
+  box-shadow: 0 12px 34px rgba(246, 178, 105, .28);
+  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.support-fab svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  fill: none;
+  stroke: #111;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.support-fab:hover {
+  transform: translateY(-2px);
+  background: #f8c184;
+  box-shadow: 0 16px 40px rgba(246, 178, 105, .4);
+}
+.support-fab:focus-visible {
+  outline: 3px solid #f8f8f8;
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .support-fab span { display: none; }
+  .support-fab { right: 14px; bottom: 14px; padding: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .support-fab { transition: none; }
+  .support-fab:hover { transform: none; }
+}

@@ -1,0 +1,30 @@
+:root,
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0d0d10;
+  --md-accent-fg-color: #f6b26a;
+  --md-typeset-a-color: #f6b26a;
+}
+
+body {
+  font-family: Inter, Satoshi, "Helvetica Neue", Arial, sans-serif;
+}
+
+.md-header {
+  border-bottom: 1px solid #24242a;
+}
+
+.md-logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.md-typeset code {
+  border-radius: 4px;
+}

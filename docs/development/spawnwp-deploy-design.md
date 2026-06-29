@@ -1,3 +1,7 @@
+---
+description: Internal design notes for the unreleased SpawnWP Deploy WordPress transfer plugin.
+---
+
 # SpawnWP Deploy design (unreleased)
 
 > Internal design document. Do not add this page to the public MkDocs navigation until

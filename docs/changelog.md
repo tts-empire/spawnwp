@@ -1,3 +1,7 @@
+---
+description: Review SpawnWP release history, product changes, fixes and compatibility updates.
+---
+
 # Changelog
 
 ## 0.3.3

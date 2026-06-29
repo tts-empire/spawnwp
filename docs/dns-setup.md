@@ -1,3 +1,7 @@
+---
+description: Configure the two DNS hostnames required for SpawnWP sites and its authenticated web cockpit.
+---
+
 # DNS setup
 
 SpawnWP uses **two hostnames you choose**, both pointing at your server:

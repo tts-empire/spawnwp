@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#000"/>
   <g transform="translate(70 62) scale(.48)"><g fill="#343439"><rect width="48" height="48" rx="8"/><rect x="66" width="48" height="48" rx="8"/><rect y="66" width="48" height="48" rx="8"/><rect x="132" y="66" width="48" height="48" rx="8"/><rect y="132" width="48" height="48" rx="8"/><rect x="66" y="132" width="48" height="48" rx="8"/><rect x="132" y="132" width="48" height="48" rx="8"/></g><rect x="132" width="48" height="48" rx="8" fill="none" stroke="#f6b26a" stroke-width="8"/><rect x="66" y="66" width="48" height="48" rx="8" fill="#f6b26a"/></g>
-  <text x="178" y="130" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="64" font-weight="700">Spawn<tspan fill="#f6b26a">WP</tspan></text>
-  <text x="70" y="236" fill="#f6b26a" font-family="Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="2">SELF-HOSTED WORDPRESS DEVELOPMENT LAB</text>
-  <text x="70" y="335" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">Create isolated WordPress sites.</text>
-  <text x="70" y="410" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">On your own server.</text>
+  <text x="178" y="130" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="64" font-weight="700">Spawn<tspan fill="#f6b26a">WP</tspan> Deploy</text>
+  <text x="70" y="236" fill="#f6b26a" font-family="Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="2">OPTIONAL WORDPRESS TRANSFER PLUGIN</text>
+  <text x="70" y="335" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">Move a finished site once.</text>
+  <text x="70" y="410" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">To a fresh WordPress install.</text>
   <line x1="70" y1="482" x2="1130" y2="482" stroke="#343439" stroke-width="2"/>
-  <text x="70" y="540" fill="#a1a1aa" font-family="Arial,sans-serif" font-size="25">Free &amp; open source  ·  Debian / Ubuntu  ·  Focused web cockpit</text>
+  <text x="70" y="540" fill="#a1a1aa" font-family="Arial,sans-serif" font-size="25">Optional workflow  ·  Public preview  ·  Your publishing choice</text>
 </svg>

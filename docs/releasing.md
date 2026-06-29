@@ -1,3 +1,7 @@
+---
+description: Maintainer workflow for validating, signing and publishing a SpawnWP release.
+---
+
 # Releasing SpawnWP
 
 Releases are stable SemVer tags and immutable GitHub Release assets. The repository is

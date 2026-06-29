@@ -1,3 +1,7 @@
+---
+description: Install SpawnWP on a fresh Debian or Ubuntu server with the guided installer, HTTPS and cockpit authentication.
+---
+
 # Installation
 
 With your [two hostnames pointing at the server](dns-setup.md), install SpawnWP with a

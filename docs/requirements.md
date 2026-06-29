@@ -1,3 +1,7 @@
+---
+description: Check supported Debian and Ubuntu releases, architectures, server resources, DNS and network requirements for SpawnWP.
+---
+
 # Requirements
 
 You need a fresh server and two hostnames. The installer handles Docker, nginx,

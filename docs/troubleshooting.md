@@ -1,3 +1,7 @@
+---
+description: Diagnose common SpawnWP installation, DNS, TLS, authentication, container and WordPress environment problems.
+---
+
 # Troubleshooting
 
 ## The cockpit redirects to login

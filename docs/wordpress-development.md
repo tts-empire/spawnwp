@@ -1,3 +1,7 @@
+---
+description: Develop and test WordPress plugins and themes with SpawnWP, its QA tools, Mailpit, Adminer and WP-CLI.
+---
+
 # WordPress development
 
 When a project is finished, use any backup, export, migration or publishing workflow

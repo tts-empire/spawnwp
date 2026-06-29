@@ -1,3 +1,7 @@
+---
+description: Safely uninstall SpawnWP and understand which environments, volumes and server files will be removed.
+---
+
 # Uninstall
 
 SpawnWP installs into `/srv`, the host nginx config and systemd. To remove it, work from

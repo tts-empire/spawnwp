@@ -1,3 +1,7 @@
+---
+description: SpawnWP command-line reference for managing environments, updates, telemetry and server operations.
+---
+
 # CLI reference
 
 ## SpawnWP platform

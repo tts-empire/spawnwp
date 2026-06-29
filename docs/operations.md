@@ -1,3 +1,7 @@
+---
+description: Operate and maintain a SpawnWP server, including services, logs, TLS renewal, timers and routine diagnostics.
+---
+
 # Operations
 
 Day-to-day running of a SpawnWP host.

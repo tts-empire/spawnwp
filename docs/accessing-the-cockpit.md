@@ -1,3 +1,7 @@
+---
+description: Activate the SpawnWP cockpit, enroll secure authentication and sign in to manage WordPress development environments.
+---
+
 # Accessing the cockpit
 
 The cockpit is served over HTTPS at the `COCKPIT_DOMAIN` chosen during installation.

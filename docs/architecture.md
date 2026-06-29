@@ -1,3 +1,7 @@
+---
+description: Understand the SpawnWP architecture, container stacks, host services, filesystem layout and security boundaries.
+---
+
 # Architecture
 
 The optional [SpawnWP Deploy WordPress plugin](deploying-a-site.md) is separate from

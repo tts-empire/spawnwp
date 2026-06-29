@@ -1,3 +1,7 @@
+---
+description: Compare ways to publish or export a finished SpawnWP site, including the optional SpawnWP Deploy WordPress plugin.
+---
+
 # Publishing or exporting a finished site
 
 SpawnWP does not decide how you publish a finished WordPress site. You can create a

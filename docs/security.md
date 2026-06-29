@@ -1,3 +1,7 @@
+---
+description: Review SpawnWP security defaults, authentication, container isolation, threat model and operational responsibilities.
+---
+
 # Security
 
 ## Optional WordPress transfer plugin

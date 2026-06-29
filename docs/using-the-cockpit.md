@@ -1,3 +1,7 @@
+---
+description: Use the SpawnWP cockpit to create, manage, inspect, snapshot and destroy isolated WordPress environments.
+---
+
 # Using the cockpit
 
 Once you're [in the cockpit](accessing-the-cockpit.md), navigation is split into two

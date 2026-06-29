@@ -1,3 +1,7 @@
+---
+description: Learn how SpawnWP blueprints define repeatable WordPress development environments and what is currently implemented.
+---
+
 # Blueprints
 
 Blueprints define the WordPress state applied when SpawnWP creates a site. They do not

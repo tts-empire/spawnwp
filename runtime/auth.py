@@ -329,8 +329,13 @@ def setup_finish(body: CeremonyFinish, request: Request, response: Response):
             raise HTTPException(400, "Activation code is invalid, expired or already used")
         secret = _decrypt(payload["totp"])
         totp = pyotp.TOTP(secret, digest=hashlib.sha256)
-        if not totp.verify(body.totp, valid_window=1):
-            raise HTTPException(400, "Authenticator code is invalid")
+        if not totp.verify(body.totp, valid_window=2):
+            raise HTTPException(400, (
+                "Authenticator code rejected. Check the server clock is accurate "
+                "(sudo timedatectl set-ntp true) and that you scanned the QR code with an "
+                "app that supports SHA-256 (Aegis, 2FAS, 1Password, Bitwarden) instead of "
+                "typing the secret by hand."
+            ))
         try:
             verified = verify_registration_response(
                 credential=body.credential, expected_challenge=challenge["challenge"],
@@ -495,7 +500,7 @@ def fallback_login(body: FallbackLogin, request: Request, response: Response):
             totp = pyotp.TOTP(_decrypt(admin["totp_secret"]), digest=hashlib.sha256)
             import datetime
             now = datetime.datetime.now()
-            for offset in (-1, 0, 1):
+            for offset in (-2, -1, 0, 1, 2):
                 step = totp.timecode(now) + offset
                 if step > (admin["last_totp_step"] or -1) and hmac.compare_digest(totp.at(now, offset), body.second_factor):
                     connection.execute("UPDATE admins SET last_totp_step=? WHERE id=?", (step, admin["id"]))

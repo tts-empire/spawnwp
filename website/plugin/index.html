@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpawnWP Deploy — Optional WordPress transfer plugin</title>
+  <meta name="description" content="SpawnWP Deploy is an optional WordPress plugin that transfers a finished site once to a separate, fresh WordPress installation. Public preview.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <link rel="canonical" href="https://spawnwp.com/plugin/">
+  <meta property="og:title" content="SpawnWP Deploy — Optional WordPress transfer plugin">
+  <meta property="og:description" content="An optional WordPress plugin for transferring a finished site from SpawnWP to a separate, fresh WordPress installation.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://spawnwp.com/plugin/">
+  <meta property="og:site_name" content="SpawnWP">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://spawnwp.com/assets/og-spawnwp-deploy.png">
+  <meta property="og:image:secure_url" content="https://spawnwp.com/assets/og-spawnwp-deploy.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SpawnWP Deploy: optional WordPress transfer plugin">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SpawnWP Deploy — Optional WordPress transfer plugin">
+  <meta name="twitter:description" content="An optional WordPress plugin for transferring a finished site to a separate, fresh WordPress installation.">
+  <meta name="twitter:image" content="https://spawnwp.com/assets/og-spawnwp-deploy.png">
+  <meta name="twitter:image:alt" content="SpawnWP Deploy: optional WordPress transfer plugin">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/site.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"SpawnWP Deploy","url":"https://spawnwp.com/plugin/","description":"An optional WordPress plugin that transfers a finished site once to a separate, fresh WordPress installation.","runtimePlatform":"WordPress with PHP 8.1 or later","programmingLanguage":"PHP","version":"0.1.0-dev","license":"https://github.com/tts-empire/spawnwp/blob/main/LICENSE","codeRepository":"https://github.com/tts-empire/spawnwp","image":"https://spawnwp.com/assets/og-spawnwp-deploy.png"}</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="SpawnWP home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span>Spawn<strong>WP</strong></span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="/#how">How it works</a>
+      <a href="/#features">Features</a>
+      <a href="/plugin/" aria-current="page">Optional WP plugin</a>
+      <a href="/roadmap/">Roadmap</a>
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/tts-empire/spawnwp">GitHub</a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="section plugin-intro"><div><div class="eyebrow">Optional WordPress plugin · Public preview</div><h1>Transfer a finished WordPress site.<br><em>Only if you want to.</em></h1></div><div><figure class="plugin-shot"><img src="/assets/screens/plugin.png" width="1446" height="615" alt="SpawnWP Deploy plugin screen: paste a short-lived connection key to publish a finished site once to an empty WordPress destination" loading="lazy"><figcaption>The SpawnWP Deploy plugin running inside the source WordPress site.</figcaption></figure><p class="lede">You do not need this plugin to use SpawnWP. When your work is finished, you can back up, export, migrate or publish the site with any workflow you choose. SpawnWP Deploy is one optional WordPress plugin that can copy a site once to a separate, fresh WordPress installation.</p><div class="actions"><a class="button primary" href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip" download>Download WordPress plugin 0.1.0-dev</a><a class="button secondary" href="/docs/deploying-a-site/">Read the plugin guide</a></div><p class="preview-note"><strong>Public preview:</strong> use disposable test sites first and keep an independent backup.</p></div></section>
+    <section class="section split"><div><div class="eyebrow">Where this plugin fits</div><h2>Three different jobs. This plugin does the last one.</h2></div><div class="prose"><p><strong>Install SpawnWP</strong> sets up the lab and cockpit on your server — that is the one-line installer, not this page.</p><p><strong>Create a site</strong> from the cockpit to spin up a disposable WordPress environment and work in it.</p><p><strong>Move a finished site out</strong> is where this plugin helps: it copies a site once to a separate, fresh WordPress install. It stays optional — any backup or migration tool works just as well.</p></div></section>
+    <section class="section"><div class="eyebrow">If you choose this plugin</div><h2>One transfer between two WordPress sites.</h2><ol class="plugin-steps"><li><span>1</span><div><h3>Install the WordPress plugin twice</h3><p>Upload and activate the same plugin ZIP on the source site inside SpawnWP and on the separate, fresh target site.</p></div></li><li><span>2</span><div><h3>Connect the target briefly</h3><p>Generate a 15-minute connection key on the target WordPress site and paste it into the source.</p></div></li><li><span>3</span><div><h3>Review before transfer</h3><p>Run the compatibility checks, review the result and explicitly confirm before any content is copied.</p></div></li><li><span>4</span><div><h3>Verify or roll back</h3><p>The target stages and verifies the package, preserves its URL and administrators, and rolls back automatically if activation fails.</p></div></li></ol></section>
+    <section class="section split"><div><div class="eyebrow">Before you transfer</div><h2>Check it fits your case first.</h2></div><div class="prose"><p><strong>Use it when</strong> both the source and the destination are single-site WordPress, run the same core and PHP version (major.minor), and the destination is a brand-new, empty install.</p><p><strong>Your server needs</strong> PHP 8.1+ with the sodium and ZIP extensions, trusted HTTPS, a reachable REST API, local uploads and direct file writes. A single transfer can be up to 2 GiB. WordPress core, users, <code>wp-config.php</code>, MU plugins, drop-ins and SpawnWP's own dev tools stay behind on purpose.</p><p><strong>Reach for another tool when</strong> the destination already has content or is live, or when you need repeated pushes, content merging, selective sync, Multisite or object-storage uploads.</p></div></section>
+    <section class="section download-details"><div><div class="eyebrow">Verify the download</div><h2>Signed release files.</h2></div><div class="terminal-list"><a href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip.sha256">SHA-256 checksum</a><a href="/downloads/spawnwp-deploy/spawnwp-deploy-0.1.0-dev.zip.sig">Ed25519 signature</a><a href="/downloads/spawnwp-deploy/release-public.pem">Public key</a><code>6fa5bd8e8ae669d4f8775279c8a05636f24162c62c011e1e7a7d274f0b4fee74</code></div></section>
+  </main>
+  <aside class="boundary"><strong>Your publishing workflow remains yours:</strong> this WordPress plugin is never installed or run automatically, and SpawnWP does not require it. Use a backup, migration plugin, manual process or any other method whenever that is a better fit.</aside>
+  <footer><a class="brand" href="/"><span>Spawn<strong>WP</strong></span></a><p>Self-hosted tooling for disposable WordPress development environments.</p><div><a href="/docs/deploying-a-site/">Documentation</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a></div></footer>
+  <a class="support-fab" href="https://buymeacoffee.com/spawnwp.com" target="_blank" rel="noopener noreferrer" aria-label="Support SpawnWP — buy me a coffee"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 3.5v2M10.5 3.5v2M14 3.5v2"/></svg><span>Buy me a coffee</span></a>
+</body>
+</html>

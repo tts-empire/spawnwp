@@ -40,7 +40,7 @@
     <nav aria-label="Primary navigation">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
-      <a href="/deploy/">Optional WP plugin</a>
+      <a href="/plugin/">Optional WP plugin</a>
       <a href="/roadmap/">Roadmap</a>
       <a href="/docs/">Docs</a>
       <a href="https://github.com/tts-empire/spawnwp">GitHub</a>
@@ -49,6 +49,7 @@
 
   <main id="main">
     <section class="hero">
+      <div class="spawn-grid" aria-hidden="true"><i></i><i></i><i></i><i class="ghost"></i><i></i><i></i></div>
       <div class="hero-copy">
         <div class="eyebrow">Free, self-hosted WordPress lab</div>
         <h1>Your WordPress lab.<br>Your server.<br><em>Your rules.</em></h1>
@@ -96,9 +97,9 @@
     </section>
 
     <section class="principles" aria-label="Product principles">
-      <article><span>01</span><h2>Disposable by design</h2><p>Create an environment for a task. Reset it, snapshot it or destroy it when the work is done.</p></article>
-      <article><span>02</span><h2>Self-hosted first</h2><p>Run on your own Debian or Ubuntu server without a hosted control plane or SaaS dependency.</p></article>
-      <article><span>03</span><h2>Simple operations</h2><p>Use the web cockpit for routine work and clear logs when you need to inspect the system.</p></article>
+      <article><span class="cell-mark" data-cell="1" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h2>Disposable by design</h2><p>Create an environment for a task. Reset it, snapshot it or destroy it when the work is done.</p></article>
+      <article><span class="cell-mark" data-cell="5" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h2>Self-hosted first</h2><p>Run on your own Debian or Ubuntu server without a hosted control plane or SaaS dependency.</p></article>
+      <article><span class="cell-mark" data-cell="9" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h2>Simple operations</h2><p>Use the web cockpit for routine work and clear logs when you need to inspect the system.</p></article>
     </section>
 
     <section id="how" class="section split">
@@ -117,13 +118,13 @@
       <div class="eyebrow">Built for development work</div>
       <h2>Everything needed for a focused WordPress lab.</h2>
       <div class="feature-grid">
-        <article><div class="mini-mark">01</div><h3>Isolated stacks</h3><p>Each environment gets its own Nginx, PHP-FPM, MariaDB, Mailpit and Adminer containers.</p></article>
-        <article><div class="mini-mark">02</div><h3>Web cockpit</h3><p>Create, start, stop, restart, snapshot, restore and destroy environments from one focused interface.</p></article>
-        <article><div class="mini-mark">03</div><h3>WordPress QA</h3><p>The development blueprint includes Plugin Check, Theme Check, PHPCS, PHPStan and Query Monitor.</p></article>
-        <article><div class="mini-mark">04</div><h3>Secure defaults</h3><p>HTTPS, mandatory cockpit authentication, random secrets and loopback-only service ports.</p></article>
-        <article><div class="mini-mark">05</div><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
-        <article><div class="mini-mark">06</div><h3>No SaaS lock-in</h3><p>The runtime lives on your server and the project is distributed under the MIT License.</p></article>
-        <article class="feature-wide"><div class="mini-mark">Optional WordPress plugin</div><h3>Need to move a finished site out of your lab?</h3><p>Use any backup, migration or publishing workflow you prefer. If the destination is a separate, fresh WordPress installation, the optional SpawnWP Deploy plugin can transfer the site once for you. The plugin is not required to use SpawnWP.</p><a href="/deploy/">See the optional WordPress plugin →</a></article>
+        <article><span class="cell-mark" data-cell="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Isolated stacks</h3><p>Each environment gets its own Nginx, PHP-FPM, MariaDB, Mailpit and Adminer containers.</p></article>
+        <article><span class="cell-mark" data-cell="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Web cockpit</h3><p>Create, start, stop, restart, snapshot, restore and destroy environments from one focused interface.</p></article>
+        <article><span class="cell-mark" data-cell="6" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>WordPress QA</h3><p>The development blueprint includes Plugin Check, Theme Check, PHPCS, PHPStan and Query Monitor.</p></article>
+        <article><span class="cell-mark" data-cell="8" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Secure defaults</h3><p>HTTPS, mandatory cockpit authentication, random secrets and loopback-only service ports.</p></article>
+        <article><span class="cell-mark" data-cell="3" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
+        <article><span class="cell-mark" data-cell="7" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>No SaaS lock-in</h3><p>The runtime lives on your server and the project is distributed under the MIT License.</p></article>
+        <article class="feature-wide"><div class="mini-mark">Optional WordPress plugin</div><h3>Need to move a finished site out of your lab?</h3><p>Use any backup, migration or publishing workflow you prefer. If the destination is a separate, fresh WordPress installation, the optional SpawnWP Deploy plugin can transfer the site once for you. The plugin is not required to use SpawnWP.</p><a href="/plugin/">See the optional WordPress plugin →</a></article>
       </div>
     </section>
 
@@ -145,8 +146,8 @@
   <footer>
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>Spawn<strong>WP</strong></span></a>
     <p>Self-hosted tooling for disposable WordPress development environments.</p>
-    <a class="support-link" href="https://buymeacoffee.com/spawnwp.com" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h13v8a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V6Zm13 2h1.5a3.5 3.5 0 1 1 0 7H17v-2h1.5a1.5 1.5 0 1 0 0-3H17V8ZM6 3h2v2H6V3Zm4 0h2v2h-2V3Zm4 0h2v2h-2V3Z"/></svg><span>Buy me a coffee</span></a>
     <div><a href="/roadmap/">Roadmap</a><a href="/docs/">Documentation</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a><a href="https://github.com/tts-empire/spawnwp/blob/main/LICENSE">MIT License</a></div>
   </footer>
+  <a class="support-fab" href="https://buymeacoffee.com/spawnwp.com" target="_blank" rel="noopener noreferrer" aria-label="Support SpawnWP — buy me a coffee"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 3.5v2M10.5 3.5v2M14 3.5v2"/></svg><span>Buy me a coffee</span></a>
 </body>
 </html>

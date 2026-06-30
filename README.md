@@ -98,3 +98,23 @@ Then the workflow is:
 ## License
 
 [MIT](LICENSE) — © 2026 spawnwp contributors.
+
+## Roadmap
+
+SpawnWP is evolving as a self-hosted WordPress lab for teams. Planned directions
+include:
+
+- **Team access** — invited users, shared site visibility, and clear admin/member
+  permissions.
+- **Disposable-site lifecycle** — configurable expiry, advance warnings, and a safe
+  grace period before automatic cleanup.
+- **Reusable environments** — fast local cloning and versioned full-site templates
+  containing the database, uploads, plugins, and themes.
+- **Developer automation** — API tokens, CLI workflows, and Git integration for
+  repeatable plugin and theme development.
+- **Safer sharing and compatibility testing** — temporary demo access, one-click
+  WordPress admin links, and optional multisite environments.
+
+These are planned product directions, not delivery commitments or guaranteed dates.
+SpawnWP will remain focused on controlled, disposable development environments rather
+than anonymous public provisioning, WaaS, or production staging synchronization.

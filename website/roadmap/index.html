@@ -49,6 +49,26 @@
         <div class="eyebrow">Open source · Built with intention</div>
         <h1>What comes<em>next.</em></h1>
       </div>
+      <div class="roadmap-visual" aria-hidden="true">
+        <svg viewBox="0 0 620 500" role="img">
+          <defs><filter id="glow"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+          <circle class="orbit orbit-a" cx="310" cy="250" r="198"/>
+          <circle class="orbit orbit-b" cx="310" cy="250" r="132"/>
+          <circle class="orbit orbit-c" cx="310" cy="250" r="72"/>
+          <path class="route" d="M76 166 C164 92 218 174 310 110 S470 104 548 168"/>
+          <path class="route route-b" d="M76 336 C170 408 234 330 310 392 S470 404 548 330"/>
+          <g class="core" transform="translate(262 202)" filter="url(#glow)">
+            <rect x="0" y="0" width="24" height="24" rx="4"/><rect x="36" y="0" width="24" height="24" rx="4"/><rect x="72" y="0" width="24" height="24" rx="4"/>
+            <rect x="0" y="36" width="24" height="24" rx="4"/><rect class="hot" x="36" y="36" width="24" height="24" rx="4"/><rect x="72" y="36" width="24" height="24" rx="4"/>
+            <rect x="0" y="72" width="24" height="24" rx="4"/><rect x="36" y="72" width="24" height="24" rx="4"/><rect class="outline" x="72" y="72" width="24" height="24" rx="4"/>
+          </g>
+          <g class="roadmap-node node-one"><circle cx="112" cy="116" r="9"/><text x="130" y="122">TEAM</text></g>
+          <g class="roadmap-node node-two"><circle cx="518" cy="116" r="9"/><text x="430" y="122">TEMPLATES</text></g>
+          <g class="roadmap-node node-three"><circle cx="96" cy="386" r="9"/><text x="114" y="392">AUTOMATION</text></g>
+          <g class="roadmap-node node-four"><circle cx="530" cy="382" r="9"/><text x="444" y="388">SHARING</text></g>
+          <text class="core-label" x="310" y="374" text-anchor="middle">SELF-HOSTED CORE</text>
+        </svg>
+      </div>
       <div class="roadmap-intro">
         <p class="lede">SpawnWP is growing from a focused single-admin lab into a stronger self-hosted workspace for WordPress teams — without turning into another hosted control plane.</p>
         <p class="roadmap-note">This roadmap communicates direction, not deadlines. Priorities can change as the project learns from real-world use.</p>
@@ -64,19 +84,19 @@
     <section class="roadmap-section">
       <div class="roadmap-heading"><div class="eyebrow">Now · Team foundation</div><div><h2>One lab.<br>A whole team.</h2><p>The first priority is safe collaboration and a lifecycle that keeps disposable infrastructure genuinely disposable.</p></div></div>
       <div class="roadmap-grid">
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">01</span><h3>Team access</h3><p>Invite members into the cockpit, share site visibility and keep platform-level controls with administrators.</p></article>
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">02</span><h3>Disposable-site lifecycle</h3><p>Default expiry, clear advance warnings and a safe grace period before automatic cleanup reclaims resources.</p></article>
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">03</span><h3>Fast local cloning</h3><p>Duplicate a complete environment while regenerating its URL, credentials, salts, ports and private secrets.</p></article>
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">04</span><h3>Reusable site templates</h3><p>Turn a working site into a versioned template with its database, media, plugins and themes ready to spawn again.</p></article>
+        <article class="roadmap-card" data-glyph="team"><span class="status-pill">Planned</span><span class="index">01</span><h3>Team access</h3><p>Invite members into the cockpit, share site visibility and keep platform-level controls with administrators.</p></article>
+        <article class="roadmap-card" data-glyph="time"><span class="status-pill">Planned</span><span class="index">02</span><h3>Disposable-site lifecycle</h3><p>Default expiry, clear advance warnings and a safe grace period before automatic cleanup reclaims resources.</p></article>
+        <article class="roadmap-card" data-glyph="clone"><span class="status-pill">Planned</span><span class="index">03</span><h3>Fast local cloning</h3><p>Duplicate a complete environment while regenerating its URL, credentials, salts, ports and private secrets.</p></article>
+        <article class="roadmap-card" data-glyph="template"><span class="status-pill">Planned</span><span class="index">04</span><h3>Reusable site templates</h3><p>Turn a working site into a versioned template with its database, media, plugins and themes ready to spawn again.</p></article>
       </div>
     </section>
 
     <section class="roadmap-section">
       <div class="roadmap-heading"><div class="eyebrow">Next · Developer workflows</div><div><h2>Less repetition.<br>More momentum.</h2><p>Once the team foundation is solid, SpawnWP can become easier to automate and connect to existing development workflows.</p></div></div>
       <div class="roadmap-grid">
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">05</span><h3>API tokens and CLI automation</h3><p>Create, inspect, snapshot and destroy environments from trusted CI pipelines and local developer tools.</p></article>
-        <article class="roadmap-card"><span class="status-pill">Planned</span><span class="index">06</span><h3>Git integration</h3><p>Bring plugin and theme repositories into repeatable environments and run their build or test workflows consistently.</p></article>
-        <article class="roadmap-card wide"><span class="status-pill">Planned</span><span class="index">07</span><h3>Safer temporary sharing</h3><p>Share short-lived demos and issue one-click WordPress admin access without exposing permanent credentials or opening anonymous provisioning.</p></article>
+        <article class="roadmap-card" data-glyph="api"><span class="status-pill">Planned</span><span class="index">05</span><h3>API tokens and CLI automation</h3><p>Create, inspect, snapshot and destroy environments from trusted CI pipelines and local developer tools.</p></article>
+        <article class="roadmap-card" data-glyph="git"><span class="status-pill">Planned</span><span class="index">06</span><h3>Git integration</h3><p>Bring plugin and theme repositories into repeatable environments and run their build or test workflows consistently.</p></article>
+        <article class="roadmap-card wide" data-glyph="share"><span class="status-pill">Planned</span><span class="index">07</span><h3>Safer temporary sharing</h3><p>Share short-lived demos and issue one-click WordPress admin access without exposing permanent credentials or opening anonymous provisioning.</p></article>
       </div>
     </section>
 

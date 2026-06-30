@@ -58,7 +58,10 @@ creates a new one-time activation code.
 - **Activation code rejected:** check that it was copied completely and has not expired or
   already been consumed. Run `sudo spawnwp auth reset` if recovery is required.
 - **Passkey unavailable:** sign in with the password plus TOTP.
-- **TOTP rejected:** verify that the phone and server clocks are synchronized.
+- **TOTP rejected:** verify that the phone and server clocks are synchronized
+  (`sudo timedatectl set-ntp true`); the timezone does not matter, only the absolute
+  time. SpawnWP uses SHA-256 codes, so scan the QR rather than typing the secret by
+  hand, and use an app that honours SHA-256 such as Aegis, 2FAS, 1Password or Bitwarden.
 - **Recovery code rejected:** recovery codes are single-use. Try an unused code.
 - **Too many attempts:** wait for the rate-limit window before retrying.
 

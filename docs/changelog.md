@@ -4,6 +4,15 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.3.12
+
+- Widened the first-run authenticator window to ±60 seconds so a small server clock
+  drift no longer rejects every TOTP code during enrollment.
+- Applied the same tolerance to password-plus-TOTP fallback sign-in; the single-use
+  replay guard is unchanged.
+- Replaced the generic setup rejection message with guidance pointing at the real
+  causes: server clock skew and authenticator apps that ignore the SHA-256 algorithm.
+
 ## 0.3.3
 
 - Removed the obsolete source-IP network gate from the installer and cockpit runtime.

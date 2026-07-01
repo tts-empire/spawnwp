@@ -1,5 +1,17 @@
-/* SpawnWP contact concierge — scripted chat widget, first-party, no dependencies.
-   Design tokens are reused from site.css (--apricot, --off, --slate, --line…). */
+/* SpawnWP contact concierge — scripted chat widget, first-party, no dependencies. */
+
+/* Self-contained tokens: define them on the widget roots so it renders the same
+   on the landing (site.css present) and on the MkDocs docs (site.css absent).
+   Without this the docs pages leave var(--apricot) undefined and the SVG icon,
+   which is drawn with stroke:var(--apricot), disappears. */
+.cx-launcher, .cx-panel {
+  --apricot: #f6b269;
+  --off: #f8f8f8;
+  --slate: #a1a1aa;
+  --charcoal: #0d0d10;
+  --muted: #2a2a2f;
+  --line: #24242a;
+}
 
 .cx-launcher {
   position: fixed;

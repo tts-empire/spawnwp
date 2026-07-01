@@ -36,16 +36,8 @@ def render_report(command: str) -> str:
     return result.stdout.strip()
 
 
-def send_report(config: dict, report: str, now: datetime) -> None:
-    message = EmailMessage()
-    message["From"] = config["from"]
-    message["To"] = config["to"]
-    message["Subject"] = f"SpawnWP daily telemetry report — {now:%Y-%m-%d}"
-    message.set_content(
-        f"SpawnWP aggregate telemetry snapshot\n"
-        f"Generated: {now.isoformat()}\n\n{report}\n"
-    )
-
+def send_message(config: dict, message: EmailMessage) -> None:
+    """Send a prepared message over the configured SMTP relay."""
     context = ssl.create_default_context()
     if config["security"] == "ssl":
         with smtplib.SMTP_SSL(config["host"], config["port"], timeout=30, context=context) as smtp:
@@ -58,6 +50,18 @@ def send_report(config: dict, report: str, now: datetime) -> None:
             smtp.ehlo()
             smtp.login(config["username"], config["password"])
             smtp.send_message(message)
+
+
+def send_report(config: dict, report: str, now: datetime) -> None:
+    message = EmailMessage()
+    message["From"] = config["from"]
+    message["To"] = config["to"]
+    message["Subject"] = f"SpawnWP daily telemetry report — {now:%Y-%m-%d}"
+    message.set_content(
+        f"SpawnWP aggregate telemetry snapshot\n"
+        f"Generated: {now.isoformat()}\n\n{report}\n"
+    )
+    send_message(config, message)
 
 
 def main() -> None:

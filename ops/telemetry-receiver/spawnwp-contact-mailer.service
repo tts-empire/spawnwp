@@ -1,0 +1,14 @@
+[Unit]
+Description=Deliver queued SpawnWP contact-concierge messages
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/spawnwp-telemetry-receiver
+ExecStart=/usr/bin/python3 contact_mailer.py
+# Runs as root so it can read /etc/spawnwp-telemetry-mail.json; the public
+# receiver never has access to the SMTP credentials.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spawnwp-contact

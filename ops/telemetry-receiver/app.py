@@ -4,12 +4,13 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -18,6 +19,9 @@ DB_PATH = Path(os.environ.get("SPAWNWP_TELEMETRY_DB", "/var/lib/spawnwp-telemetr
 KEY_PATH = Path(os.environ.get("SPAWNWP_TELEMETRY_HASH_KEY", "/etc/spawnwp-telemetry-receiver.key"))
 RETENTION_SECONDS = 90 * 24 * 60 * 60
 MAX_CLOCK_SKEW_SECONDS = 48 * 60 * 60
+
+CONTACT_SPOOL = Path(os.environ.get("SPAWNWP_CONTACT_SPOOL", "/var/lib/spawnwp-contact"))
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class StrictModel(BaseModel):
@@ -129,6 +133,48 @@ def receive(payload: UsageEvent | DisableEvent, response: Response):
                  json.dumps(payload.features, sort_keys=True, separators=(",", ":")),
                  payload.counters["environments_current"]))
     response.headers["Cache-Control"] = "no-store"
+    return {"accepted": True}
+
+
+class ContactMessage(BaseModel):
+    """A message composed by the website contact concierge."""
+    model_config = ConfigDict(extra="forbid")
+    intent: Literal["support", "bug", "business", "security"]
+    email: str = Field(min_length=3, max_length=254)
+    message: str = Field(min_length=1, max_length=4000)
+    consent: Literal[True]
+    website: str = Field(default="", max_length=200)  # honeypot; must stay empty
+
+    @field_validator("email")
+    @classmethod
+    def valid_email(cls, value):
+        value = value.strip()
+        if not EMAIL_RE.match(value):
+            raise ValueError("invalid email address")
+        return value
+
+
+@app.post("/api/v1/contact", status_code=202)
+def contact(payload: ContactMessage, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    # A filled honeypot means a bot; accept silently without spooling anything.
+    if payload.website.strip():
+        return {"accepted": True}
+    record = {
+        "id": str(uuid4()),
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "intent": payload.intent,
+        "email": payload.email,
+        "message": payload.message,
+        "consent": payload.consent,
+    }
+    CONTACT_SPOOL.mkdir(parents=True, exist_ok=True)
+    # Write to a temp name and rename so the mailer never reads a partial file.
+    final = CONTACT_SPOOL / f"{record['id']}.json"
+    staging = final.with_suffix(".json.tmp")
+    staging.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+    os.chmod(staging, 0o640)
+    staging.rename(final)
     return {"accepted": True}
 
 

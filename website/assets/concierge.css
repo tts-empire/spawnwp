@@ -1,0 +1,99 @@
+/* SpawnWP contact concierge — scripted chat widget, first-party, no dependencies.
+   Design tokens are reused from site.css (--apricot, --off, --slate, --line…). */
+
+.cx-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 80px; /* stacked above the .support-fab coffee button (bottom:20px) */
+  z-index: 51;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--charcoal);
+  border: 1px solid var(--line);
+  color: var(--off);
+  font: 700 14px/1 Inter, "Helvetica Neue", Arial, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
+  transition: transform .15s ease, border-color .15s ease, background-color .15s ease;
+}
+.cx-launcher:hover { transform: translateY(-2px); border-color: var(--apricot); }
+.cx-launcher:focus-visible { outline: 3px solid var(--apricot); outline-offset: 3px; }
+.cx-launcher svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: var(--apricot); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.cx-launcher[hidden] { display: none; }
+
+.cx-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 52;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  max-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
+  background: #0b0b0e;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .6);
+  overflow: hidden;
+  animation: cx-in .18s ease both;
+}
+.cx-panel[hidden] { display: none; }
+@keyframes cx-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.cx-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 14px 16px; border-bottom: 1px solid var(--line); }
+.cx-head .cx-dot { width: 8px; height: 8px; border-radius: 50%; background: #62c98b; box-shadow: 0 0 0 4px rgba(98, 201, 139, .12); flex: 0 0 8px; }
+.cx-head b { font-size: 14px; font-weight: 700; color: var(--off); }
+.cx-head small { color: var(--slate); font-size: 12px; }
+.cx-head .cx-close { margin-left: auto; appearance: none; background: transparent; border: 0; color: var(--slate); cursor: pointer; font-size: 20px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.cx-head .cx-close:hover, .cx-head .cx-close:focus-visible { color: var(--off); background: var(--muted); outline: none; }
+
+.cx-log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.cx-msg { max-width: 85%; padding: 10px 13px; border-radius: 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cx-msg.bot { align-self: flex-start; background: var(--muted); color: var(--off); border-bottom-left-radius: 4px; }
+.cx-msg.user { align-self: flex-end; background: var(--apricot); color: #111; border-bottom-right-radius: 4px; }
+
+.cx-foot { border-top: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.cx-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.cx-choices button, .cx-link {
+  appearance: none; cursor: pointer; text-decoration: none;
+  border: 1px solid var(--line); background: var(--charcoal); color: var(--off);
+  border-radius: 999px; padding: 9px 14px; font: 600 13px/1 Inter, "Helvetica Neue", Arial, sans-serif;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.cx-choices button:hover, .cx-link:hover, .cx-choices button:focus-visible, .cx-link:focus-visible { border-color: var(--apricot); transform: translateY(-1px); outline: none; }
+.cx-choices button.primary { background: var(--apricot); color: #111; border-color: var(--apricot); }
+
+.cx-field { display: flex; flex-direction: column; gap: 6px; }
+.cx-field textarea, .cx-field input[type="email"] {
+  width: 100%; background: #08080a; color: var(--off); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; font: 14px/1.5 Inter, "Helvetica Neue", Arial, sans-serif; resize: vertical;
+}
+.cx-field textarea { min-height: 78px; }
+.cx-field textarea:focus, .cx-field input[type="email"]:focus { border-color: var(--apricot); outline: none; }
+.cx-consent { display: flex; align-items: flex-start; gap: 9px; color: var(--slate); font-size: 12.5px; line-height: 1.4; cursor: pointer; }
+.cx-consent input { margin-top: 2px; flex: 0 0 auto; accent-color: var(--apricot); }
+.cx-actions { display: flex; gap: 8px; align-items: center; }
+.cx-send {
+  appearance: none; cursor: pointer; border: 1px solid var(--apricot); background: var(--apricot); color: #111;
+  border-radius: 8px; padding: 10px 16px; font: 700 14px/1 Inter, "Helvetica Neue", Arial, sans-serif;
+}
+.cx-send:disabled { opacity: .45; cursor: not-allowed; }
+.cx-back { appearance: none; cursor: pointer; border: 0; background: transparent; color: var(--slate); font-size: 13px; padding: 8px; }
+.cx-back:hover { color: var(--off); }
+.cx-honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* The honeypot label is deliberately hidden from real users but present for bots. */
+.cx-hidden { display: none !important; }
+
+@media (max-width: 520px) {
+  .cx-launcher { right: 14px; bottom: 68px; padding: 11px 15px; }
+  .cx-panel { right: 14px; left: 14px; bottom: 14px; width: auto; max-height: 78vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cx-launcher, .cx-panel { animation: none; transition: none; }
+  .cx-launcher:hover, .cx-choices button:hover, .cx-link:hover { transform: none; }
+}

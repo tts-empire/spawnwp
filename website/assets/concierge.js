@@ -66,47 +66,33 @@
       bot('Happy to help. Ask publicly on GitHub Discussions (great for a searchable answer), or write to me privately here.');
       foot.append(choices([
         { label: 'Ask on Discussions ↗', href: DISCUSSIONS_URL },
-        { label: 'Write privately', primary: true, onClick: askMessage },
+        { label: 'Write privately', primary: true, onClick: startPrivate },
       ]));
     } else if (intent.id === 'bug') {
       bot('Bugs are best tracked as a GitHub Issue so they don’t get lost. Open one, or describe it here and I’ll take it from there.');
       foot.append(choices([
         { label: 'Open an Issue ↗', href: ISSUES_URL },
-        { label: 'Describe it here', primary: true, onClick: askMessage },
+        { label: 'Describe it here', primary: true, onClick: startPrivate },
       ]));
     } else if (intent.id === 'security') {
       bot('Thanks for the care. Please don’t post security details publicly — write them privately here and I’ll follow up.');
-      askMessage();
+      askForm();
     } else {
       bot('Sure — tell me a bit about it and leave an email so I can get back to you.');
-      askMessage();
+      askForm();
     }
   }
 
-  function askMessage() {
-    clearFoot();
-    const field = el('div', { className: 'cx-field' });
-    const textarea = el('textarea', { placeholder: 'Write your message…', maxLength: 4000 });
-    const next = el('button', { type: 'button', className: 'cx-send', textContent: 'Next', disabled: true });
-    textarea.addEventListener('input', () => { next.disabled = textarea.value.trim().length === 0; });
-    next.addEventListener('click', () => {
-      state.message = textarea.value.trim();
-      if (!state.message) return;
-      user(state.message);
-      askEmail();
-    });
-    field.append(textarea);
-    const actions = el('div', { className: 'cx-actions' });
-    actions.append(next, backButton(askIntent));
-    foot.append(field, actions);
-    textarea.focus();
+  function startPrivate() {
+    bot('Go ahead — write your message and the email I should reply to.');
+    askForm();
   }
 
-  function askEmail() {
+  // Single step: message + email + consent, one Send button.
+  function askForm() {
     clearFoot();
-    bot('Great. What’s the best email to reply to?');
-
     const field = el('div', { className: 'cx-field' });
+    const textarea = el('textarea', { placeholder: 'Your message…', maxLength: 4000 });
     const email = el('input', { type: 'email', placeholder: 'you@example.com', autocomplete: 'email', maxLength: 254 });
 
     const consentId = 'cx-consent-' + Math.random().toString(36).slice(2);
@@ -121,21 +107,28 @@
     honeypot.setAttribute('aria-hidden', 'true');
 
     const send = el('button', { type: 'button', className: 'cx-send', textContent: 'Send', disabled: true });
-    const refresh = () => { send.disabled = !(EMAIL_RE.test(email.value.trim()) && consent.checked); };
+    const refresh = () => {
+      send.disabled = !(textarea.value.trim() && EMAIL_RE.test(email.value.trim()) && consent.checked);
+    };
+    textarea.addEventListener('input', refresh);
     email.addEventListener('input', refresh);
     consent.addEventListener('change', refresh);
 
-    send.addEventListener('click', () => submit({ email: email.value.trim(), consent: consent.checked, honeypot: honeypot.value }, send));
+    send.addEventListener('click', () => {
+      state.message = textarea.value.trim();
+      submit({ email: email.value.trim(), consent: consent.checked, honeypot: honeypot.value }, send);
+    });
 
-    field.append(email, consentLabel, honeypot);
+    field.append(textarea, email, consentLabel, honeypot);
     const actions = el('div', { className: 'cx-actions' });
-    actions.append(send, backButton(askMessage));
+    actions.append(send, backButton(askIntent));
     foot.append(field, actions);
-    email.focus();
+    textarea.focus();
   }
 
   async function submit(data, sendBtn) {
-    if (!EMAIL_RE.test(data.email) || !data.consent) return;
+    if (!state.message || !EMAIL_RE.test(data.email) || !data.consent) return;
+    user(state.message);
     user(data.email);
     sendBtn.disabled = true;
     sendBtn.textContent = 'Sending…';

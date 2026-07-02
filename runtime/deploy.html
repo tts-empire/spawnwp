@@ -13,7 +13,7 @@
       <span class="brand-mark" aria-hidden="true"><span></span><span></span><span class="outline"></span><span></span><span class="lit"></span><span></span><span></span><span></span><span></span></span>
       <span class="brand-lockup"><span class="brand-name">Spawn<strong>WP</strong></span><span class="brand-context">Cockpit</span></span>
     </a>
-    <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy" aria-current="page">Deploy</a><a href="/updates">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
+    <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy" aria-current="page">Deploy</a><a href="/system">System</a><a href="/updates">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
     <time id="header-clock" title="Local time"></time>
     <button class="header-logout" type="button" onclick="logoutCockpit()">Log out</button>
   </header>
@@ -36,6 +36,20 @@
         <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
         <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select></label>
         <input id="new-blueprint" type="hidden" value="development">
+        <details class="php-advanced" id="php-advanced">
+          <summary>PHP settings (advanced)</summary>
+          <div class="php-advanced-grid">
+            <label><span>memory_limit</span><input id="php-memory" type="text" value="256M" placeholder="256M"></label>
+            <label><span>upload_max_filesize</span><input id="php-upload" type="text" value="64M" placeholder="64M"></label>
+            <label><span>post_max_size</span><input id="php-post" type="text" value="64M" placeholder="64M"></label>
+            <label><span>max_execution_time</span><input id="php-exec" type="number" min="10" max="3600" value="120"></label>
+            <label><span>max_input_vars</span><input id="php-vars" type="number" min="100" max="100000" value="3000"></label>
+            <label><span>max_input_time</span><input id="php-input-time" type="number" min="-1" max="3600" value="-1"></label>
+            <label class="php-advanced-check"><input id="php-display-errors" type="checkbox"><span>display_errors (dev only)</span></label>
+          </div>
+          <small class="field-help">Sizes accept K/M/G (upload/post up to 512M — the nginx limits follow automatically).
+          Values above the container's 512M RAM limit require raising that limit too. Editable later from Manage.</small>
+        </details>
         <div class="deploy-summary"><span>Destination</span><strong>https://<span id="domain-preview">domain</span>/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
         <button type="submit" class="btn-primary sensitive" id="btn-create">Create site</button>
       </form>

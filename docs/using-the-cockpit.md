@@ -42,15 +42,27 @@ SpawnWP will:
 - allocate free internal ports,
 - write the site's config and a fresh `.env` with random secrets,
 - start the container stack and install WordPress (the PHP image is built only the
-  first time a PHP version is used, after a SpawnWP update that changes it, or when
-  it is more than 7 days old — that one-off build takes about 5 minutes and the
-  cockpit shows a clear notice when it happens; every other creation reuses the
-  image and takes about 35 seconds),
+  first time a PHP version is used or after a SpawnWP update that changes it — that
+  one-off build takes about 5 minutes and the cockpit shows a clear notice when it
+  happens; every other creation reuses the image and takes about 35 seconds. Images
+  never rebuild on a schedule: refresh them when you choose, from **System**),
 - validate and apply the selected blueprint,
 - add the nginx routes (WordPress on `DOMAIN`, Adminer/Mailpit on `COCKPIT_DOMAIN`).
 
 The result is live at `https://DOMAIN/<name>/`. On completion, Deploy links directly to
 the front page, WP Admin and the environment on Manage.
+
+### PHP settings (advanced)
+
+The Deploy form's collapsed **PHP settings (advanced)** section exposes the classic
+hosting knobs — `memory_limit`, `upload_max_filesize`, `post_max_size`,
+`max_execution_time`, `max_input_vars`, `max_input_time` and a `display_errors` toggle.
+Leave it untouched for the defaults (256M / 64M / 64M / 120s / 3000 / -1 / Off). Raising
+the upload sizes automatically aligns the nginx limits (site and proxy) so large uploads
+actually work, up to 512M. The values live in a per-site override file mounted into the
+php container, so they never rebuild the shared image — and they can be changed later
+from **Manage → ⚙️ PHP settings** (applies in ~2 seconds with a php restart). Sites
+created before 0.3.14 don't have the override mount; recreate them to use this feature.
 
 ## Per-site actions
 
@@ -87,8 +99,25 @@ The first switch to a PHP version downloads and compiles its image and can take 
 minutes. The cockpit shows structured progress and keeps the verbose BuildKit log under
 **Show technical details**. Cached PHP versions switch substantially faster. The same
 applies to site creation: once a PHP version's image exists, new sites reuse it (it is
-rebuilt only after a SpawnWP update that changes it, when it is older than 7 days, or
-with `SPAWNWP_REBUILD=1`).
+rebuilt only after a SpawnWP update that changes it, or with `SPAWNWP_REBUILD=1`).
+
+## The System tab
+
+**System** shows the host resources plus everything about the shared PHP images —
+the real fixed cost on disk (~1.8&nbsp;GB per PHP version in use):
+
+- **PHP images**: size, age and which sites use each image. Keeping an image means
+  every deploy on that PHP version takes ~35 seconds; **Delete** (available only for
+  images no site uses, with a typed confirmation) frees the space, at the price of a
+  ~5-minute rebuild on the next deploy of that version. **Refresh** rebuilds an image
+  now with the latest WordPress — do it from time to time: deploys never rebuild
+  automatically, and images older than 7 days are flagged as *stale* here and with a
+  notice during deploys.
+- **Auto-delete (optional)**: "auto-delete unused images after N days" — 0 (the
+  default) means manual deletion only. Images used by at least one site are never
+  auto-deleted, whatever their age. The check runs daily.
+- **Docker disk usage**: images / containers / volumes / build-cache breakdown and the
+  host filesystem headroom.
 
 ### Snapshots & restore
 

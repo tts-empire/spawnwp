@@ -46,6 +46,9 @@ services:
     volumes:
       - wp_data:/var/www/html
       - ./projects/primary/wp-content:/var/www/html/wp-content
+      # Per-site PHP overrides (cockpit "PHP settings"): conf.d loads alphabetically,
+      # so zz- wins over the baked custom.ini without rebuilding the shared image.
+      - ./docker/php/zz-site.ini:/usr/local/etc/php/conf.d/zz-site.ini:ro
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${DB_NAME}

@@ -214,8 +214,9 @@ APP_SETUP_CODE=$(cd /srv/wp-cockpit && /srv/wp-cockpit/venv/bin/python -c 'from 
 install -m 0644 "$(src installer wp-cockpit.service)" /etc/systemd/system/wp-cockpit.service
 install -m 0644 "$(src installer spawnwp-update.service)" /etc/systemd/system/spawnwp-update.service
 install -m 0644 "$(src installer docker-prune.service)" "$(src installer docker-prune.timer)" /etc/systemd/system/
+install -m 0644 "$(src installer spawnwp-image-gc.service)" "$(src installer spawnwp-image-gc.timer)" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now wp-cockpit docker-prune.timer
+systemctl enable --now wp-cockpit docker-prune.timer spawnwp-image-gc.timer
 echo "Cockpit authentication is ready. The one-time activation procedure and code are shown in the final report below."
 
 printf '{"telemetry":false}\n' > /var/lib/spawnwp/features.json

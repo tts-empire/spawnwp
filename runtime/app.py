@@ -41,7 +41,8 @@ async def application_authentication(request: Request, call_next):
         return RedirectResponse("/login", status_code=303)
     if active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
         return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
-    destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply"}
+    destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
+                   "/api/images/delete", "/api/images/refresh"}
     if active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
         return JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     response = await call_next(request)
@@ -105,12 +106,13 @@ def run(cmd: list[str], cwd: Path) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     return (result.stdout + result.stderr).strip()
 
-async def stream_command(cmd: list[str], cwd: Path) -> AsyncIterator[str]:
+async def stream_command(cmd: list[str], cwd: Path, env: dict | None = None) -> AsyncIterator[str]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         cwd=cwd,
+        env={**os.environ, **env} if env else None,
     )
     assert proc.stdout
     while True:
@@ -130,9 +132,9 @@ async def stream_command(cmd: list[str], cwd: Path) -> AsyncIterator[str]:
     rc = proc.returncode
     yield f"data: {json.dumps(f'__EXIT__{rc}')}\n\n"
 
-def sse_response(cmd: list[str], cwd: Path) -> StreamingResponse:
+def sse_response(cmd: list[str], cwd: Path, env: dict | None = None) -> StreamingResponse:
     return StreamingResponse(
-        stream_command(cmd, cwd),
+        stream_command(cmd, cwd, env),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -488,10 +490,71 @@ def list_blueprints():
     return blueprint_catalog()
 
 
+# ── Per-site PHP settings (the classic hosting knobs, closed whitelist) ───────
+# Values become a zz-site.ini mounted into the php container; never free text.
+
+PHP_SIZE_RE = re.compile(r"^[0-9]{1,4}[KMG]$")
+
+PHP_INI_DEFAULTS = {
+    "memory_limit": "256M",
+    "upload_max_filesize": "64M",
+    "post_max_size": "64M",
+    "max_execution_time": 120,
+    "max_input_vars": 3000,
+    "max_input_time": -1,
+    "display_errors": False,
+}
+
+
+def _size_mb(value: str) -> int:
+    unit = value[-1]
+    n = int(value[:-1])
+    return {"K": max(1, n // 1024), "M": n, "G": n * 1024}[unit]
+
+
+class PhpIniSettings(BaseModel):
+    memory_limit: str = "256M"
+    upload_max_filesize: str = "64M"
+    post_max_size: str = "64M"
+    max_execution_time: int = 120
+    max_input_vars: int = 3000
+    max_input_time: int = -1
+    display_errors: bool = False
+
+    def validated(self) -> "PhpIniSettings":
+        for field in ("memory_limit", "upload_max_filesize", "post_max_size"):
+            if not PHP_SIZE_RE.match(getattr(self, field)):
+                raise HTTPException(400, f"Invalid {field}: use a number with K/M/G unit (e.g. 128M)")
+        if not 16 <= _size_mb(self.memory_limit) <= 1024:
+            raise HTTPException(400, "memory_limit must be between 16M and 1G")
+        for field in ("upload_max_filesize", "post_max_size"):
+            if not 1 <= _size_mb(getattr(self, field)) <= 512:
+                raise HTTPException(400, f"{field} must be between 1M and 512M")
+        if not 10 <= self.max_execution_time <= 3600:
+            raise HTTPException(400, "max_execution_time must be between 10 and 3600 seconds")
+        if not 100 <= self.max_input_vars <= 100000:
+            raise HTTPException(400, "max_input_vars must be between 100 and 100000")
+        if not -1 <= self.max_input_time <= 3600:
+            raise HTTPException(400, "max_input_time must be between -1 and 3600")
+        return self
+
+    def as_env(self) -> dict:
+        return {
+            "SPAWNWP_PHP_MEMORY_LIMIT": self.memory_limit,
+            "SPAWNWP_PHP_UPLOAD_MAX_FILESIZE": self.upload_max_filesize,
+            "SPAWNWP_PHP_POST_MAX_SIZE": self.post_max_size,
+            "SPAWNWP_PHP_MAX_EXECUTION_TIME": str(self.max_execution_time),
+            "SPAWNWP_PHP_MAX_INPUT_VARS": str(self.max_input_vars),
+            "SPAWNWP_PHP_MAX_INPUT_TIME": str(self.max_input_time),
+            "SPAWNWP_PHP_DISPLAY_ERRORS": "On" if self.display_errors else "Off",
+        }
+
+
 class NewProject(BaseModel):
     name: str
     blueprint: str = "development"
     php_version: str | None = None
+    php_settings: PhpIniSettings | None = None
 
 @app.post("/api/new-project")
 def new_project(body: NewProject):
@@ -503,9 +566,11 @@ def new_project(body: NewProject):
     guard_not_busy()
     if is_project(PROJECTS_ROOT / body.name):
         raise HTTPException(409, f"Project '{body.name}' already exists")
+    env = body.php_settings.validated().as_env() if body.php_settings else None
     return sse_response(
         ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or ""],
         PRIMARY_PROJECT,
+        env,
     )
 
 
@@ -827,6 +892,197 @@ def disk_project(project: str):
     }
 
 
+# ── Per-site PHP settings: read / apply on an existing site ───────────────────
+
+PHP_INI_APPLY_TOOL = PRIMARY_PROJECT / "scripts" / "php-ini-apply.sh"
+
+
+@app.get("/api/php-ini/{project}")
+def get_php_ini(project: str):
+    proj = resolve_project(project)
+    supported = "zz-site.ini" in (proj / "compose.yaml").read_text()
+    values = dict(PHP_INI_DEFAULTS)
+    ini = proj / "docker" / "php" / "zz-site.ini"
+    if ini.is_file():
+        for line in ini.read_text().splitlines():
+            if "=" not in line or line.lstrip().startswith(";"):
+                continue
+            key, _, raw = line.partition("=")
+            key, raw = key.strip(), raw.strip()
+            if key not in values:
+                continue
+            if key == "display_errors":
+                values[key] = raw == "On"
+            elif isinstance(PHP_INI_DEFAULTS[key], int):
+                try:
+                    values[key] = int(raw)
+                except ValueError:
+                    pass
+            else:
+                values[key] = raw
+    return {"project": proj.name, "supported": supported, "settings": values}
+
+
+@app.post("/api/php-ini/{project}")
+def set_php_ini(project: str, body: PhpIniSettings):
+    proj = resolve_project(project)
+    if proj == PRIMARY_PROJECT:
+        raise HTTPException(400, "The primary stack's PHP settings are not managed here")
+    if "zz-site.ini" not in (proj / "compose.yaml").read_text():
+        raise HTTPException(409, "This site was created before SpawnWP 0.3.14 and has no "
+                                 "per-site PHP overrides mount. Recreate it to use PHP settings.")
+    guard_not_busy()
+    env = body.validated().as_env()
+    result = subprocess.run(
+        ["bash", str(PHP_INI_APPLY_TOOL), proj.name],
+        capture_output=True, text=True, cwd=PRIMARY_PROJECT,
+        env={**os.environ, **env}, timeout=120,
+    )
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        raise HTTPException(500, output.splitlines()[-1] if output else "Failed to apply PHP settings")
+    return {"project": proj.name, "settings": body.model_dump(), "output": output}
+
+
+# ── System info: PHP image inventory + manual lifecycle ───────────────────────
+# Images are shared across sites (one per PHP version, ~1.8 GB each). Keeping
+# them makes every deploy fast (~35s); deleting one frees the space but the next
+# deploy on that PHP version rebuilds it (~5 min). Nothing rebuilds or deletes
+# automatically unless the admin opts into the auto-delete setting below.
+
+CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG_ENV", "/etc/spawnwp/config.env"))
+PHP_IMAGE_REPO = "wp-dev-php"
+REFRESH_IMAGE_TOOL = PRIMARY_PROJECT / "scripts" / "refresh-image.sh"
+PHP_VER_RE = re.compile(r"^[0-9]+\.[0-9]+$")
+
+
+def _config_env_get(key: str, default: str) -> str:
+    if CONFIG_ENV.is_file():
+        for line in CONFIG_ENV.read_text().splitlines():
+            if line.startswith(f"{key}="):
+                return line.partition("=")[2].strip()
+    return default
+
+
+def _config_env_set(key: str, value: str) -> None:
+    lines = CONFIG_ENV.read_text().splitlines() if CONFIG_ENV.is_file() else []
+    replaced = False
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[i] = f"{key}={value}"
+            replaced = True
+            break
+    if not replaced:
+        lines.append(f"{key}={value}")
+    CONFIG_ENV.write_text("\n".join(lines) + "\n")
+
+
+def _image_age_days(created: str) -> int:
+    from datetime import datetime, timezone
+    # Docker returns RFC3339 with nanoseconds; trim to microseconds for fromisoformat.
+    iso = re.sub(r"\.(\d{6})\d*", r".\1", created.replace("Z", "+00:00"))
+    try:
+        then = datetime.fromisoformat(iso)
+    except ValueError:
+        return 0
+    return max(0, int((datetime.now(timezone.utc) - then).total_seconds() // 86400))
+
+
+def _php_versions_in_use() -> dict[str, list[str]]:
+    used: dict[str, list[str]] = {}
+    for proj in get_projects():
+        ver = _read_env(proj).get("PHP_VERSION", "")
+        if ver:
+            used.setdefault(ver, []).append(proj.name)
+    return used
+
+
+@app.get("/api/images")
+def list_images():
+    stale_days = int(_config_env_get("SPAWNWP_IMAGE_MAX_AGE_DAYS", "7") or 7)
+    used = _php_versions_in_use()
+    images = []
+    raw = run(["docker", "image", "ls", PHP_IMAGE_REPO, "--format", "json"], PRIMARY_PROJECT)
+    for line in raw.splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        tag = entry.get("Tag", "")
+        if not PHP_VER_RE.match(tag):
+            continue
+        created = run(["docker", "image", "inspect", "-f", "{{.Created}}",
+                       f"{PHP_IMAGE_REPO}:{tag}"], PRIMARY_PROJECT)
+        age = _image_age_days(created)
+        images.append({
+            "tag": f"{PHP_IMAGE_REPO}:{tag}",
+            "php_version": tag,
+            "size_gb": round(_parse_size(entry.get("Size", "0B")), 2),
+            "age_days": age,
+            "stale": age >= stale_days,
+            "used_by": sorted(used.get(tag, [])),
+        })
+    images.sort(key=lambda i: i["php_version"])
+    return {"images": images, "stale_days": stale_days}
+
+
+class ImageDelete(BaseModel):
+    php_version: str
+    confirm: str   # must match php_version (guards against accidental click)
+
+
+@app.post("/api/images/delete")
+def delete_image(body: ImageDelete):
+    if not PHP_VER_RE.match(body.php_version):
+        raise HTTPException(400, "Invalid PHP version")
+    if body.confirm != body.php_version:
+        raise HTTPException(400, "Confirmation does not match")
+    guard_not_busy()
+    users = _php_versions_in_use().get(body.php_version, [])
+    if users:
+        raise HTTPException(409, f"Image in use by: {', '.join(sorted(users))}. "
+                                 "Destroy or switch those sites first.")
+    tag = f"{PHP_IMAGE_REPO}:{body.php_version}"
+    out = run(["docker", "rmi", tag], PRIMARY_PROJECT)
+    if "Error" in out or "unable" in out.lower():
+        raise HTTPException(409, out.splitlines()[-1] if out else "Unable to delete the image")
+    return {"deleted": tag}
+
+
+class ImageRefresh(BaseModel):
+    php_version: str
+
+
+@app.post("/api/images/refresh")
+def refresh_image(body: ImageRefresh):
+    if not PHP_VER_RE.match(body.php_version):
+        raise HTTPException(400, "Invalid PHP version")
+    guard_not_busy()
+    return sse_response(["bash", str(REFRESH_IMAGE_TOOL), body.php_version], PRIMARY_PROJECT)
+
+
+class ImageSettings(BaseModel):
+    autodelete_days: int
+
+
+@app.get("/api/images/settings")
+def image_settings():
+    raw = _config_env_get("SPAWNWP_IMAGE_AUTODELETE_DAYS", "0")
+    try:
+        days = max(0, int(raw))
+    except ValueError:
+        days = 0
+    return {"autodelete_days": days}
+
+
+@app.post("/api/images/settings")
+def set_image_settings(body: ImageSettings):
+    if not 0 <= body.autodelete_days <= 365:
+        raise HTTPException(400, "autodelete_days must be between 0 and 365")
+    _config_env_set("SPAWNWP_IMAGE_AUTODELETE_DAYS", str(body.autodelete_days))
+    return {"autodelete_days": body.autodelete_days}
+
+
 # ── Cockpit pages and shared assets ───────────────────────────────────────────
 
 STATIC_DIR = Path(os.environ.get("SPAWNWP_STATIC_DIR", "/srv/wp-cockpit/static"))
@@ -855,6 +1111,11 @@ def deploy_page():
 @app.get("/updates", include_in_schema=False)
 def updates_page():
     return FileResponse(STATIC_DIR / "updates.html")
+
+
+@app.get("/system", include_in_schema=False)
+def system_page():
+    return FileResponse(STATIC_DIR / "system.html")
 
 
 app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")

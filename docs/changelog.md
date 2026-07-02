@@ -4,6 +4,23 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.3.14
+
+- New **System** cockpit tab: inventory of the shared PHP images (size, age, which
+  sites use them) with manual **Refresh** (rebuild now with the latest WordPress) and
+  **Delete** (only for images no site uses), plus a Docker disk-usage breakdown.
+- Removed the automatic 7-day image rebuild introduced in 0.3.13: deploys never pay a
+  surprise 5-minute build any more. Images older than 7 days are flagged as stale (in
+  System and with a deploy notice) and refreshed only when you choose.
+- Optional **auto-delete of unused images** after a configurable number of days
+  (0 = manual only, the default); images used by any site are never touched. A daily
+  timer is installed by a migration on existing hosts.
+- Per-site **PHP settings**: memory_limit, upload/post sizes, execution time,
+  input vars/time and display_errors, settable in the Deploy form (advanced section)
+  and editable later from Manage (~2s php restart, no image rebuild). Raising the
+  upload sizes aligns the nginx limits automatically, up to 512M. Available for sites
+  created from 0.3.14 onward.
+
 ## 0.3.13
 
 - Site creation no longer rebuilds the PHP image every time: the image is built only

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>System · SpawnWP Cockpit</title>
+  <style>html{background:#000;color-scheme:dark}</style>
+  <link rel="stylesheet" href="/assets/cockpit.css?v=20260702a">
+</head>
+<body data-page="system">
+  <header>
+    <a class="brand" href="/manage" aria-label="SpawnWP Cockpit">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span class="outline"></span><span></span><span class="lit"></span><span></span><span></span><span></span><span></span></span>
+      <span class="brand-lockup"><span class="brand-name">Spawn<strong>WP</strong></span><span class="brand-context">Cockpit</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy">Deploy</a><a href="/system" aria-current="page">System</a><a href="/updates">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
+    <time id="header-clock" title="Local time"></time>
+    <button class="header-logout" type="button" onclick="logoutCockpit()">Log out</button>
+  </header>
+  <main>
+    <div class="sys-banner" id="sys-banner"><span id="sys-banner-text">System under load</span></div>
+    <section class="resource-summary" aria-label="Host resources">
+      <div class="resource-ring" id="kpi-ram"><div class="ring"><div class="ring-core"><strong id="host-ram-pct">0%</strong></div></div><div><span>RAM</span><small id="host-ram-text">Loading</small></div></div>
+      <div class="resource-ring" id="kpi-disk"><div class="ring"><div class="ring-core"><strong id="host-disk-pct">0%</strong></div></div><div><span>Disk</span><small id="host-disk-text">Loading</small></div></div>
+      <div class="resource-ring" id="kpi-load"><div class="ring"><div class="ring-core"><strong id="host-load-pct">0%</strong></div></div><div><span>Load</span><small id="host-load">Loading</small></div></div>
+      <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">PHP images</div>
+      <div class="image-explainer">
+        Each PHP version keeps one shared image (~1.8&nbsp;GB) used by all its sites.
+        <b>Keeping an image means every deploy on that PHP version takes about 35 seconds.</b>
+        Deleting one frees its space, but the next deploy on that version rebuilds it from
+        scratch (about 5 minutes). <b>Refresh</b> rebuilds an image now with the latest
+        WordPress — recommended from time to time, since deploys never rebuild automatically.
+        Sites already running keep their current image until their containers are recreated.
+      </div>
+      <div id="images-alert" class="inline-alert" hidden></div>
+      <table class="svc-table" id="images-table">
+        <thead><tr><th>PHP</th><th>Size</th><th>Age</th><th>Used by</th><th>Actions</th></tr></thead>
+        <tbody id="images-body"><tr><td colspan="5" class="loading-copy">Loading…</td></tr></tbody>
+      </table>
+      <div class="gc-setting">
+        <label for="gc-days">Auto-delete <b>unused</b> images after</label>
+        <input id="gc-days" type="number" min="0" max="365" step="1" value="0">
+        <span>days</span>
+        <button class="icon-btn" type="button" id="gc-save" onclick="saveImageGc()">Save</button>
+        <small>0 = never delete automatically (default). Images used by at least one site are
+        never auto-deleted, whatever their age.</small>
+      </div>
+      <div class="output-box" id="out-system">
+        <div class="output-head"><span class="out-label">image output</span><span><button class="icon-btn" type="button" onclick="copyBox('out-system')" title="Copy output">⧉</button><button class="icon-btn" type="button" onclick="closeBox('out-system')" title="Close output">×</button></span></div>
+        <div class="output-body" id="out-system-body"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Docker disk usage</div>
+      <div id="docker-disk" class="docker-disk"><p class="loading-copy">Loading…</p></div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script src="/assets/cockpit.js?v=20260702a"></script>
+</body>
+</html>

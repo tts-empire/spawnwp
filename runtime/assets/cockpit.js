@@ -480,6 +480,7 @@ function renderTop(p) {
       <button class="btn-db btn-sm" onclick="openAdminer('${p.name}')">🗄 DB ▸</button>
       ${p.mail_url ? `<button class="btn-db btn-sm" onclick="window.open('${esc(p.mail_url)}','_blank','noopener')" title="Open Mailpit (captured mail)">✉️ Mailpit ▸</button>` : ''}
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
+      <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
         <option value="">PHP ${esc(p.php)} ▾</option>
         <option value="7.4">→ PHP 7.4 (legacy)</option>
@@ -850,7 +851,9 @@ function createProject(e) {
   result.hidden = true;
   notice.hidden = true;
   notice.classList.remove('cached');
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version }, 'out-new', ok => {
+  const php_settings = collectPhpSettings();
+  if (php_settings === undefined) return;   // invalid input, message already shown
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {
@@ -866,9 +869,13 @@ function createProject(e) {
       if (first) {
         notice.hidden = false;
         notice.textContent = `⏳ First deploy on PHP ${first[1]}: its image is being downloaded and built — a one-off step of about 5 minutes. Every later site on PHP ${first[1]} deploys in about 35 seconds.`;
-      } else if (/build context changed|refreshing base|forcing a fresh php image/.test(line)) {
+      } else if (/build context changed|forcing a fresh php image/.test(line)) {
         notice.hidden = false;
-        notice.textContent = '⏳ The PHP image needs a rebuild (SpawnWP update or weekly WordPress refresh): this deploy takes about 5 minutes; the next ones about 35 seconds.';
+        notice.textContent = '⏳ The PHP image needs a rebuild (SpawnWP update or forced): this deploy takes about 5 minutes; the next ones about 35 seconds.';
+      } else if (/Reusing php image .* \(stale: (\d+) days old\)/.test(line)) {
+        const days = line.match(/stale: (\d+) days old/)[1];
+        notice.hidden = false;
+        notice.textContent = `⚠️ Deploying in about 35 seconds, but this PHP image is ${days} days old — the WordPress inside may be outdated. You can refresh it from the System info tab.`;
       } else if (/Reusing php image/.test(line)) {
         notice.hidden = false;
         notice.classList.add('cached');
@@ -876,6 +883,99 @@ function createProject(e) {
       }
     },
   });
+}
+
+// ── Per-site PHP settings (deploy form + manage editing) ─────────────────────
+const PHP_DEFAULTS = { memory_limit: '256M', upload_max_filesize: '64M', post_max_size: '64M',
+  max_execution_time: 120, max_input_vars: 3000, max_input_time: -1, display_errors: false };
+const PHP_SIZE_RE = /^[0-9]{1,4}[KMG]$/;
+
+// Reads the deploy form's advanced section. Returns null when everything is at
+// the defaults (nothing to send), undefined when a value is invalid.
+function collectPhpSettings() {
+  const val = id => document.getElementById(id).value.trim().toUpperCase();
+  const num = id => parseInt(document.getElementById(id).value, 10);
+  const s = {
+    memory_limit: val('php-memory') || '256M',
+    upload_max_filesize: val('php-upload') || '64M',
+    post_max_size: val('php-post') || '64M',
+    max_execution_time: isNaN(num('php-exec')) ? 120 : num('php-exec'),
+    max_input_vars: isNaN(num('php-vars')) ? 3000 : num('php-vars'),
+    max_input_time: isNaN(num('php-input-time')) ? -1 : num('php-input-time'),
+    display_errors: document.getElementById('php-display-errors').checked,
+  };
+  for (const field of ['memory_limit', 'upload_max_filesize', 'post_max_size']) {
+    if (!PHP_SIZE_RE.test(s[field])) {
+      showToast(`Invalid ${field}: use a number with K/M/G unit, e.g. 128M`, true);
+      return undefined;
+    }
+  }
+  const unchanged = Object.keys(PHP_DEFAULTS).every(k => s[k] === PHP_DEFAULTS[k]);
+  return unchanged ? null : s;
+}
+
+async function showPhpIni(name) {
+  const body = getOutputBox(`out-${name}`);
+  appendLine(body, '⚙️ Loading PHP settings…');
+  try {
+    const data = await fetch(`${BASE}/php-ini/${encodeURIComponent(name)}`, { cache: 'no-store' }).then(r => r.json());
+    body.textContent = '';
+    if (!data.supported) {
+      appendLine(body, `PHP settings are not available for "${name}": the site was created before SpawnWP 0.3.14. Recreate it to use them.`, true);
+      return;
+    }
+    const s = data.settings;
+    const form = document.createElement('div');
+    form.className = 'php-advanced-grid php-inline-form';
+    form.innerHTML = `
+      <label><span>memory_limit</span><input id="pi-memory-${name}" type="text" value="${esc(s.memory_limit)}"></label>
+      <label><span>upload_max_filesize</span><input id="pi-upload-${name}" type="text" value="${esc(s.upload_max_filesize)}"></label>
+      <label><span>post_max_size</span><input id="pi-post-${name}" type="text" value="${esc(s.post_max_size)}"></label>
+      <label><span>max_execution_time</span><input id="pi-exec-${name}" type="number" min="10" max="3600" value="${s.max_execution_time}"></label>
+      <label><span>max_input_vars</span><input id="pi-vars-${name}" type="number" min="100" max="100000" value="${s.max_input_vars}"></label>
+      <label><span>max_input_time</span><input id="pi-time-${name}" type="number" min="-1" max="3600" value="${s.max_input_time}"></label>
+      <label class="php-advanced-check"><input id="pi-errors-${name}" type="checkbox" ${s.display_errors ? 'checked' : ''}><span>display_errors</span></label>`;
+    const apply = document.createElement('button');
+    apply.className = 'icon-btn sensitive';
+    apply.textContent = 'Apply (restarts php, ~2s)';
+    apply.onclick = () => applyPhpIni(name, apply);
+    body.appendChild(form);
+    body.appendChild(apply);
+  } catch (e) {
+    appendLine(body, '❌ ' + e.message, true);
+  }
+}
+
+async function applyPhpIni(name, btn) {
+  const val = id => document.getElementById(id).value.trim().toUpperCase();
+  const num = id => parseInt(document.getElementById(id).value, 10);
+  const payload = {
+    memory_limit: val(`pi-memory-${name}`),
+    upload_max_filesize: val(`pi-upload-${name}`),
+    post_max_size: val(`pi-post-${name}`),
+    max_execution_time: num(`pi-exec-${name}`),
+    max_input_vars: num(`pi-vars-${name}`),
+    max_input_time: num(`pi-time-${name}`),
+    display_errors: document.getElementById(`pi-errors-${name}`).checked,
+  };
+  for (const field of ['memory_limit', 'upload_max_filesize', 'post_max_size']) {
+    if (!PHP_SIZE_RE.test(payload[field])) { showToast(`Invalid ${field}: e.g. 128M`, true); return; }
+  }
+  btn.disabled = true;
+  btn.textContent = 'Applying…';
+  try {
+    const res = await fetch(`${BASE}/php-ini/${encodeURIComponent(name)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    showToast(`PHP settings applied to "${name}"`);
+    closeBox(`out-${name}`);
+  } catch (e) {
+    showToast(e.message, true);
+    btn.disabled = false;
+    btn.textContent = 'Apply (restarts php, ~2s)';
+  }
 }
 
 // ── Adminer (auto-login via bridge page served by the cockpit) ───────────────
@@ -987,11 +1087,107 @@ function destroyProject(name) {
   });
 }
 
+// ── System info: PHP image inventory ─────────────────────────────────────────
+async function loadSystemInfo() {
+  try {
+    const [imagesData, disk, settings] = await Promise.all([
+      fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${BASE}/disk`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${BASE}/images/settings`, { cache: 'no-store' }).then(r => r.json()),
+    ]);
+    renderImages(imagesData);
+    renderDockerDisk(disk);
+    document.getElementById('gc-days').value = settings.autodelete_days;
+  } catch (e) {
+    const alertBox = document.getElementById('images-alert');
+    alertBox.hidden = false;
+    alertBox.textContent = 'Unable to load system info: ' + e.message;
+  }
+}
+
+function renderImages(data) {
+  const body = document.getElementById('images-body');
+  if (!data.images.length) {
+    body.innerHTML = '<tr><td colspan="5">No PHP images yet — the first deploy will build one.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.images.map(img => {
+    const age = img.stale
+      ? `<span class="badge badge-yellow" title="Older than ${data.stale_days} days: the WordPress inside may be outdated. Refresh to update it.">${img.age_days}d — stale</span>`
+      : `<span class="badge badge-green">${img.age_days}d</span>`;
+    const used = img.used_by.length
+      ? img.used_by.map(esc).join(', ')
+      : '<span class="badge badge-gray">no sites</span>';
+    const delBtn = img.used_by.length
+      ? `<button class="icon-btn" disabled title="In use by ${esc(img.used_by.join(', '))} — cannot be deleted">Delete</button>`
+      : `<button class="icon-btn" onclick="deleteImage('${esc(img.php_version)}')">Delete</button>`;
+    return `<tr><td><b>PHP ${esc(img.php_version)}</b></td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
+      <td><button class="icon-btn sensitive" onclick="refreshImage('${esc(img.php_version)}')" title="Rebuild now with the latest WordPress (~5 min)">Refresh</button> ${delBtn}</td></tr>`;
+  }).join('');
+}
+
+function renderDockerDisk(data) {
+  const el = document.getElementById('docker-disk');
+  const rows = data.docker.map(d =>
+    `<tr><td>${esc(d.type)}</td><td>${d.size_gb} GB</td><td>${d.reclaimable_gb} GB reclaimable</td></tr>`).join('');
+  el.innerHTML = `<table class="svc-table"><thead><tr><th>Type</th><th>Size</th><th>Reclaimable</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <p class="field-help">Host filesystem: ${data.fs.used_gb} GB used of ${data.fs.total_gb} GB (${data.fs.free_gb} GB free).
+    Reclaimable build cache is trimmed automatically after builds and weekly.</p>`;
+}
+
+function refreshImage(version) {
+  if (blockedIfBusy()) return;
+  if (!confirm(`Rebuild the PHP ${version} image now with the latest WordPress?\n\nThis takes about 5 minutes. Deploys are blocked while it runs; running sites are not touched (they pick the new image on their next recreate).`)) return;
+  streamSSE(`${BASE}/images/refresh`, { php_version: version }, 'out-system', ok => {
+    if (ok) showToast(`PHP ${version} image refreshed`);
+    loadSystemInfo();
+  });
+}
+
+async function deleteImage(version) {
+  if (blockedIfBusy()) return;
+  const warn = `Delete the PHP ${version} image?\n\n`
+    + `It frees its disk space, but the NEXT deploy on PHP ${version} will rebuild it from scratch (about 5 minutes instead of ~35 seconds).\n\n`
+    + `Type the version “${version}” to confirm.`;
+  const typed = prompt(warn);
+  if (typed === null) return;
+  if (typed.trim() !== version) { showToast('Version mismatch: deletion cancelled', true); return; }
+  try {
+    const res = await sensitiveFetch(`${BASE}/images/delete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ php_version: version, confirm: typed.trim() }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.detail || res.statusText);
+    showToast(`Image PHP ${version} deleted`);
+  } catch (e) {
+    showToast(e.message, true);
+  }
+  loadSystemInfo();
+}
+
+async function saveImageGc() {
+  const days = parseInt(document.getElementById('gc-days').value, 10);
+  if (isNaN(days) || days < 0 || days > 365) { showToast('Enter a number of days between 0 and 365', true); return; }
+  try {
+    const res = await fetch(`${BASE}/images/settings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autodelete_days: days }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+    showToast(days === 0 ? 'Auto-delete disabled (manual only)' : `Unused images will be deleted after ${days} days`);
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 updateClock();
 loadPlatform();
 if (document.body.dataset.page === 'deploy') loadBlueprints();
 if (document.body.dataset.page === 'manage') loadProjects();
+if (document.body.dataset.page === 'system') loadSystemInfo();
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();
 loadTelemetryStatus();

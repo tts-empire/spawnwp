@@ -32,6 +32,12 @@ fi
 eval "$(python3 scripts/blueprint.py "${RESOLVE_ARGS[@]}")"
 RESOLVED_BLUEPRINT="/tmp/spawnwp-blueprint-$$.json"
 
+# Per-site PHP overrides (SPAWNWP_PHP_* env vars from the cockpit's advanced
+# section; defaults = the values baked in docker/php/php.ini). Validate early,
+# before creating anything.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-php-ini.sh"
+php_ini_defaults
+
 exec 9>/run/lock/spawnwp-new-project.lock
 if ! flock -n 9; then
   echo "ERROR: another site creation is already in progress." >&2
@@ -105,6 +111,9 @@ cp -r docker "${PROJ_DIR}/"
 rm -rf "${PROJ_DIR}/docker/mariadb/custom.cnf"
 cp Makefile "${PROJ_DIR}/"
 cp -r scripts "${PROJ_DIR}/"
+write_php_ini "${PROJ_DIR}"
+BODY_SIZE=$(php_ini_body_size)
+sed -i "s/^\(\s*client_max_body_size\s\+\).*/\1${BODY_SIZE};/" "${PROJ_DIR}/docker/nginx/default.conf"
 mkdir -p "${PROJ_DIR}/projects/primary/wp-content/plugins"
 mkdir -p "${PROJ_DIR}/backups/db" "${PROJ_DIR}/backups/files"
 mkdir -p "${PROJ_DIR}/.spawnwp"
@@ -163,6 +172,7 @@ wp_block = """
     # ── ${NAME} (port ${PORT}) ──────────────────────────────────────────────
     location /${NAME}/ {
         include /etc/nginx/snippets/spawnwp-proxy.conf;
+        client_max_body_size ${BODY_SIZE};
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/;
         # On the /wp-admin directory redirect, the backend (internal nginx) emits
@@ -221,15 +231,16 @@ echo "==> Starting stack (db + php first, then the rest)..."
 cd "${PROJ_DIR}"
 
 # Build the php image only when needed. The image label records a hash of the
-# docker/php build context plus the WP build args; when it matches and the image
-# is recent we reuse it instead of paying a full 'build --pull' per create (that
-# used to cost minutes and grow the BuildKit cache without bound). Freshness is
-# preserved by an age-based refresh with --pull (default 7 days, tunable via
-# SPAWNWP_IMAGE_MAX_AGE_DAYS) — same guarantee that once avoided a stale WP 6.9.4,
-# paid at most once a week instead of on every site.
-# Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
+# docker/php build context plus the WP build args; when it matches we reuse the
+# image instead of paying a full 'build --pull' per create (that used to cost
+# minutes and grow the BuildKit cache without bound). Freshness is the admin's
+# call: images past SPAWNWP_IMAGE_MAX_AGE_DAYS (default 7) are only FLAGGED as
+# stale — the cockpit's System info tab offers a manual Refresh; nothing rebuilds
+# automatically. Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
 IMAGE="wp-dev-php:${PHP_VERSION}"
-CONTEXT_HASH=$( { cd docker/php && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
+# zz-site.ini is a runtime mount (per-site values), not part of the image:
+# keep it out of the hash or every custom PHP setting would force a rebuild.
+CONTEXT_HASH=$( { cd docker/php && find . -type f ! -name 'zz-site.ini' -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
                   echo "series=${WORDPRESS_SERIES} wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
@@ -249,8 +260,7 @@ else
     echo "==> php build context changed: rebuilding ${IMAGE}..."
     NEED_BUILD=1
   elif [ "$AGE_DAYS" -ge "$MAX_AGE_DAYS" ]; then
-    echo "==> php image is ${AGE_DAYS} days old: refreshing base (latest WordPress)..."
-    NEED_BUILD=1; BUILD_ARGS=(--pull)
+    echo "==> Reusing php image ${IMAGE} (stale: ${AGE_DAYS} days old)."
   else
     echo "==> Reusing php image ${IMAGE} (context unchanged, ${AGE_DAYS}d old)."
   fi

@@ -243,3 +243,21 @@
     .update-panel { grid-template-columns: 1fr; }
     .update-panel > div { border-right: 0; border-bottom: 1px solid var(--border); }
   }
+
+  /* ── System info tab ─────────────────────────────────────────────────────── */
+  .image-explainer { border-left: 3px solid var(--accent); background: var(--surface2, #0d0d10); color: var(--muted); padding: 10px 12px; margin-bottom: 14px; font-size: 12.5px; line-height: 1.5; }
+  .image-explainer b { color: var(--text); }
+  .gc-setting { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 4px; font-size: 12.5px; color: var(--muted); }
+  .gc-setting input[type="number"] { width: 70px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; }
+  .gc-setting small { flex-basis: 100%; color: var(--muted); font-size: 11px; }
+  .docker-disk .field-help { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
+
+  /* ── Per-site PHP settings ───────────────────────────────────────────────── */
+  .php-advanced { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; background: var(--surface2); }
+  .php-advanced summary { cursor: pointer; font-size: 12px; color: var(--muted); font-weight: 650; }
+  .php-advanced-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 12px 0 4px; }
+  .php-advanced-grid label span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .php-advanced-grid input[type="text"], .php-advanced-grid input[type="number"] { width: 100%; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 12.5px; }
+  .php-advanced-check { display: flex; align-items: center; gap: 7px; align-self: end; }
+  .php-advanced-check span { margin: 0 !important; }
+  .php-inline-form { padding: 10px; }

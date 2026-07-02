@@ -1,0 +1,6 @@
+[Unit]
+Description=SpawnWP optional auto-delete of unused PHP images
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /srv/wp-dev/scripts/image-gc.sh

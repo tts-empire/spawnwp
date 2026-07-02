@@ -77,6 +77,7 @@ def main() -> int:
                 "migrations/remove-legacy-access.py",
                 "migrations/remove-obsolete-network-gate.py",
                 "migrations/install-dashboard-update-service.py",
+                "migrations/update-docker-prune-service.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -105,6 +106,7 @@ def main() -> int:
                 "installer/migrations/remove-legacy-access.py",
                 "installer/migrations/remove-obsolete-network-gate.py",
                 "installer/migrations/install-dashboard-update-service.py",
+                "installer/migrations/update-docker-prune-service.py",
             ],
             "files": entries,
         }

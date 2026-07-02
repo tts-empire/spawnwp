@@ -100,6 +100,9 @@ mkdir -p "${PROJ_DIR}"
 PROJECT_CREATED=1
 cp compose.yaml "${PROJ_DIR}/"
 cp -r docker "${PROJ_DIR}/"
+# Pre-0.3.13 stacks mounted a docker/mariadb/custom.cnf that never existed, so
+# Docker auto-created an empty DIRECTORY with that name; don't propagate it.
+rm -rf "${PROJ_DIR}/docker/mariadb/custom.cnf"
 cp Makefile "${PROJ_DIR}/"
 cp -r scripts "${PROJ_DIR}/"
 mkdir -p "${PROJ_DIR}/projects/primary/wp-content/plugins"
@@ -217,12 +220,48 @@ echo ""
 echo "==> Starting stack (db + php first, then the rest)..."
 cd "${PROJ_DIR}"
 
-# ALWAYS rebuild the php image fresh (--pull): guarantees the LATEST WordPress and
-# the QA tools from the current Dockerfile. Without this, 'compose up' would reuse
-# a possibly STALE cached 'wp-dev-php:<ver>' tag (that is how a site once came up
-# on WP 6.9.4 instead of 7.0). Unchanged layers stay cached: usually fast.
-echo "==> Building php image (fresh, latest WordPress)..."
-docker compose build --pull php
+# Build the php image only when needed. The image label records a hash of the
+# docker/php build context plus the WP build args; when it matches and the image
+# is recent we reuse it instead of paying a full 'build --pull' per create (that
+# used to cost minutes and grow the BuildKit cache without bound). Freshness is
+# preserved by an age-based refresh with --pull (default 7 days, tunable via
+# SPAWNWP_IMAGE_MAX_AGE_DAYS) — same guarantee that once avoided a stale WP 6.9.4,
+# paid at most once a week instead of on every site.
+# Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
+IMAGE="wp-dev-php:${PHP_VERSION}"
+CONTEXT_HASH=$( { cd docker/php && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
+                  echo "series=${WORDPRESS_SERIES} wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
+export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
+MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
+NEED_BUILD=0
+BUILD_ARGS=()
+if [ "${SPAWNWP_REBUILD:-0}" = "1" ]; then
+  echo "==> SPAWNWP_REBUILD=1: forcing a fresh php image build..."
+  NEED_BUILD=1; BUILD_ARGS=(--pull)
+elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "==> php image ${IMAGE} not present: building (first use of PHP ${PHP_VERSION})..."
+  NEED_BUILD=1; BUILD_ARGS=(--pull)
+else
+  IMAGE_HASH=$(docker image inspect -f '{{index .Config.Labels "org.spawnwp.context-hash"}}' "$IMAGE" 2>/dev/null || true)
+  CREATED=$(docker image inspect -f '{{.Created}}' "$IMAGE")
+  AGE_DAYS=$(( ( $(date +%s) - $(date -d "$CREATED" +%s) ) / 86400 ))
+  if [ "$IMAGE_HASH" != "$CONTEXT_HASH" ]; then
+    echo "==> php build context changed: rebuilding ${IMAGE}..."
+    NEED_BUILD=1
+  elif [ "$AGE_DAYS" -ge "$MAX_AGE_DAYS" ]; then
+    echo "==> php image is ${AGE_DAYS} days old: refreshing base (latest WordPress)..."
+    NEED_BUILD=1; BUILD_ARGS=(--pull)
+  else
+    echo "==> Reusing php image ${IMAGE} (context unchanged, ${AGE_DAYS}d old)."
+  fi
+fi
+if [ "$NEED_BUILD" = "1" ]; then
+  docker compose build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} php
+  # Trim the BuildKit cache now that the image is tagged. 'until' counts from last
+  # use, so the layers this build just touched survive and future rebuilds still
+  # hit the cache; only stale orphaned layers are dropped.
+  docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
+fi
 
 # Deterministic two-phase startup. On the FIRST run the WordPress entrypoint
 # extracts the whole install into the empty volume (thousands of files): under

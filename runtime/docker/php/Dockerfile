@@ -67,3 +67,9 @@ COPY phpstan-wp.neon /usr/local/etc/phpstan-wp.neon
 COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 COPY xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+
+# Build-context fingerprint: new-project.sh compares this label against the hash of
+# the current docker/php context (+ WP build args) to skip rebuilds when nothing
+# changed. Declared last so changing the hash never invalidates the layers above.
+ARG SPAWNWP_CONTEXT_HASH=dev
+LABEL org.spawnwp.context-hash=$SPAWNWP_CONTEXT_HASH

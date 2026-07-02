@@ -41,7 +41,10 @@ SpawnWP will:
 
 - allocate free internal ports,
 - write the site's config and a fresh `.env` with random secrets,
-- build/start the container stack and install WordPress,
+- start the container stack and install WordPress (the PHP image is built only the
+  first time a PHP version is used, after a SpawnWP update that changes it, or when
+  it is more than 7 days old — otherwise it is reused and creation takes about a
+  minute instead of several),
 - validate and apply the selected blueprint,
 - add the nginx routes (WordPress on `DOMAIN`, Adminer/Mailpit on `COCKPIT_DOMAIN`).
 
@@ -81,7 +84,10 @@ database health check, or read Mailpit/nginx errors. The larger **Up**, **Down**
 
 The first switch to a PHP version downloads and compiles its image and can take several
 minutes. The cockpit shows structured progress and keeps the verbose BuildKit log under
-**Show technical details**. Cached PHP versions switch substantially faster.
+**Show technical details**. Cached PHP versions switch substantially faster. The same
+applies to site creation: once a PHP version's image exists, new sites reuse it (it is
+rebuilt only after a SpawnWP update that changes it, when it is older than 7 days, or
+with `SPAWNWP_REBUILD=1`).
 
 ### Snapshots & restore
 

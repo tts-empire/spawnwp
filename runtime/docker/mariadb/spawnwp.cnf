@@ -1,0 +1,13 @@
+# SpawnWP development defaults: small disk/RAM footprint, fast startup.
+# Named spawnwp.cnf (not custom.cnf): older stacks auto-created a DIRECTORY called
+# custom.cnf at this path, and the updater must be able to replace this as a file.
+[mysqld]
+performance_schema = OFF
+skip-name-resolve
+innodb_buffer_pool_size = 64M
+innodb_log_file_size = 16M
+innodb_temp_data_file_path = ibtmp1:12M:autoextend:max:128M
+aria_pagecache_buffer_size = 8M
+key_buffer_size = 4M
+max_connections = 40
+table_open_cache = 200

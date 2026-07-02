@@ -20,7 +20,7 @@ main interface.
 | **Architecture** | amd64 or arm64 |
 | **Access** | root (or sudo) |
 | **RAM** | 2 GB minimum; 4 GB+ recommended if you run several sites |
-| **Disk** | 20 GB+ (WordPress images, databases, snapshots) |
+| **Disk** | 20 GB+ (WordPress images, databases, snapshots). Steady state is roughly 2 GB per PHP version in use plus 100–250 MB per site |
 | **State** | a **fresh** machine — the installer expects to own `/srv` and the nginx config |
 
 A cloud VM or VPS, a dedicated server, or bare-metal hardware all work. ARM servers

@@ -4,7 +4,20 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
-## 0.3.12
+## 0.3.13
+
+- Site creation no longer rebuilds the PHP image every time: the image is built only
+  on first use of a PHP version, when the build context changes, or when it is older
+  than 7 days (`SPAWNWP_IMAGE_MAX_AGE_DAYS`; `SPAWNWP_REBUILD=1` forces a build).
+  Creating a site on an already-built PHP version now takes about a minute.
+- Docker build cache is trimmed right after each image build, and the weekly prune
+  now drops cache unused for 72 hours (was 168) — this cache could previously grow
+  by several GB per created site.
+- Fixed the MariaDB tuning config, which was never applied (the stack mounted a file
+  that did not exist, so Docker created an empty directory in its place). New sites
+  now use a small development profile: ~60 MB less preallocated disk and a lower
+  memory footprint per database. Existing sites keep their current behaviour;
+  recreate a site to pick up the new profile.
 
 - Widened the first-run authenticator window to ±60 seconds so a small server clock
   drift no longer rejects every TOTP code during enrollment.

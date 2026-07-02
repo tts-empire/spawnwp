@@ -26,7 +26,7 @@ systemctl list-timers | grep docker-prune
 | Unit | Role |
 |---|---|
 | `wp-cockpit.service` | Runs the cockpit (uvicorn on `127.0.0.1:9393`) |
-| `docker-prune.timer` | Weekly Docker build-cache prune (safe; never touches volumes) |
+| `docker-prune.timer` | Weekly Docker build-cache prune of layers unused for 72h (safe; never touches volumes). Site creation also trims stale cache right after each image build. |
 
 ## Updating SpawnWP
 

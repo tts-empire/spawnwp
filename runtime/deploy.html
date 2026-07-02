@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=20260628g">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=20260702a">
 </head>
 <body data-page="deploy">
   <header>
@@ -39,6 +39,7 @@
         <div class="deploy-summary"><span>Destination</span><strong>https://<span id="domain-preview">domain</span>/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
         <button type="submit" class="btn-primary sensitive" id="btn-create">Create site</button>
       </form>
+      <div class="php-first-notice" id="deploy-notice" hidden></div>
       <div class="output-box" id="out-new">
         <div class="output-head"><span class="out-label">deployment output</span><span><button class="icon-btn" type="button" onclick="copyBox('out-new')" title="Copy output">⧉</button><button class="icon-btn" type="button" onclick="closeBox('out-new')" title="Close output">×</button></span></div>
         <div class="output-body" id="out-new-body"></div>
@@ -47,6 +48,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=20260628g"></script>
+  <script src="/assets/cockpit.js?v=20260702a"></script>
 </body>
 </html>

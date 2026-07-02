@@ -9,7 +9,9 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 - Site creation no longer rebuilds the PHP image every time: the image is built only
   on first use of a PHP version, when the build context changes, or when it is older
   than 7 days (`SPAWNWP_IMAGE_MAX_AGE_DAYS`; `SPAWNWP_REBUILD=1` forces a build).
-  Creating a site on an already-built PHP version now takes about a minute.
+  Creating a site on an already-built PHP version now takes about 35 seconds; the
+  one-off first build per PHP version takes about 5 minutes, and the cockpit now
+  shows a clear notice when a deploy includes it.
 - Docker build cache is trimmed right after each image build, and the weekly prune
   now drops cache unused for 72 hours (was 168) — this cache could previously grow
   by several GB per created site.

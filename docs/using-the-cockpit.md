@@ -43,8 +43,9 @@ SpawnWP will:
 - write the site's config and a fresh `.env` with random secrets,
 - start the container stack and install WordPress (the PHP image is built only the
   first time a PHP version is used, after a SpawnWP update that changes it, or when
-  it is more than 7 days old — otherwise it is reused and creation takes about a
-  minute instead of several),
+  it is more than 7 days old — that one-off build takes about 5 minutes and the
+  cockpit shows a clear notice when it happens; every other creation reuses the
+  image and takes about 35 seconds),
 - validate and apply the selected blueprint,
 - add the nginx routes (WordPress on `DOMAIN`, Adminer/Mailpit on `COCKPIT_DOMAIN`).
 

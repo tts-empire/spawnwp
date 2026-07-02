@@ -637,6 +637,7 @@ function streamSSE(url, payload, boxId, onDone, options = {}) {
           return;
         }
         appendLine(body, line, line.toLowerCase().includes('error'));
+        if (options.onLine) options.onLine(line, body);
       }
     }
     appendLine(body, '⚠️ Connection closed before the final status. Refreshing state.', true);
@@ -843,9 +844,12 @@ function createProject(e) {
   nameHelp.textContent = 'Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.';
   const btn = document.getElementById('btn-create');
   const result = document.getElementById('deploy-result');
+  const notice = document.getElementById('deploy-notice');
   btn.disabled = true;
   DEPLOY_ACTIVE = true;
   result.hidden = true;
+  notice.hidden = true;
+  notice.classList.remove('cached');
   streamSSE(`${BASE}/new-project`, { name, blueprint, php_version }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
@@ -854,6 +858,23 @@ function createProject(e) {
       result.innerHTML = `<strong>Environment ready.</strong><div><a href="${url}/" target="_blank" rel="noopener">Open site ↗</a><a href="${url}/wp-admin/" target="_blank" rel="noopener">WP Admin ↗</a><a href="/manage">Manage environment →</a></div>`;
       result.hidden = false;
     }
+  }, {
+    // Surface the image-build decision streamed by new-project.sh: the one-off
+    // first build per PHP version takes minutes, every later deploy does not.
+    onLine: line => {
+      const first = line.match(/first use of PHP ([\d.]+)/);
+      if (first) {
+        notice.hidden = false;
+        notice.textContent = `⏳ First deploy on PHP ${first[1]}: its image is being downloaded and built — a one-off step of about 5 minutes. Every later site on PHP ${first[1]} deploys in about 35 seconds.`;
+      } else if (/build context changed|refreshing base|forcing a fresh php image/.test(line)) {
+        notice.hidden = false;
+        notice.textContent = '⏳ The PHP image needs a rebuild (SpawnWP update or weekly WordPress refresh): this deploy takes about 5 minutes; the next ones about 35 seconds.';
+      } else if (/Reusing php image/.test(line)) {
+        notice.hidden = false;
+        notice.classList.add('cached');
+        notice.textContent = '⚡ PHP image already built — this deploy should take about 35 seconds.';
+      }
+    },
   });
 }
 

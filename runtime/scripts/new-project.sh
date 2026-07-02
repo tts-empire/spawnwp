@@ -145,6 +145,15 @@ ADMINER_PORT=${ADMINER_PORT}
 REDIS_PASSWORD=${REDIS_PASS}
 EOF
 
+# Temporary site: record the self-destruct deadline (enforced by the hourly
+# spawnwp-site-expiry timer). 0/unset = permanent.
+LIFETIME_DAYS="${SPAWNWP_SITE_LIFETIME_DAYS:-0}"
+if [[ "$LIFETIME_DAYS" =~ ^[0-9]+$ ]] && [ "$LIFETIME_DAYS" -gt 0 ]; then
+  EXPIRES=$(( $(date +%s) + LIFETIME_DAYS * 86400 ))
+  echo "SPAWNWP_EXPIRES=${EXPIRES}" >> "${PROJ_DIR}/.env"
+  echo "==> Temporary site: it will be destroyed automatically around $(date -d "@${EXPIRES}" '+%Y-%m-%d %H:%M') (${LIFETIME_DAYS} day(s) from now)."
+fi
+
 cp env.example "${PROJ_DIR}/.env.example"
 cp gitignore.template "${PROJ_DIR}/.gitignore"
 

@@ -361,9 +361,18 @@ def list_projects():
             except (OSError, json.JSONDecodeError):
                 blueprint = {"id": "invalid", "name": "Invalid manifest", "version": "-"}
 
+        expires_at = None
+        days_left = None
+        if env.get("SPAWNWP_EXPIRES", "").isdigit():
+            import time as _time
+            expires_at = int(env["SPAWNWP_EXPIRES"])
+            days_left = max(0, round((expires_at - _time.time()) / 86400, 1))
+
         result.append({
             "name": proj.name,
             "url": env.get("WP_HOME", ""),
+            "expires_at": expires_at,
+            "days_left": days_left,
             "php": env.get("PHP_VERSION", "?"),
             "port": env.get("WEB_PORT", "?"),
             "db_name": env.get("DB_NAME", "wordpress"),
@@ -555,6 +564,7 @@ class NewProject(BaseModel):
     blueprint: str = "development"
     php_version: str | None = None
     php_settings: PhpIniSettings | None = None
+    lifetime_days: int = 0   # 0 = permanent; otherwise the site self-destructs
 
 @app.post("/api/new-project")
 def new_project(body: NewProject):
@@ -562,15 +572,19 @@ def new_project(body: NewProject):
         raise HTTPException(400, "Invalid name: use lowercase letters, digits and hyphens only")
     if not SLUG_RE.match(body.blueprint):
         raise HTTPException(400, "Invalid blueprint id")
+    if not 0 <= body.lifetime_days <= 365:
+        raise HTTPException(400, "lifetime_days must be between 0 and 365")
     validate_blueprint_choice(body.blueprint, body.php_version)
     guard_not_busy()
     if is_project(PROJECTS_ROOT / body.name):
         raise HTTPException(409, f"Project '{body.name}' already exists")
-    env = body.php_settings.validated().as_env() if body.php_settings else None
+    env = body.php_settings.validated().as_env() if body.php_settings else {}
+    if body.lifetime_days:
+        env["SPAWNWP_SITE_LIFETIME_DAYS"] = str(body.lifetime_days)
     return sse_response(
         ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or ""],
         PRIMARY_PROJECT,
-        env,
+        env or None,
     )
 
 
@@ -890,6 +904,30 @@ def disk_project(project: str):
         "total_mb": total_mb,
         "host": host,
     }
+
+
+# ── Site expiry: extend or remove a temporary site's lifetime ─────────────────
+# Only lengthens or removes the deadline (never shortens to "now"): the actual
+# destruction is done by the hourly spawnwp-site-expiry timer via site-expiry.sh.
+
+class SiteExpiry(BaseModel):
+    lifetime_days: int   # counted from now; 0 = make the site permanent
+
+
+@app.post("/api/expiry/{project}")
+def set_expiry(project: str, body: SiteExpiry):
+    proj = resolve_project(project)
+    if proj == PRIMARY_PROJECT:
+        raise HTTPException(400, "The primary stack cannot expire")
+    if not 0 <= body.lifetime_days <= 365:
+        raise HTTPException(400, "lifetime_days must be between 0 and 365")
+    env_file = proj / ".env"
+    lines = [l for l in env_file.read_text().splitlines() if not l.startswith("SPAWNWP_EXPIRES=")]
+    if body.lifetime_days:
+        import time as _time
+        lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_days * 86400}")
+    env_file.write_text("\n".join(lines) + "\n")
+    return {"project": proj.name, "lifetime_days": body.lifetime_days}
 
 
 # ── Per-site PHP settings: read / apply on an existing site ───────────────────

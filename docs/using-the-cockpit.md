@@ -50,11 +50,20 @@ SpawnWP will:
 - add the nginx routes (WordPress on `DOMAIN`, Adminer/Mailpit on `COCKPIT_DOMAIN`).
 
 The result is live at `https://DOMAIN/<name>/`. On completion, Deploy links directly to
-the front page, WP Admin and the environment on Manage.
+the front page, WP Admin and the environment on Manage. Blueprint cards show each
+profile's approximate deploy time, and the launch bar's **expected time** reflects your
+actual selection — it knows whether the chosen PHP version's image is already built.
+
+### Lifetime (temporary sites)
+
+The **Lifetime** field makes a site disposable: pick 1, 3, 7 or 30 days and the site is
+**destroyed automatically** when it expires — containers, database, files and routes,
+with **no backups kept**. Manage shows a countdown badge on temporary sites and a
+**⏳ Lifetime** action to extend them or make them permanent. The default is Permanent.
 
 ### PHP settings (advanced)
 
-The Deploy form's collapsed **PHP settings (advanced)** section exposes the classic
+The Deploy form's collapsed **PHP settings** panel exposes the classic
 hosting knobs — `memory_limit`, `upload_max_filesize`, `post_max_size`,
 `max_execution_time`, `max_input_vars`, `max_input_time` and a `display_errors` toggle.
 Leave it untouched for the defaults (256M / 64M / 64M / 120s / 3000 / -1 / Off). Raising

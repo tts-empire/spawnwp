@@ -139,11 +139,21 @@ if (newName) newName.addEventListener('input', e => {
   help.textContent = 'Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.';
 });
 
+// Per-blueprint deploy time on a ready image; development adds wp.org plugin installs.
+const BLUEPRINT_TIMES = { clean: '~35 sec', demo: '~35 sec', development: '~1–2 min' };
+let PHP_IMAGES = null;   // PHP versions whose image is already built; null = unknown
+
+function blueprintTime(id) { return BLUEPRINT_TIMES[id] || '~35 sec'; }
+
 async function loadBlueprints() {
   const select = document.getElementById('new-blueprint');
   const button = document.getElementById('btn-create');
   const catalog = document.getElementById('blueprint-catalog');
   if (!select || !catalog) return;
+  // Built images are only needed for the expected-time estimate: never block on them.
+  fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json())
+    .then(data => { PHP_IMAGES = (data.images || []).map(img => img.php_version); updateExpectedTime(); })
+    .catch(() => {});
   try {
     const response = await fetch(`${BASE}/blueprints`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -155,9 +165,12 @@ async function loadBlueprints() {
       <input type="radio" name="blueprint-choice" value="${esc(item.id)}">
       <div class="blueprint-option-head"><h2>${esc(item.name)}</h2><span class="badge badge-gray">${esc(item.version)}</span></div>
       <p>${esc(item.description)}</p>
+      <div class="blueprint-time"><span class="badge badge-green">${item.id === 'development' ? '⏱' : '⚡'} ${esc(blueprintTime(item.id))}</span>${item.id === 'development' ? '<small class="field-help" style="margin:0">installs plugins from wp.org</small>' : ''}</div>
       <div class="blueprint-facts"><span>${esc(item.source)}</span><span>${item.debug ? 'debug on' : 'debug off'}</span><span>${esc(item.content_preset)}</span><span>PHP ${item.php.allowed.map(version => version === '7.4' ? '7.4 legacy' : esc(version)).join(', ')}</span></div>
     </label>`).join('');
     catalog.querySelectorAll('.blueprint-option').forEach(option => option.addEventListener('click', () => selectBlueprint(option.dataset.blueprint)));
+    document.getElementById('new-php').addEventListener('change', updateExpectedTime);
+    document.getElementById('new-lifetime').addEventListener('change', updateExpectedTime);
     selectBlueprint(select.value);
     const errors = payload.errors || [];
     const alert = document.getElementById('blueprint-errors');
@@ -190,6 +203,58 @@ function updateBlueprintSelection() {
   php.innerHTML = item.php.allowed.map(version => `<option value="${esc(version)}">PHP ${esc(version)}</option>`).join('');
   php.value = item.php.default;
   document.getElementById('blueprint-note').textContent = item.description;
+  updateExpectedTime();
+}
+
+// The launch bar's live estimate: the real number for the CURRENT choice, so the
+// "first time is slow" warning only appears when it is actually true.
+function updateExpectedTime() {
+  const timeEl = document.getElementById('expected-time');
+  const noteEl = document.getElementById('expected-time-note');
+  if (!timeEl) return;
+  const blueprintId = document.getElementById('new-blueprint').value;
+  const version = document.getElementById('new-php').value;
+  const base = blueprintTime(blueprintId);
+  const lifetime = parseInt(document.getElementById('new-lifetime').value, 10) || 0;
+  const expiry = lifetime ? ` · expires after ${lifetime} day${lifetime === 1 ? '' : 's'}` : '';
+  if (PHP_IMAGES === null || !version) {
+    timeEl.textContent = base;
+    timeEl.className = '';
+    noteEl.textContent = expiry.replace(' · ', '');
+    return;
+  }
+  if (PHP_IMAGES.includes(version)) {
+    timeEl.textContent = base;
+    timeEl.className = 'time-fast';
+    noteEl.textContent = `PHP ${version} image ready${expiry}`;
+  } else {
+    timeEl.textContent = '~5 min';
+    timeEl.className = 'time-slow';
+    noteEl.textContent = `one-off first build for PHP ${version}, then ${base}${expiry}`;
+  }
+}
+
+function togglePhpPanel() {
+  const head = document.getElementById('php-panel-toggle');
+  const body = document.getElementById('php-panel-body');
+  const open = head.getAttribute('aria-expanded') === 'true';
+  head.setAttribute('aria-expanded', String(!open));
+  body.hidden = open;
+}
+
+function phpFormChanged() {
+  document.getElementById('php-modified').hidden = collectPhpSettings(true) === null;
+}
+
+function resetPhpForm() {
+  document.getElementById('php-memory').value = PHP_DEFAULTS.memory_limit;
+  document.getElementById('php-upload').value = PHP_DEFAULTS.upload_max_filesize;
+  document.getElementById('php-post').value = PHP_DEFAULTS.post_max_size;
+  document.getElementById('php-exec').value = PHP_DEFAULTS.max_execution_time;
+  document.getElementById('php-vars').value = PHP_DEFAULTS.max_input_vars;
+  document.getElementById('php-input-time').value = PHP_DEFAULTS.max_input_time;
+  document.getElementById('php-display-errors').checked = PHP_DEFAULTS.display_errors;
+  document.getElementById('php-modified').hidden = true;
 }
 
 function healthClass(h) {
@@ -467,7 +532,7 @@ function renderTop(p) {
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
       </div>
-      <span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span>
+      <span class="card-badges">${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
     </div>
     ${table}
     <div class="actions">
@@ -481,6 +546,7 @@ function renderTop(p) {
       ${p.mail_url ? `<button class="btn-db btn-sm" onclick="window.open('${esc(p.mail_url)}','_blank','noopener')" title="Open Mailpit (captured mail)">✉️ Mailpit ▸</button>` : ''}
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
       <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
+      ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
         <option value="">PHP ${esc(p.php)} ▾</option>
         <option value="7.4">→ PHP 7.4 (legacy)</option>
@@ -853,7 +919,8 @@ function createProject(e) {
   notice.classList.remove('cached');
   const php_settings = collectPhpSettings();
   if (php_settings === undefined) return;   // invalid input, message already shown
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings }, 'out-new', ok => {
+  const lifetime_days = parseInt(document.getElementById('new-lifetime').value, 10) || 0;
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {
@@ -891,8 +958,9 @@ const PHP_DEFAULTS = { memory_limit: '256M', upload_max_filesize: '64M', post_ma
 const PHP_SIZE_RE = /^[0-9]{1,4}[KMG]$/;
 
 // Reads the deploy form's advanced section. Returns null when everything is at
-// the defaults (nothing to send), undefined when a value is invalid.
-function collectPhpSettings() {
+// the defaults (nothing to send), undefined when a value is invalid (a toast is
+// shown unless silent — silent callers just want the modified/unmodified state).
+function collectPhpSettings(silent = false) {
   const val = id => document.getElementById(id).value.trim().toUpperCase();
   const num = id => parseInt(document.getElementById(id).value, 10);
   const s = {
@@ -906,6 +974,7 @@ function collectPhpSettings() {
   };
   for (const field of ['memory_limit', 'upload_max_filesize', 'post_max_size']) {
     if (!PHP_SIZE_RE.test(s[field])) {
+      if (silent) return s;
       showToast(`Invalid ${field}: use a number with K/M/G unit, e.g. 128M`, true);
       return undefined;
     }
@@ -976,6 +1045,45 @@ async function applyPhpIni(name, btn) {
     btn.disabled = false;
     btn.textContent = 'Apply (restarts php, ~2s)';
   }
+}
+
+// ── Temporary sites: expiry badge + extend/make-permanent ────────────────────
+function expiryBadge(p) {
+  if (!p.expires_at) return '';
+  const cls = p.days_left < 1 ? 'badge-red' : 'badge-yellow';
+  const left = p.days_left < 1 ? `${Math.max(1, Math.round(p.days_left * 24))}h` : `${Math.round(p.days_left)}d`;
+  return `<span class="badge ${cls}" title="Temporary site: destroyed automatically when it expires (no backups). Use ⏳ Lifetime to extend it.">⏳ expires in ${left}</span> `;
+}
+
+async function showExpiry(name, daysLeft) {
+  const body = getOutputBox(`out-${name}`);
+  appendLine(body, `⏳ "${name}" is a temporary site: it will be destroyed automatically in about ${daysLeft < 1 ? Math.max(1, Math.round(daysLeft * 24)) + ' hours' : Math.round(daysLeft) + ' days'} (no backups are kept).`);
+  const wrap = document.createElement('div');
+  wrap.className = 'php-inline-form';
+  const extend = (days, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'icon-btn';
+    btn.textContent = label;
+    btn.onclick = async () => {
+      try {
+        const res = await fetch(`${BASE}/expiry/${encodeURIComponent(name)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lifetime_days: days }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || res.statusText);
+        showToast(days === 0 ? `"${name}" is now permanent` : `"${name}" now expires in ${days} day${days === 1 ? '' : 's'}`);
+        closeBox(`out-${name}`);
+        loadProjects();
+      } catch (e) { showToast(e.message, true); }
+    };
+    return btn;
+  };
+  wrap.append(extend(1, '+ 1 day from now'), document.createTextNode(' '),
+              extend(7, '+ 7 days from now'), document.createTextNode(' '),
+              extend(30, '+ 30 days from now'), document.createTextNode(' '),
+              extend(0, 'Make permanent'));
+  body.appendChild(wrap);
 }
 
 // ── Adminer (auto-login via bridge page served by the cockpit) ───────────────

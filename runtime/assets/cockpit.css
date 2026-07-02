@@ -184,19 +184,51 @@
   .blueprint-option p { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
   .blueprint-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
   .blueprint-facts span { border: 1px solid var(--border); border-radius: 3px; padding: 3px 6px; color: var(--muted); font-size: 10px; }
+  .blueprint-time { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .blueprint-time .badge { font-variant-numeric: tabular-nums; }
+  .first-build-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 14px; }
+  .first-build-note b { color: var(--text); }
   .inline-alert { border-left: 3px solid var(--yellow); color: var(--yellow); padding: 9px 12px; margin-bottom: 12px; background: #251f10; }
-  .deploy-form { display: grid; grid-template-columns: minmax(180px,1fr) minmax(140px,.45fr) auto; gap: 12px; align-items: end; }
-  .deploy-form label > span,.deploy-summary > span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
-  .deploy-form input,.deploy-form select { width: 100%; min-height: 38px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; }
-  .deploy-form .field-help { display:block; margin-top:6px; color:var(--muted); font-size:11px; line-height:1.35; text-transform:none; }
-  .deploy-form input.input-error { border-color:var(--red); }
-  .deploy-form .field-help.input-error { color:var(--red); }
+
+  /* Deploy: vertical flow — fields grid, optional PHP panel, launch bar. */
+  .deploy-form { display: flex; flex-direction: column; gap: 16px; }
+  .deploy-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; align-items: start; }
+  .deploy-form label > span, .dl-cell > span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+  .deploy-form input, .deploy-form select { width: 100%; min-height: 38px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; }
+  .deploy-form .field-help { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.35; text-transform: none; min-height: 16px; }
+  .deploy-form input.input-error { border-color: var(--red); }
+  .deploy-form .field-help.input-error { color: var(--red); }
   .update-actions { display:flex; align-items:center; gap:14px; margin:18px 0; }
   .update-actions span { color:var(--muted); font-size:12px; }
-  .deploy-summary { grid-column: 1 / -1; padding: 12px 0; border-top: 1px solid var(--border); }
-  .deploy-form > button { grid-column: 1 / -1; }
-  .deploy-summary strong { display: block; font-family: monospace; overflow-wrap: anywhere; }
-  .deploy-summary small { display: block; color: var(--muted); margin-top: 5px; }
+
+  .php-panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+  .php-panel-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; background: transparent; border: 0; color: var(--text); cursor: pointer; text-align: left; }
+  .php-panel-head:hover { background: var(--surface2); }
+  .php-panel-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .php-panel-chevron { color: var(--accent); font-size: 12px; transition: transform .15s ease; flex: 0 0 auto; }
+  .php-panel-head[aria-expanded="true"] .php-panel-chevron { transform: rotate(90deg); }
+  .php-panel-title { font-size: 12.5px; font-weight: 700; }
+  .php-panel-sub { color: var(--muted); font-size: 11.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .php-panel-body { padding: 4px 14px 14px; border-top: 1px solid var(--border); }
+  .php-advanced-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 12px 0 4px; }
+  .php-advanced-grid label span { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .php-advanced-grid label small { display: block; margin-top: 4px; color: var(--muted); font-size: 10.5px; }
+  .php-advanced-grid input[type="text"], .php-advanced-grid input[type="number"] { width: 100%; min-height: 38px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; font-size: 12.5px; }
+  .php-advanced-check { display: flex; align-items: center; gap: 8px; padding-top: 22px; }
+  .php-advanced-check input { accent-color: var(--accent); }
+  .php-advanced-check span { margin: 0 !important; text-transform: none !important; font-size: 12px !important; font-weight: 400 !important; color: var(--text) !important; }
+  .php-panel-foot { display: flex; align-items: baseline; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .php-panel-foot small { color: var(--muted); font-size: 11px; }
+  .php-reset { appearance: none; border: 0; background: transparent; color: var(--accent); font-size: 11.5px; cursor: pointer; padding: 0; text-decoration: underline; }
+
+  .deploy-launch { display: grid; grid-template-columns: 1fr auto auto; gap: 20px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+  .dl-cell strong { display: block; font-family: monospace; font-size: 13.5px; overflow-wrap: anywhere; }
+  .dl-cell small { display: block; color: var(--muted); margin-top: 4px; font-size: 11px; }
+  .dl-time strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dl-time strong.time-fast { color: var(--green); }
+  .dl-time strong.time-slow { color: var(--yellow); }
+  .deploy-launch > button { min-height: 42px; padding: 0 22px; }
+
   .deploy-result { margin-top: 12px; border-left: 3px solid var(--green); padding: 12px; background: #101d16; }
   .deploy-result a { color: var(--accent); margin-right: 14px; }
   .updates-main { max-width: 900px; }
@@ -230,16 +262,16 @@
     .resource-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .main-nav { margin-left: 6px; }
     .main-nav a { padding: 0 9px; }
-    .deploy-form { grid-template-columns: 1fr 1fr; }
-    .deploy-form button { grid-column: 1 / -1; }
+    .deploy-fields { grid-template-columns: 1fr 1fr; }
+    .deploy-launch { grid-template-columns: 1fr; gap: 12px; }
+    .deploy-launch > button { width: 100%; }
     .telemetry-card { align-items: flex-start; flex-direction: column; }
   }
   @media (max-width: 440px) {
     .brand-context,#header-clock { display: none; }
     .resource-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .resource-ring,.uptime-kpi { min-height: 82px; }
-    .deploy-form { grid-template-columns: 1fr; }
-    .deploy-form button { grid-column: 1; }
+    .deploy-fields { grid-template-columns: 1fr; }
     .update-panel { grid-template-columns: 1fr; }
     .update-panel > div { border-right: 0; border-bottom: 1px solid var(--border); }
   }
@@ -252,12 +284,8 @@
   .gc-setting small { flex-basis: 100%; color: var(--muted); font-size: 11px; }
   .docker-disk .field-help { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
 
-  /* ── Per-site PHP settings ───────────────────────────────────────────────── */
-  .php-advanced { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; background: var(--surface2); }
-  .php-advanced summary { cursor: pointer; font-size: 12px; color: var(--muted); font-weight: 650; }
-  .php-advanced-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 12px 0 4px; }
-  .php-advanced-grid label span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-  .php-advanced-grid input[type="text"], .php-advanced-grid input[type="number"] { width: 100%; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 12.5px; }
-  .php-advanced-check { display: flex; align-items: center; gap: 7px; align-self: end; }
-  .php-advanced-check span { margin: 0 !important; }
+  /* Inline PHP settings form rendered inside a site's output box (Manage). */
   .php-inline-form { padding: 10px; }
+
+  /* Temporary-site badges next to the status badge on Manage cards. */
+  .card-badges { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }

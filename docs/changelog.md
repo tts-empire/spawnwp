@@ -4,6 +4,27 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.3.15
+
+- Redesigned the **Deploy** page: a clear stepped flow (blueprint → configure →
+  create), aligned fields, and a launch bar showing the destination URL, a live
+  **expected-time estimate** (it knows whether the chosen PHP version's image is
+  already built) and the Create button. The PHP settings section is now a proper
+  collapsible panel with per-field hints, a "modified" indicator and a reset.
+- Blueprint cards now show the **approximate deploy time** (~35 sec; ~1–2 min for
+  Development, which installs plugins), with a note that the first deploy on a
+  not-yet-built PHP version adds a one-off ~5-minute image build.
+- **Temporary sites**: an optional lifetime at creation (1/3/7/30 days). Expired
+  sites are destroyed automatically by an hourly check (no backups kept — they are
+  disposable by design). Manage shows a countdown badge and lets you extend the
+  lifetime or make the site permanent.
+- Fixed the System tab stuck on "Loading": the asset cache-busting version was not
+  bumped in 0.3.14, so browsers kept the previous JavaScript. The version string is
+  now tied to the SpawnWP release and enforced by a static test.
+- Fixed `destroy-project.sh` leaving orphaned nginx location blocks behind on hosts
+  serving from `sites-enabled/default` — dangerous once internal ports get reused
+  by new sites.
+
 ## 0.3.14
 
 - New **System** cockpit tab: inventory of the shared PHP images (size, age, which

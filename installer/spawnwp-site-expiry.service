@@ -1,0 +1,6 @@
+[Unit]
+Description=SpawnWP destruction of expired temporary sites
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /srv/wp-dev/scripts/site-expiry.sh

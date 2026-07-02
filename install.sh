@@ -215,8 +215,9 @@ install -m 0644 "$(src installer wp-cockpit.service)" /etc/systemd/system/wp-coc
 install -m 0644 "$(src installer spawnwp-update.service)" /etc/systemd/system/spawnwp-update.service
 install -m 0644 "$(src installer docker-prune.service)" "$(src installer docker-prune.timer)" /etc/systemd/system/
 install -m 0644 "$(src installer spawnwp-image-gc.service)" "$(src installer spawnwp-image-gc.timer)" /etc/systemd/system/
+install -m 0644 "$(src installer spawnwp-site-expiry.service)" "$(src installer spawnwp-site-expiry.timer)" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now wp-cockpit docker-prune.timer spawnwp-image-gc.timer
+systemctl enable --now wp-cockpit docker-prune.timer spawnwp-image-gc.timer spawnwp-site-expiry.timer
 echo "Cockpit authentication is ready. The one-time activation procedure and code are shown in the final report below."
 
 printf '{"telemetry":false}\n' > /var/lib/spawnwp/features.json

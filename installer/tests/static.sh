@@ -40,3 +40,13 @@ if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/i
   echo "active runtime must not reference the removed cockpit network allow-list" >&2
   exit 1
 fi
+
+# Asset cache-busting must match the release: a stale ?v= serves users the old
+# cockpit.js/css from browser cache (the 0.3.14 System-tab "Loading" bug).
+VERSION_STR=$(tr -d '[:space:]' < "$ROOT/VERSION")
+for page in manage deploy updates system; do
+  if grep -Eo '\?v=[0-9a-zA-Z.]+' "$ROOT/runtime/${page}.html" | grep -qv "?v=${VERSION_STR}$"; then
+    echo "runtime/${page}.html has an asset ?v= that does not match VERSION (${VERSION_STR})" >&2
+    exit 1
+  fi
+done

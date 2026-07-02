@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=20260702a">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.3.15">
 </head>
 <body data-page="deploy">
   <header>
@@ -26,32 +26,56 @@
       <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
     </section>
     <section class="section">
-      <div class="section-title">Blueprint catalog</div>
+      <div class="section-title">1 · Choose a blueprint</div>
       <div id="blueprint-errors" class="inline-alert" hidden></div>
       <div id="blueprint-catalog" class="blueprint-grid"><p class="loading-copy">Loading…</p></div>
+      <p class="first-build-note">⏱ Times shown are for a ready PHP image. The <b>first</b> deploy on a
+      PHP version not built yet adds a one-off image build of about <b>5 minutes</b> — after that,
+      every deploy on it runs at the times above.</p>
     </section>
     <section class="section deploy-workspace">
-      <div class="section-title">Configure environment</div>
+      <div class="section-title">2 · Configure &amp; create</div>
       <form class="deploy-form" onsubmit="createProject(event)">
-        <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
-        <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select></label>
+        <div class="deploy-fields">
+          <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
+          <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select><small class="field-help">Switchable later from Manage.</small></label>
+          <label><span>Lifetime</span><select id="new-lifetime" aria-describedby="lifetime-help">
+            <option value="0" selected>Permanent</option>
+            <option value="1">1 day</option>
+            <option value="3">3 days</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+          </select><small class="field-help" id="lifetime-help">Temporary sites are destroyed when they expire — no backups kept.</small></label>
+        </div>
         <input id="new-blueprint" type="hidden" value="development">
-        <details class="php-advanced" id="php-advanced">
-          <summary>PHP settings (advanced)</summary>
-          <div class="php-advanced-grid">
-            <label><span>memory_limit</span><input id="php-memory" type="text" value="256M" placeholder="256M"></label>
-            <label><span>upload_max_filesize</span><input id="php-upload" type="text" value="64M" placeholder="64M"></label>
-            <label><span>post_max_size</span><input id="php-post" type="text" value="64M" placeholder="64M"></label>
-            <label><span>max_execution_time</span><input id="php-exec" type="number" min="10" max="3600" value="120"></label>
-            <label><span>max_input_vars</span><input id="php-vars" type="number" min="100" max="100000" value="3000"></label>
-            <label><span>max_input_time</span><input id="php-input-time" type="number" min="-1" max="3600" value="-1"></label>
-            <label class="php-advanced-check"><input id="php-display-errors" type="checkbox"><span>display_errors (dev only)</span></label>
+        <div class="php-panel">
+          <button type="button" class="php-panel-head" id="php-panel-toggle" aria-expanded="false" aria-controls="php-panel-body" onclick="togglePhpPanel()">
+            <span class="php-panel-chevron" aria-hidden="true">▸</span>
+            <span class="php-panel-title">PHP settings</span>
+            <span class="php-panel-sub">memory, uploads, execution time — optional</span>
+            <span class="badge badge-yellow" id="php-modified" hidden>modified</span>
+          </button>
+          <div class="php-panel-body" id="php-panel-body" hidden>
+            <div class="php-advanced-grid">
+              <label><span>memory_limit</span><input id="php-memory" type="text" value="256M" placeholder="256M" oninput="phpFormChanged()"><small>16M – 1G</small></label>
+              <label><span>upload_max_filesize</span><input id="php-upload" type="text" value="64M" placeholder="64M" oninput="phpFormChanged()"><small>up to 512M</small></label>
+              <label><span>post_max_size</span><input id="php-post" type="text" value="64M" placeholder="64M" oninput="phpFormChanged()"><small>up to 512M</small></label>
+              <label><span>max_execution_time</span><input id="php-exec" type="number" min="10" max="3600" value="120" oninput="phpFormChanged()"><small>seconds</small></label>
+              <label><span>max_input_vars</span><input id="php-vars" type="number" min="100" max="100000" value="3000" oninput="phpFormChanged()"><small>form fields limit</small></label>
+              <label><span>max_input_time</span><input id="php-input-time" type="number" min="-1" max="3600" value="-1" oninput="phpFormChanged()"><small>-1 = no limit</small></label>
+              <label class="php-advanced-check"><input id="php-display-errors" type="checkbox" onchange="phpFormChanged()"><span>display_errors (dev only)</span></label>
+            </div>
+            <div class="php-panel-foot">
+              <button type="button" class="php-reset" onclick="resetPhpForm()">Reset to defaults</button>
+              <small>Raising the upload sizes aligns the nginx limits automatically. Editable later from Manage.</small>
+            </div>
           </div>
-          <small class="field-help">Sizes accept K/M/G (upload/post up to 512M — the nginx limits follow automatically).
-          Values above the container's 512M RAM limit require raising that limit too. Editable later from Manage.</small>
-        </details>
-        <div class="deploy-summary"><span>Destination</span><strong>https://<span id="domain-preview">domain</span>/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
-        <button type="submit" class="btn-primary sensitive" id="btn-create">Create site</button>
+        </div>
+        <div class="deploy-launch">
+          <div class="dl-cell dl-dest"><span>Destination</span><strong>https://<span id="domain-preview">domain</span>/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
+          <div class="dl-cell dl-time"><span>Expected time</span><strong id="expected-time">—</strong><small id="expected-time-note"></small></div>
+          <button type="submit" class="btn-primary sensitive" id="btn-create">Create site</button>
+        </div>
       </form>
       <div class="php-first-notice" id="deploy-notice" hidden></div>
       <div class="output-box" id="out-new">
@@ -62,6 +86,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=20260702a"></script>
+  <script src="/assets/cockpit.js?v=0.3.15"></script>
 </body>
 </html>

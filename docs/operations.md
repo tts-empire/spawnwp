@@ -28,6 +28,7 @@ systemctl list-timers | grep docker-prune
 | `wp-cockpit.service` | Runs the cockpit (uvicorn on `127.0.0.1:9393`) |
 | `docker-prune.timer` | Weekly Docker build-cache prune of layers unused for 72h (safe; never touches volumes). Site creation also trims stale cache right after each image build. |
 | `spawnwp-image-gc.timer` | Daily check for the optional auto-delete of unused PHP images (System tab setting; disabled by default) |
+| `spawnwp-site-expiry.timer` | Hourly destruction of expired temporary sites (sites created with a lifetime) |
 
 ## Updating SpawnWP
 

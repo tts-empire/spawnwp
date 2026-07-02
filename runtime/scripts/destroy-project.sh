@@ -9,7 +9,13 @@ if [ -z "$NAME" ]; then
 fi
 
 PROJ_DIR="/srv/${NAME}"
+# Same vhost resolution as new-project.sh: what matters is which conf is ENABLED.
+# (A hardcoded path here used to leave orphaned location blocks behind on hosts
+# serving from sites-enabled/default — dangerous once ports get reused.)
 NGINX_CONF="/etc/nginx/sites-available/spawnwp"
+if [ ! -e /etc/nginx/sites-enabled/spawnwp ] && [ -e /etc/nginx/sites-enabled/default ]; then
+  NGINX_CONF=$(readlink -f /etc/nginx/sites-enabled/default)
+fi
 
 # ── Safety guards ────────────────────────────────────────────────────────────────
 # Never destroy the primary stack.

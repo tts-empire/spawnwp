@@ -79,6 +79,7 @@ def main() -> int:
                 "migrations/install-dashboard-update-service.py",
                 "migrations/update-docker-prune-service.py",
                 "migrations/install-image-gc-units.py",
+                "migrations/install-site-expiry-units.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -109,6 +110,7 @@ def main() -> int:
                 "installer/migrations/install-dashboard-update-service.py",
                 "installer/migrations/update-docker-prune-service.py",
                 "installer/migrations/install-image-gc-units.py",
+                "installer/migrations/install-site-expiry-units.py",
             ],
             "files": entries,
         }

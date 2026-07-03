@@ -143,7 +143,20 @@ if (newName) newName.addEventListener('input', e => {
 const BLUEPRINT_TIMES = { clean: '~35 sec', demo: '~35 sec', development: '~1–2 min' };
 let PHP_IMAGES = null;   // PHP versions whose image is already built; null = unknown
 
-function blueprintTime(id) { return BLUEPRINT_TIMES[id] || '~35 sec'; }
+function blueprintTime(id) {
+  const item = BLUEPRINTS.find(candidate => candidate.id === id);
+  if (item && item.schema_version === 2) {
+    // Content blueprints replay a captured payload: ~1 min base + ~1 min/GB.
+    return `~${1 + Math.ceil((item.payload?.bytes || 0) / 1024 ** 3)} min`;
+  }
+  return BLUEPRINT_TIMES[id] || '~35 sec';
+}
+
+function humanBytes(bytes) {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 async function loadBlueprints() {
   const select = document.getElementById('new-blueprint');
@@ -161,13 +174,25 @@ async function loadBlueprints() {
     BLUEPRINTS = payload.blueprints || [];
     if (!BLUEPRINTS.length) throw new Error('No valid blueprints available');
     select.value = BLUEPRINTS.some(item => item.id === 'development') ? 'development' : BLUEPRINTS[0].id;
-    catalog.innerHTML = BLUEPRINTS.map(item => `<label class="blueprint-option" data-blueprint="${esc(item.id)}">
+    catalog.innerHTML = BLUEPRINTS.map(item => {
+      const isTemplate = item.schema_version === 2;
+      const phpFact = `PHP ${item.php.allowed.map(version => version === '7.4' ? '7.4 legacy' : esc(version)).join(', ')}`;
+      const facts = isTemplate
+        ? [esc(item.source), humanBytes(item.payload.bytes),
+           esc(['plugins', 'themes', 'uploads', 'database'].filter(key => item.capture[key]).join(' · ')), phpFact]
+        : [esc(item.source), item.debug ? 'debug on' : 'debug off', esc(item.content_preset), phpFact];
+      const premiumCount = isTemplate && item.premium_plugins ? item.premium_plugins.length : 0;
+      const premium = premiumCount
+        ? `<div class="blueprint-warning">⚠ ${premiumCount} premium/custom plugin${premiumCount === 1 ? '' : 's'} may need new license keys</div>` : '';
+      return `<label class="blueprint-option" data-blueprint="${esc(item.id)}">
       <input type="radio" name="blueprint-choice" value="${esc(item.id)}">
-      <div class="blueprint-option-head"><h2>${esc(item.name)}</h2><span class="badge badge-gray">${esc(item.version)}</span></div>
+      <div class="blueprint-option-head"><h2>${esc(item.name)}</h2>${isTemplate ? '<span class="badge badge-yellow">Template</span>' : ''}<span class="badge badge-gray">${esc(item.version)}</span></div>
       <p>${esc(item.description)}</p>
-      <div class="blueprint-time"><span class="badge badge-green">${item.id === 'development' ? '⏱' : '⚡'} ${esc(blueprintTime(item.id))}</span>${item.id === 'development' ? '<small class="field-help" style="margin:0">installs plugins from wp.org</small>' : ''}</div>
-      <div class="blueprint-facts"><span>${esc(item.source)}</span><span>${item.debug ? 'debug on' : 'debug off'}</span><span>${esc(item.content_preset)}</span><span>PHP ${item.php.allowed.map(version => version === '7.4' ? '7.4 legacy' : esc(version)).join(', ')}</span></div>
-    </label>`).join('');
+      <div class="blueprint-time"><span class="badge badge-green">${item.id === 'development' || isTemplate ? '⏱' : '⚡'} ${esc(blueprintTime(item.id))}</span>${item.id === 'development' ? '<small class="field-help" style="margin:0">installs plugins from wp.org</small>' : ''}</div>
+      ${premium}
+      <div class="blueprint-facts">${facts.map(fact => `<span>${fact}</span>`).join('')}</div>
+    </label>`;
+    }).join('');
     catalog.querySelectorAll('.blueprint-option').forEach(option => option.addEventListener('click', () => selectBlueprint(option.dataset.blueprint)));
     document.getElementById('new-php').addEventListener('change', updateExpectedTime);
     document.getElementById('new-lifetime').addEventListener('change', updateExpectedTime);
@@ -202,7 +227,13 @@ function updateBlueprintSelection() {
   const php = document.getElementById('new-php');
   php.innerHTML = item.php.allowed.map(version => `<option value="${esc(version)}">PHP ${esc(version)}</option>`).join('');
   php.value = item.php.default;
-  document.getElementById('blueprint-note').textContent = item.description;
+  const note = document.getElementById('blueprint-note');
+  note.textContent = item.description;
+  if (item.schema_version === 2 && item.premium_plugins && item.premium_plugins.length) {
+    const names = item.premium_plugins.map(plugin => plugin.name).slice(0, 5).join(', ');
+    const extra = item.premium_plugins.length > 5 ? ', …' : '';
+    note.textContent += ` — ⚠ includes ${item.premium_plugins.length} premium/custom plugin${item.premium_plugins.length === 1 ? '' : 's'} (${names}${extra}) that may require new license keys or re-activation.`;
+  }
   updateExpectedTime();
 }
 
@@ -1295,12 +1326,78 @@ async function saveImageGc() {
   }
 }
 
+// ── System: template connections & content blueprints ───────────────────────
+async function loadTemplateConnections() {
+  const box = document.getElementById('bp-connections');
+  const list = document.getElementById('bp-blueprints');
+  if (!box) return;
+  try {
+    const [pairings, catalog] = await Promise.all([
+      fetch(`${BASE}/blueprint-pairings`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${BASE}/blueprints`, { cache: 'no-store' }).then(r => r.json()),
+    ]);
+    const rows = (pairings.connections || []).map(connection => {
+      const status = connection.status === 'active'
+        ? '<span class="badge badge-green">connected</span>'
+        : `<span class="badge badge-yellow">pending · expires ${new Date(connection.pair_expires * 1000).toLocaleTimeString()}</span>`;
+      return `<tr><td>${esc(connection.remote_host || connection.label || connection.id.slice(0, 8))}</td><td>${status}</td>
+        <td>${new Date(connection.created_at * 1000).toLocaleDateString()}</td>
+        <td><button class="icon-btn" onclick="revokeBlueprintConnection('${esc(connection.id)}')">Revoke</button></td></tr>`;
+    }).join('');
+    box.innerHTML = rows
+      ? `<table class="svc-table"><thead><tr><th>Site</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<p class="field-help">No template connections yet.</p>';
+    const templates = (catalog.blueprints || []).filter(item => item.schema_version === 2);
+    list.innerHTML = templates.length
+      ? `<table class="svc-table"><thead><tr><th>Blueprint</th><th>Size</th><th>Captured</th><th></th></tr></thead><tbody>${templates.map(item =>
+        `<tr><td><b>${esc(item.name)}</b> <span class="badge badge-gray">${esc(item.version)}</span> <small>${esc(item.id)}</small></td>
+          <td>${humanBytes(item.payload.bytes)}</td><td>${esc(item.created_at.replace('T', ' ').replace('Z', ' UTC'))}</td>
+          <td><button class="icon-btn" onclick="deleteContentBlueprint('${esc(item.id)}')">Delete</button></td></tr>`).join('')}</tbody></table>`
+      : '<p class="field-help">No content blueprints yet. Pair a configured site, then press “Create blueprint” in the SpawnWP Deploy plugin.</p>';
+  } catch (error) {
+    box.innerHTML = `<p class="field-help">Unable to load template connections: ${esc(error.message)}</p>`;
+  }
+}
+
+async function generateBlueprintPairing() {
+  try {
+    const response = await sensitiveFetch(`${BASE}/blueprint-pairings`, { method: 'POST' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText);
+    document.getElementById('bp-bundle-box').hidden = false;
+    document.getElementById('bp-bundle').value = payload.bundle;
+    document.getElementById('bp-bundle-expiry').textContent =
+      `Paste this code in the SpawnWP Deploy plugin on the site to capture. Expires ${new Date(payload.expires * 1000).toLocaleString()}.`;
+    loadTemplateConnections();
+  } catch (error) { showToast(error.message, true); }
+}
+
+async function revokeBlueprintConnection(id) {
+  if (!confirm('Revoke this template connection? The site will no longer be able to push blueprints to this server.')) return;
+  try {
+    const response = await fetch(`${BASE}/blueprint-connections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);
+    showToast('Connection revoked');
+  } catch (error) { showToast(error.message, true); }
+  loadTemplateConnections();
+}
+
+async function deleteContentBlueprint(id) {
+  if (!confirm(`Delete the content blueprint “${id}” and its captured payload?\n\nExisting sites are not affected; you can re-capture it from the source site at any time.`)) return;
+  try {
+    const response = await fetch(`${BASE}/blueprints/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);
+    showToast('Blueprint deleted');
+  } catch (error) { showToast(error.message, true); }
+  loadTemplateConnections();
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 updateClock();
 loadPlatform();
 if (document.body.dataset.page === 'deploy') loadBlueprints();
 if (document.body.dataset.page === 'manage') loadProjects();
-if (document.body.dataset.page === 'system') loadSystemInfo();
+if (document.body.dataset.page === 'system') { loadSystemInfo(); loadTemplateConnections(); }
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();
 loadTelemetryStatus();

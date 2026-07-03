@@ -1,0 +1,33 @@
+{
+    "public_key": "DTivjLGacb3bNPaxWUa5dn/H6JWqqlNanCwlhFXTnpU=",
+    "cases": [
+        {
+            "method": "GET",
+            "path": "/api/ingest/preflight",
+            "timestamp": 1751500000,
+            "nonce": "abcdef0123456789abcdef",
+            "body_b64": "",
+            "signature": "9c7X1tvW8oIddsX2o56uAiQrgMFjkR6uUGhrM1kYODMUVLXA1NLI/CSDlDLhuhTVE0v5F+cWZhaVQUX4WxovBg=="
+        },
+        {
+            "method": "POST",
+            "path": "/api/ingest/jobs",
+            "timestamp": 1751500123,
+            "nonce": "ffeeddccbbaa99887766",
+            "body_b64": "eyJibHVlcHJpbnQiOnsiaWQiOiJhZ2VuY3ktYmFzZSJ9LCJyZXBsYWNlIjpmYWxzZX0=",
+            "signature": "XdTeqKoQZJ3lerlMJq5VNM8lz//+l1stJEyEqb3SzGKYrrDhyfsZyDge2aHY6waN/pR0Zpso35LlD1spAwYMCQ=="
+        },
+        {
+            "method": "PUT",
+            "path": "/api/ingest/jobs/deadbeef/chunks/3",
+            "timestamp": 1751500456,
+            "nonce": "0123456789abcdef0123",
+            "body_b64": "AAECYmluYXJ5/w==",
+            "signature": "iclTaisWZPqS8AIRa8njiRutsKlhdgkyn2vONOHihxH6fbitazzVG2e9SHwTS67LZ0LUlpwev0VrBM640yHxAg=="
+        }
+    ],
+    "pair_proof": {
+        "data": "pair|pid1234|DTivjLGacb3bNPaxWUa5dn/H6JWqqlNanCwlhFXTnpU=|template.example.com",
+        "signature": "jh7b7D7vThcy8IBEt969YLD6z/VRj/b64CQHEQ2q8lzvXo7293Yb23XfOexKHEdaTLQNyK5YvauFVjGL7bRLDQ=="
+    }
+}

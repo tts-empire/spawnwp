@@ -78,6 +78,14 @@ Spawning and destroying a site (`make new-project` / the Destroy button) also wr
 matching nginx blocks: the WordPress block on `DOMAIN`, the Adminer/Mailpit blocks on
 `COCKPIT_DOMAIN`.
 
+The cockpit also hosts the **blueprint ingest API** (`/api/ingest/*`, since 0.4.0):
+the only cockpit surface reachable without a session, authenticated instead by
+per-connection Ed25519 request signatures (see [Security](security.md)). It accepts
+content-blueprint captures pushed from the SpawnWP Deploy plugin, verifies and
+hardens them, and installs manifest (in `/etc/spawnwp/blueprints.d/`) and payload
+(in `/var/lib/spawnwp/blueprints/<id>/`) atomically. Connection and upload state
+lives in a root-only SQLite database (`/var/lib/spawnwp/ingest.db`).
+
 ## Host services
 
 | Service | Role |

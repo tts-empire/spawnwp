@@ -69,6 +69,15 @@ checksummed resumable chunks. The target stages and verifies the package before
 activation, performs a health check and rolls back automatically if activation fails.
 The pre-transfer rollback is retained for seven days.
 
+## Capture a site as a blueprint
+
+Since plugin 0.2.0 (with SpawnWP 0.4.0+), the plugin can also capture the configured
+site as a reusable **content blueprint** on your own SpawnWP server: pair with a
+single-use code from the cockpit's **System → Template connections**, choose what to
+capture, and press *Create blueprint*. See
+[Content blueprints](blueprints.md#content-blueprints-captured-from-a-site) for the
+full flow, defaults and privacy guarantees.
+
 ## What the plugin does not replace
 
 SpawnWP Deploy is not a backup system, hosting service, staging platform or general

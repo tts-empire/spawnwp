@@ -14,6 +14,18 @@ timestamps, nonces, body hashes and checksummed chunks. Connection keys expire a
 15 minutes. The target stages and verifies the package before activation and retains a
 seven-day rollback. The plugin is a public preview and is not installed by default.
 
+Since 0.4.0 the same machine-authentication model also protects **content blueprint
+captures** pushed from the plugin to the SpawnWP server (`/api/ingest/*`): every
+request is signed with a per-connection Ed25519 key over the method, path, timestamp,
+nonce and body hash; timestamps are bounded (±5 minutes), nonces are single-use, and
+the endpoint is rate-limited by nginx. Pairing codes are generated only from an
+authenticated cockpit session with recent authentication, are single-use and expire
+after 15 minutes. Uploaded archives are checksum-verified and hardened (no absolute
+or traversal paths, no symlinks, bounded expansion) before a blueprint is installed,
+and the manifest is written last so a failed upload cannot leave a partial blueprint.
+Captured databases never include the `users` or `usermeta` tables, and the source
+site URL is replaced with a placeholder before upload.
+
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
 application authentication.

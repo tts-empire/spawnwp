@@ -1,5 +1,6 @@
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 limit_req_zone $binary_remote_addr zone=spawnwp_auth:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=spawnwp_ingest:10m rate=120r/m;
 
 server {
     listen 80 default_server;
@@ -71,6 +72,15 @@ server {
         proxy_pass http://127.0.0.1:9393/assets/;
         proxy_buffering on;
         add_header Cache-Control "public, max-age=604800, immutable" always;
+    }
+    location /api/ingest/ {
+        limit_req zone=spawnwp_ingest burst=40 nodelay;
+        include /etc/nginx/snippets/spawnwp-proxy.conf;
+        proxy_pass http://127.0.0.1:9393;
+        proxy_read_timeout 600s;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        add_header Cache-Control "no-store" always;
     }
     location ~ ^/api/auth/(setup/(start|finish)|passkey/(start|finish)|fallback)$ {
         limit_req zone=spawnwp_auth burst=10 nodelay;

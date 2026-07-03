@@ -19,30 +19,51 @@ final class SpawnWP_Deploy_Package {
 		return WP_CONTENT_DIR . '/.spawnwp-deploy/jobs/' . sanitize_file_name( $job_id );
 	}
 
-	public static function prepare( string $job_id, string $target_url, array $target_env ): array {
+	public static function prepare( string $job_id, string $target_url, array $target_env, array $options = array() ): array {
 		global $wpdb, $wp_version;
+		$options   = wp_parse_args(
+			$options,
+			array(
+				'include_plugins'    => true,
+				'include_themes'     => true,
+				'include_uploads'    => true,
+				'include_database'   => true,
+				'keep_deploy_plugin' => true,
+			)
+		);
 		$workspace = self::workspace( $job_id );
 		if ( ! wp_mkdir_p( $workspace ) ) {
 			throw new RuntimeException( 'Unable to create package workspace.' );
 		}
 
 		$db_file = $workspace . '/database.jsonl';
-		self::export_database( $db_file, untrailingslashit( home_url() ), untrailingslashit( $target_url ) );
+		if ( $options['include_database'] ) {
+			self::export_database( $db_file, untrailingslashit( home_url() ), untrailingslashit( $target_url ), (bool) $options['keep_deploy_plugin'] );
+		}
 
 		$archive = $workspace . '/payload.zip';
 		$zip     = new ZipArchive();
 		if ( true !== $zip->open( $archive, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
 			throw new RuntimeException( 'Unable to create payload ZIP.' );
 		}
-		$zip->addFile( $db_file, 'database.jsonl' );
-		self::add_tree( $zip, WP_PLUGIN_DIR, 'content/plugins', 'plugins' );
-		self::add_tree( $zip, get_theme_root(), 'content/themes', 'themes' );
+		if ( $options['include_database'] ) {
+			$zip->addFile( $db_file, 'database.jsonl' );
+		}
+		if ( $options['include_plugins'] ) {
+			self::add_tree( $zip, WP_PLUGIN_DIR, 'content/plugins', 'plugins' );
+		}
+		if ( $options['include_themes'] ) {
+			self::add_tree( $zip, get_theme_root(), 'content/themes', 'themes' );
+		}
 		$uploads = wp_get_upload_dir()['basedir'];
-		if ( is_dir( $uploads ) ) {
+		if ( $options['include_uploads'] && is_dir( $uploads ) ) {
 			self::add_tree( $zip, $uploads, 'content/uploads', 'uploads' );
 		}
 		$zip->close();
 
+		if ( ! file_exists( $archive ) ) {
+			throw new RuntimeException( 'The selected contents produced an empty package.' );
+		}
 		$size = filesize( $archive );
 		if ( false === $size || $size > self::MAX_BYTES ) {
 			@unlink( $archive );
@@ -88,7 +109,7 @@ final class SpawnWP_Deploy_Package {
 		self::remove_tree( self::workspace( $job_id ) );
 	}
 
-	private static function export_database( string $file, string $source_url, string $target_url ): void {
+	private static function export_database( string $file, string $source_url, string $target_url, bool $keep_deploy_plugin = true ): void {
 		global $wpdb;
 		$handle = fopen( $file, 'wb' );
 		if ( ! $handle ) {
@@ -131,7 +152,7 @@ final class SpawnWP_Deploy_Package {
 							continue;
 						}
 						if ( 'active_plugins' === $db_row['option_name'] ) {
-							$db_row['option_value'] = self::filter_active_plugins( $db_row['option_value'] );
+							$db_row['option_value'] = self::filter_active_plugins( $db_row['option_value'], $keep_deploy_plugin );
 						}
 					}
 					$encoded = array();
@@ -158,12 +179,12 @@ final class SpawnWP_Deploy_Package {
 		fclose( $handle );
 	}
 
-	private static function filter_active_plugins( string $serialized ): string {
+	private static function filter_active_plugins( string $serialized, bool $keep_deploy_plugin = true ): string {
 		$plugins = maybe_unserialize( $serialized );
 		if ( ! is_array( $plugins ) ) {
 			return $serialized;
 		}
-		$plugins   = array_values(
+		$plugins = array_values(
 			array_filter(
 				$plugins,
 				static function ( $plugin ) {
@@ -172,7 +193,9 @@ final class SpawnWP_Deploy_Package {
 				}
 			)
 		);
-		$plugins[] = 'spawnwp-deploy/spawnwp-deploy.php';
+		if ( $keep_deploy_plugin ) {
+			$plugins[] = 'spawnwp-deploy/spawnwp-deploy.php';
+		}
 		return maybe_serialize( array_values( array_unique( $plugins ) ) );
 	}
 

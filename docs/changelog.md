@@ -4,6 +4,40 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.4.0
+
+- **Content blueprints**: capture an already-configured WordPress site as a reusable
+  blueprint on your own SpawnWP server. Install the SpawnWP Deploy plugin (0.2.0+) on
+  the configured site, pair it with a single-use code generated on the cockpit's
+  **System → Template connections**, choose what to capture (plugin files, theme
+  files, media uploads, database — all on by default) and press *Create blueprint*.
+  The capture is pushed over Ed25519-signed chunked uploads (same request format as
+  site-to-site deploys), verified, hardened and installed atomically; it then appears
+  on the **Deploy** page with a `Template` badge, payload size, capture summary and
+  an estimated spawn time.
+- New blueprint **manifest schema v2** (`schema_version: 2`) for captured payloads,
+  allowed only in `/etc/spawnwp/blueprints.d/`; payloads live under
+  `/var/lib/spawnwp/blueprints/<id>/`. Existing schema v1 blueprints are unchanged.
+- **Privacy by construction**: the capture rewrites the source site URL to a fixed
+  placeholder before upload, so the source URL never reaches the SpawnWP server; users
+  and passwords are never included; each spawned site gets fresh credentials and the
+  placeholder is rewritten to the new site URL.
+- **License caveat surfaced**: plugins that are not from WordPress.org are listed in
+  the manifest and flagged both at capture time and on the Deploy card — sites spawned
+  from the blueprint may require new license keys or re-activation for those plugins.
+- Re-capturing with an existing blueprint id offers a **replace** flow: the old
+  payload is kept until the new one is fully verified, then swapped atomically.
+- The capture form lets you widen the allowed PHP versions; the default pins to the
+  source site's PHP version.
+- New cockpit ingest API under `/api/ingest/` (signature-authenticated, rate-limited)
+  plus session-side endpoints to generate pairing codes, revoke connections and delete
+  content blueprints. Existing installations get the nginx changes through an update
+  migration.
+- Telemetry (notice v3 consents only): new aggregate counter `blueprint_captures`.
+- SpawnWP Deploy plugin **0.2.0-dev**: new "Create a SpawnWP blueprint from this
+  site" panel, plugin inventory (wp.org vs premium/custom), capture options and
+  database-content disclaimer. The existing one-time site transfer is unchanged.
+
 ## 0.3.17
 
 - The installer now offers to **pre-build the shared PHP 8.3 image** (default: yes),

@@ -55,6 +55,52 @@ final class SpawnWP_Deploy_Guard {
 		);
 	}
 
+	/**
+	 * Classify active plugins into WordPress.org slugs and premium/custom
+	 * entries (used for the blueprint manifest and the license warning).
+	 * The wp.org lookup result is cached for a day.
+	 */
+	public static function plugin_inventory(): array {
+		$cached = get_transient( 'spawnwp_deploy_plugin_inventory' );
+		if ( is_array( $cached ) && isset( $cached['wporg'], $cached['premium'] ) ) {
+			return $cached;
+		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+		$update = get_site_transient( 'update_plugins' );
+		$known  = array_merge( (array) ( $update->response ?? array() ), (array) ( $update->no_update ?? array() ) );
+		$wporg   = array();
+		$premium = array();
+		foreach ( get_option( 'active_plugins', array() ) as $basename ) {
+			$slug = str_contains( $basename, '/' ) ? explode( '/', $basename )[0] : preg_replace( '/\.php$/', '', $basename );
+			if ( in_array( $slug, SpawnWP_Deploy_Package::DEV_PLUGINS, true ) ) {
+				continue;
+			}
+			$file = WP_PLUGIN_DIR . '/' . $basename;
+			$data = file_exists( $file ) ? get_plugin_data( $file, false, false ) : array();
+			$is_wporg = isset( $known[ $basename ] );
+			if ( ! $is_wporg ) {
+				$info     = plugins_api( 'plugin_information', array( 'slug' => $slug, 'fields' => array( 'sections' => false ) ) );
+				$is_wporg = ! is_wp_error( $info ) && ! empty( $info->slug ) && $info->slug === $slug;
+			}
+			if ( $is_wporg && preg_match( '/^[a-z0-9][a-z0-9-]{0,63}$/', $slug ) ) {
+				$wporg[] = $slug;
+			} else {
+				$premium[] = array(
+					'name'    => substr( (string) ( $data['Name'] ?? '' ) ?: $slug, 0, 100 ),
+					'slug'    => substr( $slug, 0, 64 ),
+					'version' => substr( (string) ( $data['Version'] ?? '' ) ?: 'unknown', 0, 32 ),
+				);
+			}
+		}
+		$inventory = array(
+			'wporg'   => array_values( array_unique( $wporg ) ),
+			'premium' => $premium,
+		);
+		set_transient( 'spawnwp_deploy_plugin_inventory', $inventory, DAY_IN_SECONDS );
+		return $inventory;
+	}
+
 	public static function environment(): array {
 		global $wpdb, $wp_version;
 		return array(

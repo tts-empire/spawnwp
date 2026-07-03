@@ -49,7 +49,7 @@ METRIC_KEYS = frozenset({
     "creates_total", "creates_failed", "healthcheck_timeouts",
     "create_warm_count", "create_warm_seconds_sum", "create_warm_seconds_max",
     "create_cold_count", "create_cold_seconds_sum", "create_cold_seconds_max",
-    "blueprint_clean", "blueprint_demo", "blueprint_development", "blueprint_custom",
+    "blueprint_clean", "blueprint_demo", "blueprint_development", "blueprint_custom", "blueprint_captures",
     "sites_temporary_created", "sites_expired_auto", "php_settings_customized",
     "destroys_total", "php_switches", "image_refreshes", "image_deletes",
 })

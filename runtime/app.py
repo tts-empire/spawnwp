@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from auth import initialize as initialize_auth
 from auth import is_enrolled, login_page, router as auth_router, session as auth_session, valid_csrf
+from ingest import router as ingest_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -24,6 +25,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(ingest_router)
 
 
 @app.middleware("http")
@@ -33,7 +35,7 @@ async def application_authentication(request: Request, call_next):
         "/login", "/api/version", "/api/auth/state", "/api/auth/setup/start",
         "/api/auth/setup/finish", "/api/auth/passkey/start", "/api/auth/passkey/finish",
         "/api/auth/fallback",
-    }
+    } or path.startswith("/api/ingest/")  # signed-request auth lives in ingest.py
     active = None if public else auth_session(request)
     if not public and not active:
         if path.startswith("/api/"):
@@ -42,7 +44,7 @@ async def application_authentication(request: Request, call_next):
     if active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
         return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
     destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
-                   "/api/images/delete", "/api/images/refresh"}
+                   "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings"}
     if active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
         return JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     response = await call_next(request)

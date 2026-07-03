@@ -9,6 +9,11 @@ if [ ! -f "$MANIFEST" ]; then
   exit 1
 fi
 
+SCHEMA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema_version", 1))' "$MANIFEST")
+if [ "$SCHEMA" = "2" ]; then
+  exec bash scripts/apply-content-blueprint.sh "$MANIFEST"
+fi
+
 eval "$(python3 - "$MANIFEST" <<'PY'
 import json, shlex, sys
 item = json.load(open(sys.argv[1], encoding="utf-8"))

@@ -44,6 +44,11 @@ $warnings = SpawnWP_Deploy_Guard::compatibility_warnings(
 $assert( 2 === count( $warnings ), 'WordPress and PHP mismatches produce soft warnings' );
 $assert( file_exists( WPMU_PLUGIN_DIR . '/spawnwp-deploy-loader.php' ), 'Recovery MU loader installed' );
 
+$assert( class_exists( 'SpawnWP_Deploy_Blueprint' ), 'Blueprint capture class loaded' );
+$assert( false !== has_action( 'wp_ajax_spawnwp_blueprint_step' ), 'Blueprint capture ajax handler registered' );
+$inventory = SpawnWP_Deploy_Guard::plugin_inventory();
+$assert( isset( $inventory['wporg'], $inventory['premium'] ) && is_array( $inventory['wporg'] ) && is_array( $inventory['premium'] ), 'Plugin inventory classifies wp.org and premium plugins' );
+
 if ( $failures ) {
 	throw new RuntimeException( count( $failures ) . ' SpawnWP Deploy smoke test(s) failed.' );
 }

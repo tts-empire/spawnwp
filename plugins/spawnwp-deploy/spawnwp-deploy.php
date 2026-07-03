@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpawnWP Deploy
  * Description: One-time publication from SpawnWP to a new, empty WordPress site.
- * Version: 0.1.0-dev
+ * Version: 0.2.0-dev
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: SpawnWP
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SPAWNWP_DEPLOY_VERSION', '0.1.0-dev' );
+define( 'SPAWNWP_DEPLOY_VERSION', '0.2.0-dev' );
 define( 'SPAWNWP_DEPLOY_FILE', __FILE__ );
 define( 'SPAWNWP_DEPLOY_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -24,6 +24,7 @@ require_once SPAWNWP_DEPLOY_DIR . 'src/class-guard.php';
 require_once SPAWNWP_DEPLOY_DIR . 'src/class-package.php';
 require_once SPAWNWP_DEPLOY_DIR . 'src/class-receiver.php';
 require_once SPAWNWP_DEPLOY_DIR . 'src/class-rest.php';
+require_once SPAWNWP_DEPLOY_DIR . 'src/class-blueprint.php';
 require_once SPAWNWP_DEPLOY_DIR . 'src/class-admin.php';
 
 register_activation_hook( __FILE__, array( 'SpawnWP_Deploy_Database', 'activate' ) );
@@ -45,5 +46,6 @@ add_action(
 
 		SpawnWP_Deploy_REST::init();
 		SpawnWP_Deploy_Admin::init();
+		SpawnWP_Deploy_Blueprint::init();
 	}
 );

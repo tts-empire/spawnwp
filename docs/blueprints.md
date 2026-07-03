@@ -58,6 +58,47 @@ Plugin and theme values must be WordPress.org slugs. Supported content presets a
 are rejected. Invalid custom manifests are ignored and reported by the cockpit without
 hiding valid blueprints.
 
+## Content blueprints (captured from a site)
+
+Since 0.4.0 a blueprint can also be **captured from an already-configured WordPress
+site** with the [SpawnWP Deploy plugin](deploying-a-site.md) 0.2.0+:
+
+1. On the cockpit's **System** page, under **Template connections**, generate a
+   pairing code (single-use, valid 15 minutes) and paste it into the plugin's
+   *Create a SpawnWP blueprint from this site* panel on the source site.
+2. Choose what to capture — plugin files, theme files, media uploads and the
+   database, all enabled by default — and press **Create blueprint**. The payload
+   (up to 2 GiB) is pushed to the server in signed, checksummed chunks.
+3. The blueprint appears on the **Deploy** page with a `Template` badge, its size
+   and a capture summary, and behaves like any other blueprint.
+
+Content blueprints use manifest **schema v2** (`schema_version: 2`), are accepted
+only from `/etc/spawnwp/blueprints.d/`, and reference a payload archive under
+`/var/lib/spawnwp/blueprints/<id>/`. The manifest and payload are installed
+atomically: an interrupted capture never leaves a half-installed blueprint, and
+re-capturing with the same id swaps the payload only after full verification.
+
+Defaults and guarantees:
+
+- **Users and passwords are never captured** (the `users` and `usermeta` tables are
+  excluded); each spawned site keeps its own fresh admin, and captured content is
+  reassigned to it.
+- The database capture includes the source site's real posts, pages and settings —
+  the plugin asks for explicit confirmation, because that content will appear in
+  every site spawned from the blueprint.
+- The source site URL is rewritten to a fixed placeholder before upload and never
+  reaches the server; every spawned site rewrites the placeholder to its own URL.
+- Plugins that are not from WordPress.org are listed in the manifest and flagged at
+  capture time and on the Deploy card: spawned sites may require new license keys or
+  re-activation for them. If the payload exceeds 2 GiB, exclude the uploads and
+  re-capture.
+- The allowed PHP versions are chosen at capture time; the default pins to the
+  source site's PHP version.
+
+The payload never leaves your server and is not part of telemetry. Content
+blueprints can be deleted — manifest and payload — from **System → Content
+blueprints**; existing sites are unaffected.
+
 Validate the catalog from the server with:
 
 ```bash

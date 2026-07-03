@@ -5,6 +5,12 @@ Development status: **public preview**.
 SpawnWP Deploy publishes a SpawnWP site once to a fresh, empty WordPress installation.
 It is deliberately not a staging/synchronization engine.
 
+Since 0.2.0 it can also **capture a configured site as a content blueprint** on the
+owner's SpawnWP server (0.4.0+): pair with a single-use code generated in the
+cockpit, choose what to capture (plugin files, themes, uploads, database — users and
+passwords never included), and the capture is pushed as an Ed25519-signed chunked
+upload to `/api/ingest/*`.
+
 Download the preview package and verification files from
 <https://spawnwp.com/deploy/>. The plugin is optional and is not installed by SpawnWP.
 

@@ -186,6 +186,8 @@
   .blueprint-facts span { border: 1px solid var(--border); border-radius: 3px; padding: 3px 6px; color: var(--muted); font-size: 10px; }
   .blueprint-time { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
   .blueprint-time .badge { font-variant-numeric: tabular-nums; }
+  .blueprint-warning { margin-top: 12px; padding: 7px 10px; border-left: 3px solid var(--yellow); background: #251f10; color: var(--yellow); font-size: 11px; line-height: 1.45; }
+  .bp-bundle-code { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; font-family: monospace; font-size: 11px; word-break: break-all; resize: vertical; }
   .first-build-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 14px; }
   .first-build-note b { color: var(--text); }
   .inline-alert { border-left: 3px solid var(--yellow); color: var(--yellow); padding: 9px 12px; margin-bottom: 12px; background: #251f10; }

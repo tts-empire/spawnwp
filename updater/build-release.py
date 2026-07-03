@@ -66,7 +66,8 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = relative if relative in {"app.py", "auth.py", "requirements.txt"} else f"static/{relative}"
+            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "requirements.txt"}
+                      else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
             mode = "0755" if relative.startswith("scripts/") else "0644"
@@ -80,6 +81,7 @@ def main() -> int:
                 "migrations/update-docker-prune-service.py",
                 "migrations/install-image-gc-units.py",
                 "migrations/install-site-expiry-units.py",
+                "migrations/add-ingest-nginx-location.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -111,6 +113,7 @@ def main() -> int:
                 "installer/migrations/update-docker-prune-service.py",
                 "installer/migrations/install-image-gc-units.py",
                 "installer/migrations/install-site-expiry-units.py",
+                "installer/migrations/add-ingest-nginx-location.py",
             ],
             "files": entries,
         }

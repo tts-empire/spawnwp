@@ -30,6 +30,10 @@ final class SpawnWP_Deploy_Admin {
 				self::revoke_local( sanitize_text_field( wp_unslash( $_POST['connection_id'] ?? '' ) ) );
 			} elseif ( 'revoke_target' === $action ) {
 				self::revoke_target( sanitize_text_field( wp_unslash( $_POST['connection_id'] ?? '' ) ) );
+			} elseif ( 'connect_server' === $action ) {
+				SpawnWP_Deploy_Blueprint::connect( sanitize_textarea_field( wp_unslash( $_POST['pairing_bundle'] ?? '' ) ) );
+			} elseif ( 'revoke_server' === $action ) {
+				SpawnWP_Deploy_Blueprint::revoke( sanitize_text_field( wp_unslash( $_POST['connection_id'] ?? '' ) ) );
 			}
 			self::redirect( 'success' );
 		} catch ( Throwable $error ) {
@@ -129,6 +133,8 @@ final class SpawnWP_Deploy_Admin {
 				<pre id="spawnwp-log" hidden></pre>
 			</section>
 
+			<?php SpawnWP_Deploy_Blueprint::render_panel(); ?>
+
 			<?php if ( $history ) : ?>
 				<details class="spawnwp-panel spawnwp-history">
 					<summary>Connection history (<?php echo esc_html( count( $history ) ); ?>)</summary>
@@ -142,7 +148,7 @@ final class SpawnWP_Deploy_Admin {
 			<?php endif; ?>
 		</div>
 		<style>
-		.spawnwp-deploy-wrap h1 span{color:#f6b269}.spawnwp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:20px 0}.spawnwp-panel{background:#fff;border:1px solid #dcdcde;border-radius:4px;padding:18px;margin:16px 0}.spawnwp-panel h2{margin-top:0}.spawnwp-ok{color:#18743b}.spawnwp-bad{color:#b32d2e;font-weight:600}.spawnwp-connection,.spawnwp-receiver{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid #dcdcde}.spawnwp-actions{display:flex;gap:8px;align-items:center}.spawnwp-actions form,.spawnwp-receiver form{margin:0}#spawnwp-log{display:block;background:#0d0d10;color:#f8f8f8;border-left:3px solid #f6b269;padding:14px;max-height:360px;overflow:auto;white-space:pre-wrap}@media(max-width:700px){.spawnwp-connection,.spawnwp-receiver{align-items:flex-start;flex-direction:column}.spawnwp-actions{flex-wrap:wrap}}
+		.spawnwp-deploy-wrap h1 span{color:#f6b269}.spawnwp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:20px 0}.spawnwp-panel{background:#fff;border:1px solid #dcdcde;border-radius:4px;padding:18px;margin:16px 0}.spawnwp-panel h2{margin-top:0}.spawnwp-ok{color:#18743b}.spawnwp-bad{color:#b32d2e;font-weight:600}.spawnwp-connection,.spawnwp-receiver{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid #dcdcde}.spawnwp-actions{display:flex;gap:8px;align-items:center}.spawnwp-actions form,.spawnwp-receiver form{margin:0}.spawnwp-warning{background:#fcf9e8;border:1px solid #dba617;border-radius:4px;padding:10px 14px;margin:12px 0}.spawnwp-warning ul{margin:6px 0 0 18px;list-style:disc}#spawnwp-log,#spawnwp-bp-log{display:block;background:#0d0d10;color:#f8f8f8;border-left:3px solid #f6b269;padding:14px;max-height:360px;overflow:auto;white-space:pre-wrap}@media(max-width:700px){.spawnwp-connection,.spawnwp-receiver{align-items:flex-start;flex-direction:column}.spawnwp-actions{flex-wrap:wrap}}
 		</style>
 		<script>
 		(function(){

@@ -109,3 +109,28 @@
   .cx-launcher, .cx-panel { animation: none; transition: none; }
   .cx-launcher:hover, .cx-choices button:hover, .cx-link:hover { transform: none; }
 }
+
+/* Support fab — base styles here so both the landing (site.css) and the MkDocs
+   docs (which only load this file) render it identically. Self-contained colors
+   for the same reason as the widget tokens above. The once-per-session entrance
+   animation lives in site.css (landing only). */
+.support-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 50;
+  display: inline-flex; align-items: center; gap: 9px; padding: 12px 18px;
+  border-radius: 999px; background: #f6b269; border: 1px solid #f6b269; color: #111;
+  font: 700 14px/1 Inter, "Helvetica Neue", Arial, sans-serif; text-decoration: none;
+  box-shadow: 0 12px 34px rgba(246, 178, 105, .28);
+  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.support-fab svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: #111; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+.support-fab span { color: #111; }
+.support-fab:hover { transform: translateY(-2px); background: #f8c184; box-shadow: 0 16px 40px rgba(246, 178, 105, .4); }
+.support-fab:focus-visible { outline: 3px solid #f8f8f8; outline-offset: 3px; }
+@media (max-width: 520px) {
+  .support-fab { right: 14px; bottom: 14px; padding: 11px; }
+  .support-fab span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .support-fab { animation: none; }
+  .support-fab:hover { transform: none; }
+}

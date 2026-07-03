@@ -87,3 +87,14 @@
 
   start();
 })();
+
+// Entrance animations (hero spawn dots, support fab) play once per browser
+// session instead of on every navigation, which read as flickering.
+(() => {
+  try {
+    if (!sessionStorage.getItem('spawnwp-intro-played')) {
+      sessionStorage.setItem('spawnwp-intro-played', '1');
+      document.documentElement.classList.add('intro-animate');
+    }
+  } catch (_error) { /* storage unavailable: skip the animation, never break */ }
+})();

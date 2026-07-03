@@ -15,7 +15,9 @@ footer>p{flex:1 1 240px}@media(max-width:1050px){footer{flex-wrap:wrap}}
 .hero>*:not(.spawn-grid){position:relative;z-index:1}
 .spawn-grid{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 .spawn-grid::before{content:"";position:absolute;inset:-2px;background-image:radial-gradient(circle,#1b1b21 1.4px,transparent 1.7px);background-size:30px 30px;-webkit-mask-image:radial-gradient(130% 95% at 82% 4%,#000,transparent 68%);mask-image:radial-gradient(130% 95% at 82% 4%,#000,transparent 68%)}
-.spawn-grid i{position:absolute;width:9px;height:9px;border-radius:2px;background:var(--apricot);box-shadow:0 0 16px rgba(246,178,105,.45);opacity:0;transform:scale(.3);animation:spawn .6s cubic-bezier(.2,.8,.2,1) forwards}
+.spawn-grid i{position:absolute;width:9px;height:9px;border-radius:2px;background:var(--apricot);box-shadow:0 0 16px rgba(246,178,105,.45);opacity:.92}
+/* Entrance animations play once per browser session (site.js sets .intro-animate). */
+.intro-animate .spawn-grid i{opacity:0;transform:scale(.3);animation:spawn .6s cubic-bezier(.2,.8,.2,1) forwards}
 .spawn-grid i.ghost{background:transparent;border:1.5px solid var(--apricot);box-shadow:none}
 .spawn-grid i:nth-child(1){top:16px;right:120px;animation-delay:.10s}
 .spawn-grid i:nth-child(2){top:16px;right:84px;animation-delay:.20s}
@@ -29,14 +31,11 @@ footer>p{flex:1 1 240px}@media(max-width:1050px){footer{flex-wrap:wrap}}
 .cell-mark i{width:5px;height:5px;border-radius:1px;background:var(--cell)}
 .cell-mark[data-cell="1"] i:nth-child(1),.cell-mark[data-cell="2"] i:nth-child(2),.cell-mark[data-cell="3"] i:nth-child(3),.cell-mark[data-cell="4"] i:nth-child(4),.cell-mark[data-cell="5"] i:nth-child(5),.cell-mark[data-cell="6"] i:nth-child(6),.cell-mark[data-cell="7"] i:nth-child(7),.cell-mark[data-cell="8"] i:nth-child(8),.cell-mark[data-cell="9"] i:nth-child(9){background:var(--apricot)}
 .principles article:hover .cell-mark,.feature-grid article:hover .cell-mark{filter:drop-shadow(0 0 7px rgba(246,178,105,.55))}
-/* Support — floating */
-.support-fab{position:fixed;right:20px;bottom:20px;z-index:50;display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:999px;background:var(--apricot);border:1px solid var(--apricot);color:#111;font-size:14px;font-weight:700;line-height:1;text-decoration:none;box-shadow:0 12px 34px rgba(246,178,105,.28);transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease;animation:fab-in .5s .4s ease both}
-.support-fab svg{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:#111;stroke-width:1.9;stroke-linejoin:round;stroke-linecap:round}
-.support-fab:hover{transform:translateY(-2px);background:#f8c184;box-shadow:0 16px 40px rgba(246,178,105,.4)}
-.support-fab:focus-visible{outline:3px solid var(--off);outline-offset:3px}
+/* Support fab base styles live in concierge.css (loaded by landing AND docs);
+   only the once-per-session entrance animation belongs here. */
+.intro-animate .support-fab{animation:fab-in .5s .4s ease both}
 @keyframes fab-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-@media(max-width:520px){.support-fab{right:14px;bottom:14px;padding:11px}.support-fab span{display:none}}
-@media(prefers-reduced-motion:reduce){.spawn-grid i{animation:none;opacity:.9;transform:none}.support-fab{animation:none}.support-fab:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.intro-animate .spawn-grid i{animation:none;opacity:.92;transform:none}.intro-animate .support-fab{animation:none}}
 .slide picture{display:block;min-height:0}
 
 /* Roadmap */

@@ -24,3 +24,6 @@ gh release create "$TAG" \
   --title "SpawnWP $VERSION" \
   --notes-file "$ROOT/docs/release-notes/$VERSION.md" \
   --verify-tag
+
+# Non-fatal: remind the operator if the install.sh served by spawnwp.com is stale.
+bash "$ROOT/ops/website/check-live-install.sh" || true

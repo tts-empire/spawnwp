@@ -16,6 +16,7 @@ description: SpawnWP command-line reference for managing environments, updates, 
 | `sudo spawnwp auth reset` | Reset cockpit access and issue a new 24-hour activation code |
 | `spawnwp telemetry status` | Show local telemetry consent and expiry |
 | `spawnwp telemetry payload` | Print exactly what the next heartbeat would send |
+| `sudo spawnwp telemetry enable` | Enable telemetry with a fresh identity and 90-day consent |
 | `sudo spawnwp telemetry disable` | Revoke consent and delete telemetry identity/queue |
 
 Most things are doable from the [cockpit](using-the-cockpit.md), but each site is also a

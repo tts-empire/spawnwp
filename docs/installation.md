@@ -110,8 +110,11 @@ Read it again with:
 
 The separate prompt `Share anonymous usage statistics for 90 days? [y/N]` defaults to
 No. Consent expires automatically. Payloads contain a random installation ID, platform
-versions, optional feature flags and aggregate counters. They exclude domains, IPs,
-email, usernames, site names, content, plugins, logs and credentials.
+versions, optional feature flags and aggregate counters. Consents given under notice
+version 3 (SpawnWP 0.3.16+) also share aggregate performance counters (for example
+provisioning durations and failure counts), aggregate feature-usage counters, and
+rounded machine specifications (CPU count, RAM, disk and Docker space). They exclude
+domains, IPs, email, usernames, site names, content, plugins, logs and credentials.
 
 ```bash
 spawnwp telemetry status

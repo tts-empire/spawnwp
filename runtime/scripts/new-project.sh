@@ -37,6 +37,8 @@ RESOLVED_BLUEPRINT="/tmp/spawnwp-blueprint-$$.json"
 # before creating anything.
 source "$(dirname "${BASH_SOURCE[0]}")/lib-php-ini.sh"
 php_ini_defaults
+source "$(dirname "${BASH_SOURCE[0]}")/lib-metrics.sh"
+CREATE_START=$(date +%s)
 
 exec 9>/run/lock/spawnwp-new-project.lock
 if ! flock -n 9; then
@@ -53,6 +55,7 @@ cleanup() {
   rc=$?
   if [ "$FINISHED" = "0" ]; then
     echo "!! Creation failed; rolling back partial resources..." >&2
+    metric_incr creates_failed
     if [ "$PROJECT_CREATED" = "1" ] && [ -d "$PROJ_DIR" ]; then
       (cd "$PROJ_DIR" && docker compose down -v --remove-orphans) >/dev/null 2>&1 || true
       rm -rf "$PROJ_DIR"
@@ -303,6 +306,7 @@ for _ in $(seq 1 60); do
 done
 if [ "$PHP_HEALTHY" != "true" ]; then
   echo "  !! php did not become healthy in time; continuing anyway (check 'docker logs ${NAME}-php-1')." >&2
+  metric_incr healthcheck_timeouts
 fi
 
 echo "==> Starting the remaining services (nginx, mailpit, adminer)..."
@@ -323,6 +327,22 @@ docker compose exec -T -u www-data php chmod -R a+rX /var/www/html 2>/dev/null |
 # so PHP can write uploads, cache, plugin temp, etc.
 echo "==> Fixing wp-content bind mount ownership (uid 33)..."
 chown -R 33:33 "${PROJ_DIR}/projects/primary/wp-content"
+
+# Aggregate local metrics (counters only — see lib-metrics.sh).
+metric_incr creates_total
+if [ "${NEED_BUILD:-0}" = "1" ]; then
+  metric_duration create_cold $(( $(date +%s) - CREATE_START ))
+else
+  metric_duration create_warm $(( $(date +%s) - CREATE_START ))
+fi
+case "$BLUEPRINT_ID" in
+  clean|demo|development) metric_incr "blueprint_${BLUEPRINT_ID}" ;;
+  *) metric_incr blueprint_custom ;;
+esac
+[ "${LIFETIME_DAYS:-0}" -gt 0 ] 2>/dev/null && metric_incr sites_temporary_created
+if [ -n "${SPAWNWP_PHP_MEMORY_LIMIT:-}${SPAWNWP_PHP_UPLOAD_MAX_FILESIZE:-}${SPAWNWP_PHP_POST_MAX_SIZE:-}${SPAWNWP_PHP_MAX_EXECUTION_TIME:-}${SPAWNWP_PHP_MAX_INPUT_VARS:-}${SPAWNWP_PHP_MAX_INPUT_TIME:-}${SPAWNWP_PHP_DISPLAY_ERRORS:-}" ]; then
+  metric_incr php_settings_customized
+fi
 
 echo ""
 echo "==> Done! Site available at: https://${DOMAIN}/${NAME}/"

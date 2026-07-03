@@ -81,7 +81,7 @@ validate_domain "$DOMAIN" || die "Invalid DOMAIN: '$DOMAIN'"
 validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN: '$COCKPIT_DOMAIN'"
 [ "$DOMAIN" != "$COCKPIT_DOMAIN" ] || die "DOMAIN and COCKPIT_DOMAIN must differ"
 [[ "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid EMAIL"
-echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs."
+echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs. It shares aggregate usage/performance counters and rounded machine specs."
 echo "Privacy notice: https://spawnwp.com/privacy/telemetry"
 confirm ENABLE_TELEMETRY "Share anonymous usage statistics for 90 days?" 0
 

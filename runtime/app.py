@@ -989,6 +989,28 @@ def set_php_ini(project: str, body: PhpIniSettings):
 # automatically unless the admin opts into the auto-delete setting below.
 
 CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG_ENV", "/etc/spawnwp/config.env"))
+METRICS_FILE = Path(os.environ.get("SPAWNWP_METRICS_FILE", "/var/lib/spawnwp/metrics.json"))
+
+
+def _metric_incr(key: str, n: int = 1) -> None:
+    """Best-effort bump of a local aggregate counter (see scripts/lib-metrics.sh)."""
+    import fcntl
+    try:
+        METRICS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(f"{METRICS_FILE}.lock", "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                data = json.loads(METRICS_FILE.read_text())
+                if not isinstance(data, dict):
+                    data = {}
+            except (OSError, ValueError):
+                data = {}
+            data[key] = int(data.get(key, 0)) + n
+            tmp = Path(f"{METRICS_FILE}.tmp")
+            tmp.write_text(json.dumps(data, sort_keys=True))
+            tmp.replace(METRICS_FILE)
+    except Exception:
+        pass
 PHP_IMAGE_REPO = "wp-dev-php"
 REFRESH_IMAGE_TOOL = PRIMARY_PROJECT / "scripts" / "refresh-image.sh"
 PHP_VER_RE = re.compile(r"^[0-9]+\.[0-9]+$")
@@ -1084,6 +1106,7 @@ def delete_image(body: ImageDelete):
     out = run(["docker", "rmi", tag], PRIMARY_PROJECT)
     if "Error" in out or "unable" in out.lower():
         raise HTTPException(409, out.splitlines()[-1] if out else "Unable to delete the image")
+    _metric_incr("image_deletes")
     return {"deleted": tag}
 
 

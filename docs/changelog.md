@@ -4,6 +4,22 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.3.16
+
+- **Telemetry notice v3**: installations that consent under the new notice also share
+  aggregate performance counters (warm/cold create durations, failure counts,
+  healthcheck timeouts), aggregate feature-usage counters (blueprints, temporary
+  sites, PHP settings, image refresh/delete, PHP switches) and rounded machine
+  specifications (CPU count, RAM, disk and Docker space). Existing v2 consents keep
+  sending exactly the minimal payload they agreed to until their natural 90-day
+  renewal. Still strictly anonymous and aggregate — never domains, IPs, email,
+  usernames, site names, content or logs.
+- Local aggregate counters are now collected in `/var/lib/spawnwp/metrics.json`
+  regardless of telemetry consent (new `lib-metrics.sh` helper, atomic and
+  best-effort) — groundwork for future cockpit statistics.
+- The Deploy PHP settings badge now reads **"N custom values"** instead of the
+  ambiguous "modified".
+
 ## 0.3.15
 
 - Redesigned the **Deploy** page: a clear stepped flow (blueprint → configure →

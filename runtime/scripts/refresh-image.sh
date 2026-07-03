@@ -33,4 +33,5 @@ export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 echo "==> Refreshing ${IMAGE}: pulling the latest base and rebuilding..."
 docker compose build --pull php
 docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
+{ source "$(pwd)/scripts/lib-metrics.sh" 2>/dev/null && metric_incr image_refreshes; } || true
 echo "==> Done: ${IMAGE} refreshed with the latest WordPress."

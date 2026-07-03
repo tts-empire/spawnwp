@@ -20,8 +20,11 @@ for env_file in /srv/*/.env; do
     name=$(basename "$proj_dir")
     echo "site-expiry: '${name}' expired on $(date -d "@${expires}" '+%Y-%m-%d %H:%M'), destroying..."
     (cd "$proj_dir" && docker compose down --remove-orphans) || true
-    bash "${PRIMARY}/scripts/destroy-project.sh" "$name" --yes \
-      || echo "site-expiry: failed to destroy '${name}' (will retry next hour)" >&2
+    if bash "${PRIMARY}/scripts/destroy-project.sh" "$name" --yes; then
+      source "${PRIMARY}/scripts/lib-metrics.sh" 2>/dev/null && metric_incr sites_expired_auto
+    else
+      echo "site-expiry: failed to destroy '${name}' (will retry next hour)" >&2
+    fi
   fi
 done
 echo "site-expiry: check complete."

@@ -20,6 +20,28 @@ def emit(kind: str, **values) -> None:
     print(PREFIX + json.dumps({"type": kind, **values}, separators=(",", ":")), flush=True)
 
 
+def metric_incr(key: str, n: int = 1) -> None:
+    """Best-effort bump of a local aggregate counter (see lib-metrics.sh)."""
+    path = os.environ.get("SPAWNWP_METRICS_FILE", "/var/lib/spawnwp/metrics.json")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + ".lock", "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    data = {}
+            except (OSError, ValueError):
+                data = {}
+            data[key] = int(data.get(key, 0)) + n
+            with open(path + ".tmp", "w") as f:
+                json.dump(data, f, sort_keys=True)
+            os.replace(path + ".tmp", path)
+    except Exception:
+        pass
+
+
 def env_value(text: str, key: str, default: str = "") -> str:
     for line in text.splitlines():
         if line.startswith(f"{key}="):
@@ -166,6 +188,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
             emit("progress", phase="health", percent=95, message="Waiting for the PHP health check", indeterminate=True)
             if not healthy(project):
                 raise RuntimeError("PHP did not become healthy in time")
+            metric_incr("php_switches")
             emit("complete", phase="complete", percent=100, message=f"PHP {version} is active")
             return 0
         except Exception as exc:

@@ -32,6 +32,7 @@
     "scripts/devkit.php",
     "scripts/destroy-project.sh",
     "scripts/image-gc.sh",
+    "scripts/lib-metrics.sh",
     "scripts/lib-php-ini.sh",
     "scripts/new-project.sh",
     "scripts/php-ini-apply.sh",

@@ -22,6 +22,7 @@ class TelemetryTests(unittest.TestCase):
         self.module.VERSION_FILE = root / "VERSION"
         self.module.FEATURES_FILE = root / "features.json"
         self.module.ENVIRONMENTS_ROOT = root / "srv"
+        self.module.METRICS_FILE = root / "metrics.json"
         self.module.ROOT.mkdir()
         self.module.ENVIRONMENTS_ROOT.mkdir()
         self.module.VERSION_FILE.write_text("0.2.0\n")
@@ -43,6 +44,33 @@ class TelemetryTests(unittest.TestCase):
         with patch.object(self.module, "post", return_value=True):
             self.assertIsNone(self.module.payload())
         self.assertFalse((self.module.ROOT / "installation-id").exists())
+
+    def test_v2_consent_keeps_minimal_payload(self):
+        self.module.CONSENT.write_text(json.dumps({"enabled": True, "notice_version": "2",
+                                                   "expires_at": int(time.time()) + 60}))
+        self.module.METRICS_FILE.write_text('{"creates_total": 5}')
+        data = self.module.payload()
+        self.assertNotIn("metrics", data)
+        self.assertNotIn("hardware", data)
+
+    def test_v3_consent_adds_whitelisted_metrics_and_hardware(self):
+        self.module.CONSENT.write_text(json.dumps({"enabled": True, "notice_version": "3",
+                                                   "expires_at": int(time.time()) + 60}))
+        self.module.METRICS_FILE.write_text(json.dumps({
+            "creates_total": 5, "create_warm_seconds_sum": 160,
+            "site_domain": 1, "creates_failed": -2, "php_switches": "boom"}))
+        hardware = {"cpu_count": 4, "ram_gb": 8, "disk_total_gb": 100, "disk_free_gb": 40,
+                    "docker_images_gb": 6, "build_cache_gb": 1, "php_versions": 2}
+        with patch.object(self.module, "collect_hardware", return_value=hardware):
+            data = self.module.payload()
+        # Only whitelisted, non-negative integer counters survive.
+        self.assertEqual({"creates_total": 5, "create_warm_seconds_sum": 160}, data["metrics"])
+        self.assertEqual(hardware, data["hardware"])
+
+    def test_enable_writes_notice_v3(self):
+        with patch.object(self.module, "post", return_value=True):
+            self.module.enable()
+        self.assertEqual("3", json.loads(self.module.CONSENT.read_text())["notice_version"])
 
     def test_enable_and_disable_manage_consent_identifier_and_features(self):
         old_identifier = (self.module.ROOT / "installation-id").read_text()

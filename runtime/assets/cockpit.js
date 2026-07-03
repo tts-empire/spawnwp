@@ -243,7 +243,12 @@ function togglePhpPanel() {
 }
 
 function phpFormChanged() {
-  document.getElementById('php-modified').hidden = collectPhpSettings(true) === null;
+  const chip = document.getElementById('php-modified');
+  const s = collectPhpSettings(true);
+  const changed = s === null ? 0
+    : Object.keys(PHP_DEFAULTS).filter(k => s[k] !== PHP_DEFAULTS[k]).length;
+  chip.hidden = changed === 0;
+  chip.textContent = `${changed} custom value${changed === 1 ? '' : 's'}`;
 }
 
 function resetPhpForm() {

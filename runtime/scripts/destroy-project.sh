@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Source before the later cd's: a relative BASH_SOURCE would no longer resolve.
+source "$(pwd)/scripts/lib-metrics.sh" 2>/dev/null || true
 
 NAME="${1:-}"
 if [ -z "$NAME" ]; then
@@ -125,6 +127,8 @@ if [ -e "$PROJ_DIR" ]; then
   ls -la "$PROJ_DIR" >&2 || true
   exit 1
 fi
+
+type metric_incr >/dev/null 2>&1 && metric_incr destroys_total
 
 echo ""
 echo "==> Destroyed: site '$NAME' has been completely removed."

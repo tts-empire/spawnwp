@@ -43,6 +43,30 @@ class DisableEvent(StrictModel):
     event: Literal["disable"]
 
 
+# Aggregate machine counters accepted from notice-v3 clients. Must match the
+# sender's whitelist (installer/telemetry.py METRIC_KEYS).
+METRIC_KEYS = frozenset({
+    "creates_total", "creates_failed", "healthcheck_timeouts",
+    "create_warm_count", "create_warm_seconds_sum", "create_warm_seconds_max",
+    "create_cold_count", "create_cold_seconds_sum", "create_cold_seconds_max",
+    "blueprint_clean", "blueprint_demo", "blueprint_development", "blueprint_custom",
+    "sites_temporary_created", "sites_expired_auto", "php_settings_customized",
+    "destroys_total", "php_switches", "image_refreshes", "image_deletes",
+})
+
+
+class HardwareInfo(BaseModel):
+    """Rounded machine specs — coarse by design, nothing identifying."""
+    model_config = ConfigDict(extra="forbid")
+    cpu_count: int = Field(ge=0, le=1024)
+    ram_gb: int = Field(ge=0, le=4096)
+    disk_total_gb: int = Field(ge=0, le=100000)
+    disk_free_gb: int = Field(ge=0, le=100000)
+    docker_images_gb: int = Field(ge=0, le=100000)
+    build_cache_gb: int = Field(ge=0, le=100000)
+    php_versions: int = Field(ge=0, le=64)
+
+
 class UsageEvent(StrictModel):
     event: Literal["installation", "heartbeat"]
     spawnwp_version: str = Field(pattern=r"^\d+\.\d+\.\d+$", max_length=32)
@@ -51,6 +75,8 @@ class UsageEvent(StrictModel):
     architecture: str = Field(min_length=1, max_length=32)
     features: dict[str, bool]
     counters: dict[Literal["environments_current"], int]
+    metrics: dict[str, int] | None = None      # notice v3 only
+    hardware: HardwareInfo | None = None       # notice v3 only
 
     @field_validator("features")
     @classmethod
@@ -65,6 +91,20 @@ class UsageEvent(StrictModel):
         count = value.get("environments_current", -1)
         if not 0 <= count <= 10000:
             raise ValueError("invalid environment count")
+        return value
+
+    @field_validator("metrics")
+    @classmethod
+    def valid_metrics(cls, value):
+        if value is None:
+            return value
+        if len(value) > 32:
+            raise ValueError("too many metric keys")
+        for key, count in value.items():
+            if key not in METRIC_KEYS:
+                raise ValueError(f"unknown metric key: {key}")
+            if not 0 <= count <= 10**9:
+                raise ValueError(f"metric out of range: {key}")
         return value
 
 
@@ -82,8 +122,16 @@ def connection():
         architecture TEXT NOT NULL,
         features_json TEXT NOT NULL,
         environments_current INTEGER NOT NULL,
-        heartbeat_count INTEGER NOT NULL
+        heartbeat_count INTEGER NOT NULL,
+        metrics_json TEXT,
+        hardware_json TEXT
     )""")
+    # Databases created before the metrics/hardware columns (pre-0.3.16): add them.
+    for column in ("metrics_json", "hardware_json"):
+        try:
+            db.execute(f"ALTER TABLE installations ADD COLUMN {column} TEXT")
+        except sqlite3.OperationalError:
+            pass
     return db
 
 
@@ -121,17 +169,23 @@ def receive(payload: UsageEvent | DisableEvent, response: Response):
         if payload.event == "disable":
             db.execute("DELETE FROM installations WHERE installation_hash = ?", (identifier,))
         else:
-            db.execute("""INSERT INTO installations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            metrics_json = (json.dumps(payload.metrics, sort_keys=True, separators=(",", ":"))
+                            if payload.metrics is not None else None)
+            hardware_json = (json.dumps(payload.hardware.model_dump(), sort_keys=True,
+                                        separators=(",", ":"))
+                             if payload.hardware is not None else None)
+            db.execute("""INSERT INTO installations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 ON CONFLICT(installation_hash) DO UPDATE SET
                 last_seen=excluded.last_seen, spawnwp_version=excluded.spawnwp_version,
                 os_family=excluded.os_family, os_version=excluded.os_version,
                 architecture=excluded.architecture, features_json=excluded.features_json,
                 environments_current=excluded.environments_current,
-                heartbeat_count=installations.heartbeat_count + 1""",
+                heartbeat_count=installations.heartbeat_count + 1,
+                metrics_json=excluded.metrics_json, hardware_json=excluded.hardware_json""",
                 (identifier, now, now, payload.spawnwp_version, payload.os_family,
                  payload.os_version, payload.architecture,
                  json.dumps(payload.features, sort_keys=True, separators=(",", ":")),
-                 payload.counters["environments_current"]))
+                 payload.counters["environments_current"], metrics_json, hardware_json))
     response.headers["Cache-Control"] = "no-store"
     return {"accepted": True}
 

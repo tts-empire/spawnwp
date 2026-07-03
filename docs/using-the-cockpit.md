@@ -44,8 +44,10 @@ SpawnWP will:
 - start the container stack and install WordPress (the PHP image is built only the
   first time a PHP version is used or after a SpawnWP update that changes it — that
   one-off build takes about 5 minutes and the cockpit shows a clear notice when it
-  happens; every other creation reuses the image and takes about 35 seconds. Images
-  never rebuild on a schedule: refresh them when you choose, from **System**),
+  happens; every other creation reuses the image and takes about 35 seconds. If you
+  chose the image pre-build during installation, even the first PHP 8.3 creation is
+  fast. Images never rebuild on a schedule: refresh them when you choose, from
+  **System**),
 - validate and apply the selected blueprint,
 - add the nginx routes (WordPress on `DOMAIN`, Adminer/Mailpit on `COCKPIT_DOMAIN`).
 

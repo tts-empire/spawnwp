@@ -4,6 +4,14 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.3.17
+
+- The installer now offers to **pre-build the shared PHP 8.3 image** (default: yes),
+  trading ~5 extra minutes of installation and ~1.8 GB of disk for a fast (~35 s)
+  first site creation. Skipping keeps today's behaviour: the first create builds the
+  image. Scripted installs can pre-seed `PREBUILD_PHP_IMAGE=0/1`. A pre-build
+  failure never fails the installation.
+
 ## 0.3.16
 
 - **Telemetry notice v3**: installations that consent under the new notice also share

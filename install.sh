@@ -84,6 +84,9 @@ validate_domain "$COCKPIT_DOMAIN" || die "Invalid COCKPIT_DOMAIN: '$COCKPIT_DOMA
 echo "Anonymous telemetry is optional, expires after 90 days, and never includes domains, IPs, email, usernames, site names, content or logs. It shares aggregate usage/performance counters and rounded machine specs."
 echo "Privacy notice: https://spawnwp.com/privacy/telemetry"
 confirm ENABLE_TELEMETRY "Share anonymous usage statistics for 90 days?" 0
+echo "The shared PHP 8.3 image can be pre-built at the end of this installation (about 5 minutes, ~1.8 GB of disk)."
+echo "If you skip this, your first site creation builds it instead (one-off ~5 minutes; every following create takes ~35 seconds)."
+confirm PREBUILD_PHP_IMAGE "Pre-build the PHP image now so the first deploy is fast?" 1
 
 for host in "$DOMAIN" "$COCKPIT_DOMAIN"; do
   getent ahosts "$host" >/dev/null || die "$host does not resolve yet. Configure DNS before installing."
@@ -220,13 +223,25 @@ systemctl daemon-reload
 systemctl enable --now wp-cockpit docker-prune.timer spawnwp-image-gc.timer spawnwp-site-expiry.timer
 echo "Cockpit authentication is ready. The one-time activation procedure and code are shown in the final report below."
 
-printf '{"telemetry":false}\n' > /var/lib/spawnwp/features.json
+PREBUILD_FLAG=false; [ "$PREBUILD_PHP_IMAGE" = 1 ] && PREBUILD_FLAG=true
+printf '{"telemetry":false,"prebuild_image":%s}\n' "$PREBUILD_FLAG" > /var/lib/spawnwp/features.json
 if [ "$ENABLE_TELEMETRY" = 1 ]; then
   install -d -m 0700 /var/lib/spawnwp/telemetry
   install -m 0755 "$(src installer telemetry.py)" /usr/local/lib/spawnwp/telemetry.py
   install -m 0644 "$(src installer spawnwp-telemetry.service)" "$(src installer spawnwp-telemetry.timer)" /etc/systemd/system/
   /usr/local/lib/spawnwp/telemetry.py enable
   systemctl daemon-reload; systemctl enable --now spawnwp-telemetry.timer
+fi
+
+FIRST_CREATE_NOTE="The first site creation includes a one-off ~5-minute PHP image build;
+every following create takes about 35 seconds."
+if [ "$PREBUILD_PHP_IMAGE" = 1 ]; then
+  echo "Pre-building the shared PHP 8.3 image (about 5 minutes)..."
+  if bash /srv/wp-dev/scripts/refresh-image.sh 8.3; then
+    FIRST_CREATE_NOTE="The PHP image was pre-built: creating a site takes about 35 seconds."
+  else
+    echo "WARNING: image pre-build failed - the first site creation will build it instead."
+  fi
 fi
 
 touch "$MARKER"
@@ -253,6 +268,7 @@ COCKPIT FIRST-TIME ACTIVATION
 No WordPress environment was created automatically.
 After cockpit activation, create the first environment from the dashboard and
 choose the blueprint you want.
+$FIRST_CREATE_NOTE
 
 This root-only report is stored at:
   $REPORT

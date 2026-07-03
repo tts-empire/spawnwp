@@ -43,15 +43,28 @@ curl -fsSL https://spawnwp.com/install.sh \
 1. Detects the OS (Ubuntu/Debian) and installs prerequisites: Docker Engine + Compose,
    nginx, certbot and supporting tools.
 2. Installs the generic environment template and the cockpit app, without creating
-   a WordPress environment or starting application containers.
+   a WordPress environment or starting application containers. It offers to
+   **pre-build the shared PHP 8.3 image** (default: yes) so your first site creation
+   is fast.
 3. Generates fresh application-authentication secrets for this install.
 4. Configures nginx for both hostnames and obtains a **single SAN TLS certificate**
    covering `DOMAIN` and `COCKPIT_DOMAIN`.
 5. Creates the application-auth database, encryption key and one-time activation code.
 6. Starts the empty cockpit and prints the one-time **activation report**.
 
-It typically takes a few minutes. WordPress images and selected blueprint components
-are downloaded only when you create an environment from the cockpit.
+It typically takes a few minutes. Selected blueprint components are downloaded only
+when you create an environment from the cockpit.
+
+### PHP image pre-build
+
+The prompt `Pre-build the PHP image now so the first deploy is fast? [Y/n]` defaults
+to Yes. Accepting adds about 5 minutes to the installation and uses ~1.8 GB of disk,
+and every site creation afterwards takes about 35 seconds. Skipping keeps the
+installation shorter: the image is built by your **first** site creation instead
+(one-off ~5 minutes, clearly shown in the cockpit; every following create takes
+~35 seconds). For scripted installs, pre-seed `PREBUILD_PHP_IMAGE=0` (skip) or `=1`
+in the environment. A pre-build failure never fails the installation — the first
+creation simply builds the image as usual.
 
 ## What you do next
 

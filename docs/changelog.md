@@ -5,6 +5,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 # Changelog
 
 ## 0.5.1
+## 0.5.2
+
+- **Deploy blueprint catalog**: built-in blueprints, captured blueprints and
+  administrator-authored manifests are now grouped under **SpawnWP blueprints**,
+  **Your blueprints** and **Custom manifests**. The ambiguous `Template` badge has
+  been removed.
+
 
 - **Updates page**: no more spurious red error while the cockpit restarts itself
   during a dashboard update. The brief 502/JSON-parse window of the self-restart is
@@ -42,7 +49,7 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   files, media uploads, database — all on by default) and press *Create blueprint*.
   The capture is pushed over Ed25519-signed chunked uploads (same request format as
   site-to-site deploys), verified, hardened and installed atomically; it then appears
-  on the **Deploy** page with a `Template` badge, payload size, capture summary and
+  under **Your blueprints** on the **Deploy** page, with payload size, capture summary and
   an estimated spawn time.
 - New blueprint **manifest schema v2** (`schema_version: 2`) for captured payloads,
   allowed only in `/etc/spawnwp/blueprints.d/`; payloads live under

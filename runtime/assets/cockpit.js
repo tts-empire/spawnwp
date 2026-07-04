@@ -174,25 +174,39 @@ async function loadBlueprints() {
     BLUEPRINTS = payload.blueprints || [];
     if (!BLUEPRINTS.length) throw new Error('No valid blueprints available');
     select.value = BLUEPRINTS.some(item => item.id === 'development') ? 'development' : BLUEPRINTS[0].id;
-    catalog.innerHTML = BLUEPRINTS.map(item => {
-      const isTemplate = item.schema_version === 2;
+    const renderCard = item => {
+      const isCaptured = item.schema_version === 2;
       const phpFact = `PHP ${item.php.allowed.map(version => version === '7.4' ? '7.4 legacy' : esc(version)).join(', ')}`;
-      const facts = isTemplate
+      const facts = isCaptured
         ? [esc(item.source), humanBytes(item.payload.bytes),
            esc(['plugins', 'themes', 'uploads', 'database'].filter(key => item.capture[key]).join(' · ')), phpFact]
         : [esc(item.source), item.debug ? 'debug on' : 'debug off', esc(item.content_preset), phpFact];
-      const premiumCount = isTemplate && item.premium_plugins ? item.premium_plugins.length : 0;
+      const premiumCount = isCaptured && item.premium_plugins ? item.premium_plugins.length : 0;
       const premium = premiumCount
         ? `<div class="blueprint-warning">⚠ ${premiumCount} premium/custom plugin${premiumCount === 1 ? '' : 's'} may need new license keys</div>` : '';
       return `<label class="blueprint-option" data-blueprint="${esc(item.id)}">
       <input type="radio" name="blueprint-choice" value="${esc(item.id)}">
-      <div class="blueprint-option-head"><h2>${esc(item.name)}</h2>${isTemplate ? '<span class="badge badge-yellow">Template</span>' : ''}<span class="badge badge-gray">${esc(item.version)}</span></div>
+      <div class="blueprint-option-head"><h2>${esc(item.name)}</h2><span class="badge badge-gray">${esc(item.version)}</span></div>
       <p>${esc(item.description)}</p>
-      <div class="blueprint-time"><span class="badge badge-green">${item.id === 'development' || isTemplate ? '⏱' : '⚡'} ${esc(blueprintTime(item.id))}</span>${item.id === 'development' ? '<small class="field-help" style="margin:0">installs plugins from wp.org</small>' : ''}</div>
+      <div class="blueprint-time"><span class="badge badge-green">${item.id === 'development' || isCaptured ? '⏱' : '⚡'} ${esc(blueprintTime(item.id))}</span>${item.id === 'development' ? '<small class="field-help" style="margin:0">installs plugins from wp.org</small>' : ''}</div>
       ${premium}
       <div class="blueprint-facts">${facts.map(fact => `<span>${fact}</span>`).join('')}</div>
     </label>`;
-    }).join('');
+    };
+    const renderGroup = (title, items) => items.length
+      ? `<section class="blueprint-group" aria-label="${esc(title)}"><h2 class="blueprint-group-title">${esc(title)}</h2><div class="blueprint-grid">${items.map(renderCard).join('')}</div></section>`
+      : '';
+    const builtIn = BLUEPRINTS.filter(item => item.source === 'built-in');
+    const captured = BLUEPRINTS.filter(item => item.source === 'custom' && item.schema_version === 2);
+    const customManifests = BLUEPRINTS.filter(item => item.source === 'custom' && item.schema_version === 1);
+    const capturedGroup = captured.length
+      ? renderGroup('Your blueprints', captured)
+      : `<section class="blueprint-group" aria-label="Your blueprints"><h2 class="blueprint-group-title">Your blueprints</h2><p class="blueprint-empty">Capture a configured site from <a href="/system">System → Template connections</a> to reuse it here.</p></section>`;
+    catalog.innerHTML = [
+      renderGroup('SpawnWP blueprints', builtIn),
+      capturedGroup,
+      renderGroup('Custom manifests', customManifests),
+    ].join('');
     catalog.querySelectorAll('.blueprint-option').forEach(option => option.addEventListener('click', () => selectBlueprint(option.dataset.blueprint)));
     document.getElementById('new-php').addEventListener('change', updateExpectedTime);
     document.getElementById('new-lifetime').addEventListener('change', updateExpectedTime);

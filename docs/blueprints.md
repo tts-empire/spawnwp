@@ -69,8 +69,8 @@ site** with the [SpawnWP Deploy plugin](deploying-a-site.md) 0.2.0+:
 2. Choose what to capture — plugin files, theme files, media uploads and the
    database, all enabled by default — and press **Create blueprint**. The payload
    (up to 2 GiB) is pushed to the server in signed, checksummed chunks.
-3. The blueprint appears on the **Deploy** page with a `Template` badge, its size
-   and a capture summary, and behaves like any other blueprint.
+3. The blueprint appears under **Your blueprints** on the **Deploy** page, with its
+   size and a capture summary, and behaves like any other blueprint.
 
 Content blueprints use manifest **schema v2** (`schema_version: 2`), are accepted
 only from `/etc/spawnwp/blueprints.d/`, and reference a payload archive under

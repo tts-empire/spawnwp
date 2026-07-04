@@ -32,6 +32,13 @@ grep -q 'DOCKER_CONFIG=/var/lib/spawnwp/docker' "$ROOT/installer/wp-cockpit.serv
 grep -q 'ExecStart=/usr/local/bin/spawnwp update' "$ROOT/installer/spawnwp-update.service"
 grep -q 'Install update' "$ROOT/runtime/updates.html"
 grep -q '/auth/reauth/start' "$ROOT/runtime/assets/cockpit.js"
+grep -q "renderGroup('SpawnWP blueprints', builtIn)" "$ROOT/runtime/assets/cockpit.js"
+grep -q "renderGroup('Your blueprints', captured)" "$ROOT/runtime/assets/cockpit.js"
+grep -q "renderGroup('Custom manifests', customManifests)" "$ROOT/runtime/assets/cockpit.js"
+if grep -q 'badge badge-yellow">Template' "$ROOT/runtime/assets/cockpit.js"; then
+  echo "captured blueprints must not use the ambiguous Template badge" >&2
+  exit 1
+fi
 grep -q 'UPDATE sessions SET recent_auth' "$ROOT/runtime/auth.py"
 grep -q 'php-switch-progress.py' "$ROOT/updater/managed-files.json"
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"

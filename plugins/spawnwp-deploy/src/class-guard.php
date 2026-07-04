@@ -119,6 +119,16 @@ final class SpawnWP_Deploy_Guard {
 		);
 	}
 
+	/**
+	 * Whether this WordPress runs inside a SpawnWP cockpit-managed site. Cockpit
+	 * sites define SPAWNWP_DEPLOY_HEALTHCHECK_URL through their container config,
+	 * so its presence is a reliable signal that "publish this site out" belongs
+	 * here (and, on other sites, that it does not).
+	 */
+	public static function is_cockpit(): bool {
+		return defined( 'SPAWNWP_DEPLOY_HEALTHCHECK_URL' );
+	}
+
 	private static function content_counts(): array {
 		global $wpdb;
 		$sql = "SELECT COUNT(*) FROM {$wpdb->posts}

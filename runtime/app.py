@@ -613,6 +613,7 @@ class NewProject(BaseModel):
     php_version: str | None = None
     php_settings: PhpIniSettings | None = None
     lifetime_days: int = 0   # 0 = permanent; otherwise the site self-destructs
+    install_deploy_plugin: bool = False   # opt-in: bundle the SpawnWP Deploy plugin
 
 @app.post("/api/new-project")
 def new_project(body: NewProject):
@@ -629,6 +630,8 @@ def new_project(body: NewProject):
     env = body.php_settings.validated().as_env() if body.php_settings else {}
     if body.lifetime_days:
         env["SPAWNWP_SITE_LIFETIME_DAYS"] = str(body.lifetime_days)
+    if body.install_deploy_plugin:
+        env["SPAWNWP_INSTALL_DEPLOY_PLUGIN"] = "1"
     return sse_response(
         ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or ""],
         PRIMARY_PROJECT,

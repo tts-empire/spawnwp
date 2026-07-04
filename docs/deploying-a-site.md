@@ -25,9 +25,15 @@ source WordPress site inside SpawnWP to a **separate, fresh and empty WordPress
 installation**.
 
 !!! warning "Optional public-preview plugin"
-    The plugin is currently `0.1.0-dev`. Test it with disposable sites and keep an
+    The plugin is currently `0.3.0-dev`. Test it with disposable sites and keep an
     independent backup. Do not use it for a destination that already contains content
     or live user data.
+
+Since `0.3.0-dev` the plugin leads with **blueprints** — capturing a configured site as
+a reusable template (see [Content blueprints](blueprints.md#content-blueprints-captured-from-a-site)).
+Publishing a finished site out, described below, is its secondary role: it is offered
+only on sites running inside a SpawnWP cockpit, and on an external destination the
+plugin instead offers to *receive* a published site.
 
 ## When this plugin fits
 
@@ -45,6 +51,11 @@ views, and symlinked content are not supported. Choose another migration method 
 these constraints do not fit your project.
 
 ## Install the WordPress plugin
+
+On a site created inside SpawnWP, the quickest way is to tick **Install the SpawnWP
+Deploy plugin** on the cockpit's Deploy page when you create the site — it arrives
+installed and activated from the signed copy bundled with SpawnWP. Otherwise install
+it by hand:
 
 1. [Download the optional plugin](https://spawnwp.com/deploy/).
 2. In the source site inside SpawnWP, open **Plugins → Add New → Upload Plugin**,
@@ -71,10 +82,10 @@ The pre-transfer rollback is retained for seven days.
 
 ## Capture a site as a blueprint
 
-Since plugin 0.2.0 (with SpawnWP 0.4.0+), the plugin can also capture the configured
-site as a reusable **content blueprint** on your own SpawnWP server: pair with a
-single-use code from the cockpit's **System → Blueprint capture**, choose what to
-capture, and press *Create blueprint*. See
+The plugin's main job, since `0.3.0-dev`, is to capture the configured site as a
+reusable **content blueprint** on your own SpawnWP server: pair with a single-use code
+from the cockpit's **System → Blueprint capture**, choose what to capture, and press
+*Create blueprint*. See
 [Content blueprints](blueprints.md#content-blueprints-captured-from-a-site) for the
 full flow, defaults and privacy guarantees.
 

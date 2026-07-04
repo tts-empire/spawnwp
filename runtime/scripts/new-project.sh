@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+RUNTIME_ROOT="$(pwd)"   # absolute runtime dir, before any later cd into the site
 source /etc/spawnwp/config.env
 
 export DOCKER_CONFIG=${DOCKER_CONFIG:-/var/lib/spawnwp/docker}
@@ -327,6 +328,26 @@ docker compose exec -T -u www-data php chmod -R a+rX /var/www/html 2>/dev/null |
 # so PHP can write uploads, cache, plugin temp, etc.
 echo "==> Fixing wp-content bind mount ownership (uid 33)..."
 chown -R 33:33 "${PROJ_DIR}/projects/primary/wp-content"
+
+# Optional: install the SpawnWP Deploy plugin when the cockpit checkbox asked
+# for it. The signed plugin zip ships with the cockpit at a stable path; if it
+# is missing the site is still created, just without the plugin (non-fatal).
+if [ "${SPAWNWP_INSTALL_DEPLOY_PLUGIN:-0}" = "1" ]; then
+  DEPLOY_PLUGIN_ZIP="${SPAWNWP_DEPLOY_PLUGIN_ZIP:-$RUNTIME_ROOT/assets/spawnwp-deploy.zip}"
+  if [ -f "$DEPLOY_PLUGIN_ZIP" ]; then
+    echo "==> Installing the SpawnWP Deploy plugin..."
+    STAGED="${PROJ_DIR}/projects/primary/wp-content/.spawnwp-deploy.zip"
+    install -m 0644 -o 33 -g 33 "$DEPLOY_PLUGIN_ZIP" "$STAGED"
+    if docker compose exec -T -u www-data php wp plugin install /var/www/html/wp-content/.spawnwp-deploy.zip --activate --force; then
+      echo "  -> SpawnWP Deploy installed and activated."
+    else
+      echo "  !! Could not install the SpawnWP Deploy plugin; the site is otherwise ready." >&2
+    fi
+    rm -f "$STAGED"
+  else
+    echo "  !! SpawnWP Deploy plugin bundle not found at ${DEPLOY_PLUGIN_ZIP}; skipping its installation." >&2
+  fi
+fi
 
 # Aggregate local metrics (counters only — see lib-metrics.sh).
 metric_incr creates_total

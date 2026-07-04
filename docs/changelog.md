@@ -4,6 +4,21 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.4
+
+- **SpawnWP Deploy plugin, environment-aware (0.3.0-dev)**: the plugin now detects
+  whether it runs inside a SpawnWP cockpit site and leads with a single job —
+  turning a configured site into a reusable **blueprint**. Publishing a finished
+  site out is demoted to a collapsible *Advanced* panel, and only the role that
+  applies to the current environment is offered (publish-out on cockpit sites,
+  receive on external destinations). The dashboard carries the SpawnWP brand.
+- **Optional plugin at spawn**: creating a site from the Deploy page now has an
+  *Install the SpawnWP Deploy plugin* checkbox. When ticked, the cockpit installs
+  and activates the plugin on the new site so it can create blueprints or publish
+  itself out. The signed plugin ships inside the SpawnWP release and is installed
+  offline — no download required.
+- Telemetry, security and blueprint formats are unchanged.
+
 ## 0.5.3
 
 - **System page**: PHP images, blueprint capture and storage now use distinct,

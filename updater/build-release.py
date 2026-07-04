@@ -47,6 +47,27 @@ def normalize_tar(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
+def build_deploy_plugin_zip(destination: Path) -> None:
+    """Build a deterministic zip of the SpawnWP Deploy plugin so the cockpit can
+    install it on opt-in sites. Same file set as plugins/spawnwp-deploy/bin/
+    build-release.sh; fixed timestamps keep the release reproducible. The zip is
+    covered by the core release signature, so no separate plugin signature ships."""
+    import zipfile
+
+    plugin = ROOT / "plugins" / "spawnwp-deploy"
+    members: list[Path] = [plugin / "spawnwp-deploy.php", plugin / "README.md"]
+    for sub in ("src", "recovery"):
+        members += sorted(p for p in (plugin / sub).rglob("*") if p.is_file())
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in members:
+            arcname = "spawnwp-deploy/" + str(path.relative_to(plugin))
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, path.read_bytes())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", default=(ROOT / "VERSION").read_text().strip())
@@ -92,6 +113,14 @@ def main() -> int:
                   "bin", "spawnwp", "0755")
         add_entry(entries, package, ROOT / "updater/release-public.pem",
                   "payload/lib/release-public.pem", "lib", "release-public.pem")
+
+        # The SpawnWP Deploy plugin, bundled so the cockpit can install it on
+        # sites created with the opt-in checkbox. Generated (not a repo file),
+        # then added as a normal runtime asset covered by the release signature.
+        deploy_zip = Path(temporary) / "spawnwp-deploy.zip"
+        build_deploy_plugin_zip(deploy_zip)
+        add_entry(entries, package, deploy_zip, "payload/runtime/assets/spawnwp-deploy.zip",
+                  "runtime", "assets/spawnwp-deploy.zip", "0644")
 
         archive = args.output / f"{prefix}.tar.gz"
         with archive.open("wb") as raw:

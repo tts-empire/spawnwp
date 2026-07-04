@@ -49,6 +49,14 @@ $assert( false !== has_action( 'wp_ajax_spawnwp_blueprint_step' ), 'Blueprint ca
 $inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 $assert( isset( $inventory['wporg'], $inventory['premium'] ) && is_array( $inventory['wporg'] ) && is_array( $inventory['premium'] ), 'Plugin inventory classifies wp.org and premium plugins' );
 
+$assert( is_bool( SpawnWP_Deploy_Guard::is_cockpit() ), 'Environment detection returns a boolean' );
+$assert( defined( 'SPAWNWP_DEPLOY_HEALTHCHECK_URL' ) === SpawnWP_Deploy_Guard::is_cockpit(), 'Cockpit detection tracks the injected constant' );
+
+ob_start();
+SpawnWP_Deploy_Blueprint::render_panel();
+$panel = ob_get_clean();
+$assert( str_contains( $panel, 'Create a SpawnWP blueprint from this site' ), 'Blueprint hero is the primary panel' );
+
 if ( $failures ) {
 	throw new RuntimeException( count( $failures ) . ' SpawnWP Deploy smoke test(s) failed.' );
 }

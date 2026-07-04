@@ -1047,7 +1047,8 @@ function createProject(e) {
   const php_settings = collectPhpSettings();
   if (php_settings === undefined) return;   // invalid input, message already shown
   const lifetime_days = parseInt(document.getElementById('new-lifetime').value, 10) || 0;
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days }, 'out-new', ok => {
+  const install_deploy_plugin = document.getElementById('new-install-deploy').checked;
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days, install_deploy_plugin }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {

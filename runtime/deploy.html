@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.3">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.4">
 </head>
 <body data-page="deploy">
   <header>
@@ -71,6 +71,11 @@
             </div>
           </div>
         </div>
+        <label class="deploy-optin">
+          <input id="new-install-deploy" type="checkbox">
+          <span>Install the SpawnWP Deploy plugin</span>
+          <small>Lets this site create blueprints and publish itself out to a separate WordPress install. Optional — you can add it later.</small>
+        </label>
         <div class="deploy-launch">
           <div class="dl-cell dl-dest"><span>Destination</span><strong>https://<span id="domain-preview">domain</span>/<span id="name-preview">site-name</span>/</strong><small id="blueprint-note">Select a blueprint</small></div>
           <div class="dl-cell dl-time"><span>Expected time</span><strong id="expected-time">—</strong><small id="expected-time-note"></small></div>
@@ -86,6 +91,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.3"></script>
+  <script src="/assets/cockpit.js?v=0.5.4"></script>
 </body>
 </html>

@@ -27,7 +27,13 @@ class AuthenticationTests(unittest.TestCase):
         os.environ.update(SPAWNWP_AUTH_DB=str(root / "auth.db"),
                           SPAWNWP_AUTH_KEY=str(cls.key), SPAWNWP_CONFIG=str(cls.config),
                           SPAWNWP_STATIC_DIR=str(cls.static))
-        cls.auth = importlib.import_module("auth")
+        # Reload unconditionally: if any other test module imported `auth`
+        # (even indirectly, e.g. via `app`) before this env was set, its
+        # module-level paths point at the LIVE database. Reload rebinds them,
+        # and the assertion makes any regression fail loudly instead of
+        # letting the suite run against /var/lib/spawnwp/auth.db.
+        cls.auth = importlib.reload(importlib.import_module("auth"))
+        assert cls.auth.DB_PATH == root / "auth.db", cls.auth.DB_PATH
 
     @classmethod
     def tearDownClass(cls):

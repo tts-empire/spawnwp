@@ -39,6 +39,13 @@ if grep -q 'badge badge-yellow">Template' "$ROOT/runtime/assets/cockpit.js"; the
   echo "captured blueprints must not use the ambiguous Template badge" >&2
   exit 1
 fi
+grep -q 'class="section system-panel"' "$ROOT/runtime/system.html"
+grep -q 'class="btn-primary sensitive" type="button" id="bp-pair-generate"' "$ROOT/runtime/system.html"
+grep -q '#reauth-dialog { position:fixed; inset:0;' "$ROOT/runtime/assets/cockpit.css"
+grep -q 'prefers-reduced-motion: reduce' "$ROOT/runtime/assets/cockpit.css"
+grep -q 'input,button{width:100%;min-height:44px' "$ROOT/runtime/auth.py"
+grep -q 'input:focus-visible,button:focus-visible' "$ROOT/runtime/auth.py"
+grep -q 'System → Blueprint capture' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'UPDATE sessions SET recent_auth' "$ROOT/runtime/auth.py"
 grep -q 'php-switch-progress.py' "$ROOT/updater/managed-files.json"
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"

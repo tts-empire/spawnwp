@@ -73,7 +73,7 @@ The pre-transfer rollback is retained for seven days.
 
 Since plugin 0.2.0 (with SpawnWP 0.4.0+), the plugin can also capture the configured
 site as a reusable **content blueprint** on your own SpawnWP server: pair with a
-single-use code from the cockpit's **System → Template connections**, choose what to
+single-use code from the cockpit's **System → Blueprint capture**, choose what to
 capture, and press *Create blueprint*. See
 [Content blueprints](blueprints.md#content-blueprints-captured-from-a-site) for the
 full flow, defaults and privacy guarantees.

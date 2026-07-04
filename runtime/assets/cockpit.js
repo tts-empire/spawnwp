@@ -201,7 +201,7 @@ async function loadBlueprints() {
     const customManifests = BLUEPRINTS.filter(item => item.source === 'custom' && item.schema_version === 1);
     const capturedGroup = captured.length
       ? renderGroup('Your blueprints', captured)
-      : `<section class="blueprint-group" aria-label="Your blueprints"><h2 class="blueprint-group-title">Your blueprints</h2><p class="blueprint-empty">Capture a configured site from <a href="/system">System → Template connections</a> to reuse it here.</p></section>`;
+      : `<section class="blueprint-group" aria-label="Your blueprints"><h2 class="blueprint-group-title">Your blueprints</h2><p class="blueprint-empty">Capture a configured site from <a href="/system">System → Blueprint capture</a> to reuse it here.</p></section>`;
     catalog.innerHTML = [
       renderGroup('SpawnWP blueprints', builtIn),
       capturedGroup,
@@ -1354,10 +1354,10 @@ function renderImages(data) {
       ? img.used_by.map(esc).join(', ')
       : '<span class="badge badge-gray">no sites</span>';
     const delBtn = img.used_by.length
-      ? `<button class="icon-btn" disabled title="In use by ${esc(img.used_by.join(', '))} — cannot be deleted">Delete</button>`
-      : `<button class="icon-btn" onclick="deleteImage('${esc(img.php_version)}')">Delete</button>`;
+      ? `<button class="btn-neutral btn-sm" disabled title="In use by ${esc(img.used_by.join(', '))} — cannot be deleted">Delete</button>`
+      : `<button class="btn-neutral btn-sm" onclick="deleteImage('${esc(img.php_version)}')">Delete</button>`;
     return `<tr><td><b>PHP ${esc(img.php_version)}</b></td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
-      <td><button class="icon-btn sensitive" onclick="refreshImage('${esc(img.php_version)}')" title="Rebuild now with the latest WordPress (~5 min)">Refresh</button> ${delBtn}</td></tr>`;
+      <td class="table-actions"><button class="btn-neutral btn-sm sensitive" onclick="refreshImage('${esc(img.php_version)}')" title="Rebuild now with the latest WordPress (~5 min)">Refresh</button>${delBtn}</td></tr>`;
   }).join('');
 }
 
@@ -1417,8 +1417,8 @@ async function saveImageGc() {
   }
 }
 
-// ── System: template connections & content blueprints ───────────────────────
-async function loadTemplateConnections() {
+// ── System: blueprint capture ────────────────────────────────────────────────
+async function loadBlueprintCapture() {
   const box = document.getElementById('bp-connections');
   const list = document.getElementById('bp-blueprints');
   if (!box) return;
@@ -1433,20 +1433,20 @@ async function loadTemplateConnections() {
         : `<span class="badge badge-yellow">pending · expires ${new Date(connection.pair_expires * 1000).toLocaleTimeString()}</span>`;
       return `<tr><td>${esc(connection.remote_host || connection.label || connection.id.slice(0, 8))}</td><td>${status}</td>
         <td>${new Date(connection.created_at * 1000).toLocaleDateString()}</td>
-        <td><button class="icon-btn" onclick="revokeBlueprintConnection('${esc(connection.id)}')">Revoke</button></td></tr>`;
+        <td><button class="btn-neutral btn-sm" onclick="revokeBlueprintConnection('${esc(connection.id)}')">Revoke</button></td></tr>`;
     }).join('');
     box.innerHTML = rows
       ? `<table class="svc-table"><thead><tr><th>Site</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
-      : '<p class="field-help">No template connections yet.</p>';
+      : '<p class="field-help">No connections yet.</p>';
     const templates = (catalog.blueprints || []).filter(item => item.schema_version === 2);
     list.innerHTML = templates.length
       ? `<table class="svc-table"><thead><tr><th>Blueprint</th><th>Size</th><th>Captured</th><th></th></tr></thead><tbody>${templates.map(item =>
         `<tr><td><b>${esc(item.name)}</b> <span class="badge badge-gray">${esc(item.version)}</span> <small>${esc(item.id)}</small></td>
           <td>${humanBytes(item.payload.bytes)}</td><td>${esc(item.created_at.replace('T', ' ').replace('Z', ' UTC'))}</td>
-          <td><button class="icon-btn" onclick="deleteContentBlueprint('${esc(item.id)}')">Delete</button></td></tr>`).join('')}</tbody></table>`
+          <td><button class="btn-neutral btn-sm" onclick="deleteContentBlueprint('${esc(item.id)}')">Delete</button></td></tr>`).join('')}</tbody></table>`
       : '<p class="field-help">No content blueprints yet. Pair a configured site, then press “Create blueprint” in the SpawnWP Deploy plugin.</p>';
   } catch (error) {
-    box.innerHTML = `<p class="field-help">Unable to load template connections: ${esc(error.message)}</p>`;
+    box.innerHTML = `<p class="field-help">Unable to load blueprint capture: ${esc(error.message)}</p>`;
   }
 }
 
@@ -1459,7 +1459,7 @@ async function generateBlueprintPairing() {
     document.getElementById('bp-bundle').value = payload.bundle;
     document.getElementById('bp-bundle-expiry').textContent =
       `Paste this code in the SpawnWP Deploy plugin on the site to capture. Expires ${new Date(payload.expires * 1000).toLocaleString()}.`;
-    loadTemplateConnections();
+    loadBlueprintCapture();
   } catch (error) { showToast(error.message, true); }
 }
 
@@ -1470,7 +1470,7 @@ async function revokeBlueprintConnection(id) {
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);
     showToast('Connection revoked');
   } catch (error) { showToast(error.message, true); }
-  loadTemplateConnections();
+  loadBlueprintCapture();
 }
 
 async function deleteContentBlueprint(id) {
@@ -1480,7 +1480,7 @@ async function deleteContentBlueprint(id) {
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);
     showToast('Blueprint deleted');
   } catch (error) { showToast(error.message, true); }
-  loadTemplateConnections();
+  loadBlueprintCapture();
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
@@ -1488,7 +1488,7 @@ updateClock();
 loadPlatform();
 if (document.body.dataset.page === 'deploy') loadBlueprints();
 if (document.body.dataset.page === 'manage') loadProjects();
-if (document.body.dataset.page === 'system') { loadSystemInfo(); loadTemplateConnections(); }
+if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCapture(); }
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();
 loadTelemetryStatus();

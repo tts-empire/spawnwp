@@ -4,7 +4,15 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
-## 0.5.1
+## 0.5.3
+
+- **System page**: PHP images, blueprint capture and storage now use distinct,
+  consistent panels; pairing-code generation is presented as a clear primary action.
+- **Security confirmation**: the recent-auth dialog is explicitly centered, scrolls
+  safely on small screens and respects reduced-motion preferences.
+- **UI typography and controls**: a shared readable scale, spacing, focus states and
+  button treatment now cover every cockpit page, login and first activation.
+
 ## 0.5.2
 
 - **Deploy blueprint catalog**: built-in blueprints, captured blueprints and
@@ -12,6 +20,7 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   **Your blueprints** and **Custom manifests**. The ambiguous `Template` badge has
   been removed.
 
+## 0.5.1
 
 - **Updates page**: no more spurious red error while the cockpit restarts itself
   during a dashboard update. The brief 502/JSON-parse window of the self-restart is

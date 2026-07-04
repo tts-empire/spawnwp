@@ -63,7 +63,7 @@ hiding valid blueprints.
 Since 0.4.0 a blueprint can also be **captured from an already-configured WordPress
 site** with the [SpawnWP Deploy plugin](deploying-a-site.md) 0.2.0+:
 
-1. On the cockpit's **System** page, under **Template connections**, generate a
+1. On the cockpit's **System** page, under **Blueprint capture**, generate a
    pairing code (single-use, valid 15 minutes) and paste it into the plugin's
    *Create a SpawnWP blueprint from this site* panel on the source site.
 2. Choose what to capture — plugin files, theme files, media uploads and the

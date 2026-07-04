@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>System · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.2">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.3">
 </head>
 <body data-page="system">
   <header>
@@ -26,8 +26,8 @@
       <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
     </section>
 
-    <section class="section">
-      <div class="section-title">PHP images</div>
+    <section class="section system-panel" aria-labelledby="system-php-title">
+      <div class="section-title" id="system-php-title">PHP images</div>
       <div class="image-explainer">
         Each PHP version keeps one shared image (~1.8&nbsp;GB) used by all its sites.
         <b>Keeping an image means every deploy on that PHP version takes about 35 seconds.</b>
@@ -45,7 +45,7 @@
         <label for="gc-days">Auto-delete <b>unused</b> images after</label>
         <input id="gc-days" type="number" min="0" max="365" step="1" value="0">
         <span>days</span>
-        <button class="icon-btn" type="button" id="gc-save" onclick="saveImageGc()">Save</button>
+        <button class="btn-neutral btn-sm" type="button" id="gc-save" onclick="saveImageGc()">Save</button>
         <small>0 = never delete automatically (default). Images used by at least one site are
         never auto-deleted, whatever their age.</small>
       </div>
@@ -55,25 +55,29 @@
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-title">Template connections</div>
-      <p class="field-help">Capture an existing WordPress site as a reusable content blueprint: install the SpawnWP Deploy plugin on the configured site, then paste a pairing code generated here. Codes are single-use and expire after 15 minutes.</p>
-      <p><button class="icon-btn sensitive" id="bp-pair-generate" onclick="generateBlueprintPairing()">Generate pairing code</button></p>
-      <div id="bp-bundle-box" hidden>
+    <section class="section system-panel" aria-labelledby="system-blueprint-title">
+      <div class="section-title" id="system-blueprint-title">Blueprint capture</div>
+      <p class="system-intro">Capture an existing WordPress site as a reusable blueprint. Install the SpawnWP Deploy plugin on the configured site, then connect it with a single-use code that expires after 15 minutes.</p>
+      <div class="system-primary-action"><button class="btn-primary sensitive" type="button" id="bp-pair-generate" onclick="generateBlueprintPairing()">Generate pairing code</button></div>
+      <div id="bp-bundle-box" class="pairing-code-panel" hidden>
         <textarea id="bp-bundle" class="bp-bundle-code" rows="4" readonly onclick="this.select()"></textarea>
         <p class="field-help" id="bp-bundle-expiry"></p>
       </div>
-      <div id="bp-connections"><p class="loading-copy">Loading…</p></div>
-      <div class="section-title" style="margin-top:18px">Content blueprints</div>
-      <div id="bp-blueprints"><p class="loading-copy">Loading…</p></div>
+      <div class="system-subsection"><h2 class="system-subtitle">Connections</h2>
+        <div id="bp-connections"><p class="loading-copy">Loading…</p></div>
+      </div>
+      <div class="system-subsection"><h2 class="system-subtitle">Captured blueprints</h2>
+        <div id="bp-blueprints"><p class="loading-copy">Loading…</p></div>
+      </div>
     </section>
 
-    <section class="section">
-      <div class="section-title">Docker disk usage</div>
+    <section class="section system-panel" aria-labelledby="system-storage-title">
+      <div class="section-title" id="system-storage-title">Storage</div>
+      <p class="system-intro">Docker disk usage and reclaimable space on this host.</p>
       <div id="docker-disk" class="docker-disk"><p class="loading-copy">Loading…</p></div>
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.2"></script>
+  <script src="/assets/cockpit.js?v=0.5.3"></script>
 </body>
 </html>

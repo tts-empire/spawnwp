@@ -4,6 +4,22 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.0
+
+- **WP-CLI console**: every site card in the cockpit gains a **⌨ WP-CLI** button that
+  opens a one-line console. Commands run as a single non-interactive `wp` process
+  inside that site's PHP container (no shell, no host access) and the output streams
+  live into the card's output box — long jobs show progress line by line. Session
+  command history with ↑/↓.
+- Interactive subcommands that need a real terminal (`wp shell`, `wp db cli`,
+  `--prompt`) are rejected with an explanation; `wp db query "SELECT ..."` and the
+  rest of WP-CLI — including commands registered by installed plugins — work as in
+  a script. Commands that ask for confirmation abort safely without a `--yes`; the
+  console reminds you to add it.
+- Documented the console's model and limits in
+  [Using the cockpit](using-the-cockpit.md#the-wp-cli-console).
+- Telemetry (consented installs only): new aggregate counter `wp_cli_commands`.
+
 ## 0.4.0
 
 - **Content blueprints**: capture an already-configured WordPress site as a reusable

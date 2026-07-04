@@ -88,6 +88,7 @@ Each site card has:
 | **🗄 DB ▸** | Open Adminer, **already logged in** to this site's database |
 | **✉️ Mailpit ▸** | Open this site's captured-mail inbox |
 | **🔑 WP credentials** | Reveal the WordPress admin user/password (with copy) |
+| **⌨ WP-CLI** | Open the [WP-CLI console](#the-wp-cli-console) for this site |
 | **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4) |
 | **🗑 Destroy** | Permanently delete the site (enabled only when it's Down) |
 
@@ -111,6 +112,42 @@ minutes. The cockpit shows structured progress and keeps the verbose BuildKit lo
 **Show technical details**. Cached PHP versions switch substantially faster. The same
 applies to site creation: once a PHP version's image exists, new sites reuse it (it is
 rebuilt only after a SpawnWP update that changes it, or with `SPAWNWP_REBUILD=1`).
+
+## The WP-CLI console
+
+Every SpawnWP site ships [WP-CLI](https://wp-cli.org/) inside its PHP container, ready
+to use. The **⌨ WP-CLI** button on a site card opens a one-line console: type a command
+(with or without the leading `wp`), press Enter, and the output streams live into the
+card's output box — long jobs such as `wp media regenerate` or a big
+`wp search-replace` show their progress line by line. Commands registered by installed
+plugins work too (for example `wp wc ...` once WooCommerce is active). Press ↑/↓ to
+recall earlier commands from the session.
+
+Each run is a single, non-interactive `wp` process executed inside that site's PHP
+container. That model has a few practical consequences:
+
+- **No interactive commands.** `wp shell`, `wp db cli`, `--prompt` and anything that
+  opens an editor need a real terminal and are rejected with an explanation. Passing
+  the input as arguments works instead: `wp db query "SELECT ..."` is fine.
+- **Confirmations need `--yes`.** Commands that normally ask "Are you sure?"
+  (`wp db reset`, `wp site empty`, `wp plugin uninstall` ...) cannot prompt here: they
+  abort safely without doing anything, and the console reminds you to add `--yes` to
+  confirm.
+- **No shell operators.** The command runs as one process, not through a shell, so
+  `|`, `>`, `&&` and backticks have no effect. Use WP-CLI's own `--format=csv`,
+  `--format=json` or `--field=...` options and copy the output from the box.
+- **No file uploads from the browser.** A command that reads a file, such as
+  `wp db import backup.sql`, only sees files already inside the container. The site's
+  `wp-content` is a host bind mount (`/srv/<site>/projects/primary/wp-content/`), so
+  placing a file there from the host makes it reachable at
+  `/var/www/html/wp-content/`.
+
+!!! note "Scope and safety"
+    The console is not a sandbox — `wp eval` runs arbitrary PHP, and that is by
+    design: it is your site. Everything executes as the web user inside that one
+    site's container, never on the host, and a cockpit session is required. Commands
+    only affect the site whose card you opened, and a disposable site is always one
+    snapshot (or one re-spawn) away from a clean state.
 
 ## The System tab
 

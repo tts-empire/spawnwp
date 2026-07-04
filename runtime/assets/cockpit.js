@@ -487,6 +487,13 @@ async function loadProjects() {
       card.className = 'card';
       card.id = `card-${p.name}`;
       card.innerHTML = `<div class="card-top" id="top-${p.name}"></div>
+        <div class="wpcli-panel" id="wpcli-${p.name}">
+          <span class="wpcli-prompt">wp</span>
+          <input type="text" id="wpcli-${p.name}-input" spellcheck="false" autocomplete="off"
+                 placeholder="plugin list — Enter to run, ↑/↓ history"
+                 onkeydown="wpCliKey(event, '${p.name}')">
+          <button class="btn-neutral btn-sm" id="wpcli-${p.name}-run" onclick="runWpCli('${p.name}')">Run</button>
+        </div>
         <div class="output-box" id="out-${p.name}">
           <div class="output-head"><span class="out-label">output</span><span><button class="icon-btn" onclick="copyBox('out-${p.name}')">⧉</button><button class="icon-btn" onclick="closeBox('out-${p.name}')">✕</button></span></div>
           <div class="disk-visual" id="out-${p.name}-visual"></div>
@@ -582,6 +589,7 @@ function renderTop(p) {
       ${p.mail_url ? `<button class="btn-db btn-sm" onclick="window.open('${esc(p.mail_url)}','_blank','noopener')" title="Open Mailpit (captured mail)">✉️ Mailpit ▸</button>` : ''}
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
       <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
+      <button class="btn-neutral btn-sm" onclick="toggleWpCli('${p.name}')" title="Run WP-CLI commands inside this site">⌨ WP-CLI</button>
       ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
         <option value="">PHP ${esc(p.php)} ▾</option>
@@ -841,6 +849,67 @@ function runAction(project, action, service) {
     if (stopRefresh) stopRefresh();
   });
   if (action === 'disk') loadDiskVisual(project);
+}
+
+// ── WP-CLI console ────────────────────────────────────────────────────────────
+const WP_CLI_HISTORY = {};        // project → [commands run this session]
+const WP_CLI_RUNNING = new Set(); // projects with a command in flight
+
+function toggleWpCli(project) {
+  const panel = document.getElementById(`wpcli-${project}`);
+  if (!panel) return;
+  panel.classList.toggle('visible');
+  if (panel.classList.contains('visible')) document.getElementById(`wpcli-${project}-input`).focus();
+}
+
+function wpCliKey(event, project) {
+  if (event.key === 'Enter') { runWpCli(project); return; }
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+  const hist = WP_CLI_HISTORY[project] || [];
+  if (!hist.length) return;
+  event.preventDefault();
+  const input = event.target;
+  let idx = input.dataset.histIdx === undefined || input.dataset.histIdx === ''
+    ? hist.length : parseInt(input.dataset.histIdx);
+  idx += event.key === 'ArrowUp' ? -1 : 1;
+  idx = Math.min(Math.max(idx, 0), hist.length);
+  input.dataset.histIdx = idx;
+  input.value = idx === hist.length ? '' : hist[idx];
+}
+
+function runWpCli(project) {
+  if (WP_CLI_RUNNING.has(project)) return;
+  const input = document.getElementById(`wpcli-${project}-input`);
+  const command = input.value.trim();
+  if (!command) return;
+  const hist = WP_CLI_HISTORY[project] = WP_CLI_HISTORY[project] || [];
+  if (hist[hist.length - 1] !== command) hist.push(command);
+  input.dataset.histIdx = '';
+  const runBtn = document.getElementById(`wpcli-${project}-run`);
+  WP_CLI_RUNNING.add(project);
+  input.disabled = true;
+  runBtn.disabled = true;
+  const boxId = `out-${project}`;
+  streamSSE(`${BASE}/wp-cli/${project}`, { command }, boxId, () => {
+    WP_CLI_RUNNING.delete(project);
+    input.disabled = false;
+    runBtn.disabled = false;
+    input.value = '';
+    input.focus();
+  }, {
+    onExit: (rc, body) => {
+      // A refused confirmation exits 0: WP-CLI prints the [y/n] prompt, reads
+      // EOF (no TTY) and aborts without doing anything.
+      if (/\[y\/n\]/i.test(body.textContent)) {
+        appendLine(body, 'ℹ️ This command asks for confirmation and did not run: add --yes to confirm.', true);
+      } else if (rc === 0) appendLine(body, '✅ Done (exit 0).');
+      else appendLine(body, `❌ Exited with code ${rc}`, true);
+    },
+  });
+  // streamSSE has already cleared the box synchronously: echo the prompt line first.
+  const echoed = command.replace(/^wp\s+/, '');
+  document.querySelector(`#${boxId} .out-label`).textContent = `wp ${echoed}`;
+  appendLine(document.getElementById(`${boxId}-body`), `$ wp ${echoed}`);
 }
 
 // ── Disk visual: real site footprint + host context ──────────────────────────

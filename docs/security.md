@@ -58,6 +58,12 @@ protection and audit logging.
   within the previous ten minutes. When that window expires, the cockpit requests an
   inline Passkey confirmation and resumes the action only after successful verification.
 
+The per-site WP-CLI console executes only the `wp` binary inside that site's PHP
+container, as the web user, via `docker compose exec` with an argument vector — no
+shell interprets the input and nothing runs on the host. It requires an authenticated
+cockpit session and its reach is the site itself (which WP-CLI can of course modify:
+treat it with the same care as WordPress admin access).
+
 The cockpit service runs as root because it orchestrates host Docker and Nginx state.
 This makes cockpit compromise equivalent to host compromise: keep SpawnWP updated,
 protect the administrator factors and do not install it on a server containing unrelated

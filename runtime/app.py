@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from contextlib import asynccontextmanager
@@ -494,6 +495,51 @@ def php_switch(body: PhpSwitch):
     return sse_response([
         "python3", str(PHP_SWITCH_TOOL), "--project", str(proj), "--version", body.version,
     ], proj)
+
+
+class WpCliCommand(BaseModel):
+    command: str
+
+
+def parse_wp_cli_command(command: str) -> list[str]:
+    """Validate a console command line and return the argv to pass after `wp`.
+
+    The console runs one non-interactive `wp` process per command (argv, no
+    shell), so the only rejects are the subcommands that need a TTY or stdin.
+    A leading `wp` token is accepted and stripped.
+    """
+    try:
+        args = shlex.split(command)
+    except ValueError as exc:
+        raise HTTPException(400, f"Could not parse the command: {exc}")
+    if args and args[0] == "wp":
+        args = args[1:]
+    if not args:
+        raise HTTPException(400, "Type a WP-CLI command, for example: plugin list")
+    if any(a == "--prompt" or a.startswith("--prompt=") for a in args):
+        raise HTTPException(400, "--prompt is interactive; pass the values as arguments instead")
+    positional = [a for a in args if not a.startswith("-")]
+    if positional[:1] == ["shell"]:
+        raise HTTPException(400, "wp shell is an interactive REPL and cannot run in the console")
+    if positional[:2] == ["db", "cli"]:
+        raise HTTPException(400, 'wp db cli is interactive; use wp db query "SELECT ..." instead')
+    if positional[:2] == ["db", "query"] and len(positional) < 3:
+        raise HTTPException(400, "In the console, wp db query needs the SQL as an argument")
+    return args
+
+
+@app.post("/api/wp-cli/{project}")
+def wp_cli(project: str, body: WpCliCommand):
+    """Run a single WP-CLI command inside the site's php container and stream
+    its output. No TTY and no shell around it: interactive subcommands are
+    rejected up front, everything else behaves exactly like WP-CLI in a script."""
+    proj = resolve_project(project)
+    args = parse_wp_cli_command(body.command)
+    _metric_incr("wp_cli_commands")
+    return sse_response(
+        ["docker", "compose", "exec", "-T", "-u", "www-data", "php", "wp", *args],
+        proj,
+    )
 
 
 @app.get("/api/blueprints")

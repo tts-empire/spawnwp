@@ -44,6 +44,11 @@ dashboard widget:
 The PHP container ships command-line tools for scripting and CI. Run them from the site
 directory:
 
+!!! tip "WP-CLI without SSH"
+    For `wp` commands specifically you don't need a host shell: every site card in
+    the cockpit has a [WP-CLI console](using-the-cockpit.md#the-wp-cli-console) that
+    runs them inside the container and streams the output in the browser.
+
 === "Coding standards (phpcs / WPCS)"
 
     ```bash

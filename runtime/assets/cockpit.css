@@ -79,6 +79,12 @@
   select { background: var(--surface3); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; font-size: 13px; cursor: pointer; }
   select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+  .wpcli-panel { display: none; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 10px; background: #050506; border: 1px solid var(--border); border-radius: 4px; }
+  .wpcli-panel.visible { display: flex; }
+  .wpcli-prompt { font-family: monospace; font-size: 12px; color: var(--accent); user-select: none; }
+  .wpcli-panel input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-family: monospace; font-size: 12px; }
+  .wpcli-panel input:disabled { color: var(--muted); }
+
   .output-box { background: #050506; border: 1px solid var(--border); border-radius: 4px; margin-top: 12px; display: none; }
   .output-box.visible { display: block; }
   .output-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--border); }

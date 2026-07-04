@@ -32,6 +32,7 @@ METRIC_KEYS = (
     "blueprint_clean", "blueprint_demo", "blueprint_development", "blueprint_custom", "blueprint_captures",
     "sites_temporary_created", "sites_expired_auto", "php_settings_customized",
     "destroys_total", "php_switches", "image_refreshes", "image_deletes",
+    "wp_cli_commands",
 )
 
 def load(path):

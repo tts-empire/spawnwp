@@ -4,6 +4,19 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.1
+
+- **Updates page**: no more spurious red error while the cockpit restarts itself
+  during a dashboard update. The brief 502/JSON-parse window of the self-restart is
+  now treated as transient reconnection; only a failure explicitly reported by the
+  updater is shown as an error.
+- **Login page**: retrying "Verify code and create passkey" after a rejected
+  authenticator code no longer crashes with `v.replace is not a function` — the
+  passkey ceremony options are cloned per attempt.
+- Test suite: the authentication tests now rebind their temporary database path
+  unconditionally and assert it, so they can never touch a live cockpit database
+  regardless of module import order.
+
 ## 0.5.0
 
 - **WP-CLI console**: every site card in the cockpit gains a **⌨ WP-CLI** button that

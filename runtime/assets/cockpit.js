@@ -389,6 +389,10 @@ async function applyDashboardUpdate() {
 async function monitorDashboardUpdate(previousVersion, attempt) {
   const progress = document.getElementById('update-progress');
   try {
+    // While the cockpit restarts itself mid-update, these fetches fail or
+    // return nginx's HTML error page: every network/parse error here is
+    // transient by definition. The only fatal signal is the updater job
+    // explicitly reporting failure.
     const version = await fetch(`${BASE}/version`, { cache: 'no-store' }).then(response => response.json());
     if (version.version && version.version !== previousVersion) {
       progress.textContent = `Updated to ${version.version}. Reloading…`;
@@ -397,10 +401,14 @@ async function monitorDashboardUpdate(previousVersion, attempt) {
       return;
     }
     const job = await fetch(`${BASE}/update/job`, { cache: 'no-store' }).then(response => response.json());
-    if (job.state === 'failed' || job.exit_code) throw new Error(job.error || 'Update failed');
+    if (job.state === 'failed' || job.exit_code) {
+      const failure = new Error(job.error || 'Update failed');
+      failure.updateFailed = true;
+      throw failure;
+    }
     progress.textContent = job.state === 'active' ? 'Installing and verifying the release…' : 'Waiting for the updater…';
   } catch (error) {
-    if (attempt > 8 && !String(error.message).includes('fetch')) {
+    if (error.updateFailed) {
       UPDATE_RUNNING = false;
       document.getElementById('apply-update').disabled = false;
       progress.textContent = error.message;

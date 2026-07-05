@@ -25,20 +25,36 @@ class EmailReportTests(unittest.TestCase):
             config_path.write_text(json.dumps(config), encoding="utf-8")
             loaded = email_report.load_config(config_path)
 
+        now = datetime(2026, 6, 29, 8, tzinfo=ZoneInfo("Europe/Rome"))
+        report = {
+            "installations": 2,
+            "versions": [("0.5.6", 2)],
+            "operating_systems": [("Linux", 2)],
+            "architectures": [("x86_64", 2)],
+            "features": [("telemetry", 2)],
+            "environments_current": 1,
+            "metrics_installations": 1,
+            "performance": {},
+            "feature_usage": [{"key": "blueprint_captures", "label": "blueprints captured", "value": 3}],
+            "hardware": {},
+        }
+        message = email_report.build_message(loaded, report, now)
         smtp = MagicMock()
         smtp.__enter__.return_value = smtp
         with patch.object(email_report.smtplib, "SMTP", return_value=smtp):
-            email_report.send_report(
-                loaded, "Active installations: 2",
-                datetime(2026, 6, 29, 8, tzinfo=ZoneInfo("Europe/Rome")),
-            )
+            email_report.send_message(loaded, message)
 
         smtp.starttls.assert_called_once()
         smtp.login.assert_called_once_with("sender@example.test", "secret")
         message = smtp.send_message.call_args.args[0]
         self.assertEqual(message["To"], "owner@example.test")
         self.assertIn("2026-06-29", message["Subject"])
-        self.assertIn("Active installations: 2", message.get_content())
+        plain = message.get_body(preferencelist=("plain",)).get_content()
+        html = message.get_body(preferencelist=("html",)).get_content()
+        self.assertIn("Active installations (seen within 90 days): 2", plain)
+        self.assertIn("blueprints captured: 3", plain)
+        self.assertIn("SpawnWP versions", html)
+        self.assertIn("blueprints captured", html)
 
     def test_rejects_insecure_transport(self):
         with tempfile.TemporaryDirectory() as directory:

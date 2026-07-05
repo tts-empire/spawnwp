@@ -85,37 +85,38 @@
     </div>
 
     <section class="roadmap-section">
-      <div class="roadmap-heading"><div class="eyebrow">Now · Team foundation</div><div><h2>One lab.<br>A whole team.</h2><p>The first priority is safe collaboration and a lifecycle that keeps disposable infrastructure genuinely disposable.</p></div></div>
+      <div class="roadmap-heading"><div class="eyebrow">Now · Team foundation</div><div><h2>One lab.<br>A whole team.</h2><p>The first priority is safe collaboration and faster ways to reuse a working environment.</p></div></div>
       <div class="roadmap-grid">
         <article class="roadmap-card" data-glyph="team"><span class="status-pill">Planned</span><span class="index">01</span><h3>Team access</h3><p>Invite members into the cockpit, share site visibility and keep platform-level controls with administrators.</p></article>
-        <article class="roadmap-card" data-glyph="time"><span class="status-pill">Planned</span><span class="index">02</span><h3>Disposable-site lifecycle</h3><p>Default expiry, clear advance warnings and a safe grace period before automatic cleanup reclaims resources.</p></article>
-        <article class="roadmap-card" data-glyph="clone"><span class="status-pill">Planned</span><span class="index">03</span><h3>Fast local cloning</h3><p>Duplicate a complete environment while regenerating its URL, credentials, salts, ports and private secrets.</p></article>
-        <article class="roadmap-card" data-glyph="template"><span class="status-pill">Planned</span><span class="index">04</span><h3>Reusable site templates</h3><p>Turn a working site into a versioned template with its database, media, plugins and themes ready to spawn again.</p></article>
+        <article class="roadmap-card" data-glyph="clone"><span class="status-pill">Planned</span><span class="index">02</span><h3>Fast local cloning</h3><p>Duplicate a complete environment while regenerating its URL, credentials, salts, ports and private secrets.</p></article>
       </div>
     </section>
 
     <section class="roadmap-section">
       <div class="roadmap-heading"><div class="eyebrow">Next · Developer workflows</div><div><h2>Less repetition.<br>More momentum.</h2><p>Once the team foundation is solid, SpawnWP can become easier to automate and connect to existing development workflows.</p></div></div>
       <div class="roadmap-grid">
-        <article class="roadmap-card" data-glyph="api"><span class="status-pill">Planned</span><span class="index">05</span><h3>API tokens and CLI automation</h3><p>Create, inspect, snapshot and destroy environments from trusted CI pipelines and local developer tools.</p></article>
-        <article class="roadmap-card" data-glyph="git"><span class="status-pill">Planned</span><span class="index">06</span><h3>Git integration</h3><p>Bring plugin and theme repositories into repeatable environments and run their build or test workflows consistently.</p></article>
-        <article class="roadmap-card wide" data-glyph="share"><span class="status-pill">Planned</span><span class="index">07</span><h3>Safer temporary sharing</h3><p>Share short-lived demos and issue one-click WordPress admin access without exposing permanent credentials or opening anonymous provisioning.</p></article>
-        <article class="roadmap-card wide" data-glyph="terminal"><span class="status-pill">Planned</span><span class="index">08</span><h3>In-browser terminal</h3><p>A full interactive shell into each site's PHP container, straight from the cockpit — wp shell, Composer, Node and the whole QA toolchain without leaving the browser.</p></article>
+        <article class="roadmap-card" data-glyph="api"><span class="status-pill">Planned</span><span class="index">03</span><h3>API tokens and CLI automation</h3><p>Create, inspect, snapshot and destroy environments from trusted CI pipelines and local developer tools.</p></article>
+        <article class="roadmap-card" data-glyph="git"><span class="status-pill">Planned</span><span class="index">04</span><h3>Git integration</h3><p>Bring plugin and theme repositories into repeatable environments and run their build or test workflows consistently.</p></article>
+        <article class="roadmap-card wide" data-glyph="share"><span class="status-pill">Planned</span><span class="index">05</span><h3>Safer temporary sharing</h3><p>Share short-lived demos and issue one-click WordPress admin access without exposing permanent credentials or opening anonymous provisioning.</p></article>
+        <article class="roadmap-card wide" data-glyph="terminal"><span class="status-pill">Planned</span><span class="index">06</span><h3>In-browser terminal</h3><p>A full interactive shell into each site's PHP container, straight from the cockpit — wp shell, Composer, Node and the whole QA toolchain without leaving the browser. The one-line WP-CLI console already ships as a first step.</p></article>
       </div>
     </section>
 
     <section class="roadmap-section">
       <div class="roadmap-heading"><div class="eyebrow">Exploring · Compatibility</div><div><h2>Broader testing.<br>Same boundaries.</h2><p>Useful additions remain candidates until they can preserve SpawnWP's simple operations and secure defaults.</p></div></div>
       <div class="roadmap-grid">
-        <article class="roadmap-card wide"><span class="status-pill is-exploring">Exploring</span><span class="index">09</span><h3>Optional WordPress Multisite</h3><p>Create subdirectory Multisite environments for plugin and theme compatibility testing, with routing and lifecycle behavior designed specifically for the lab.</p></article>
+        <article class="roadmap-card wide"><span class="status-pill is-exploring">Exploring</span><span class="index">07</span><h3>Optional WordPress Multisite</h3><p>Create subdirectory Multisite environments for plugin and theme compatibility testing, with routing and lifecycle behavior designed specifically for the lab.</p></article>
       </div>
     </section>
 
     <section class="roadmap-section">
-      <div class="roadmap-heading"><div class="eyebrow">Already here · The foundation</div><div><h2>Built before<br>the roadmap.</h2><p>The next phase rests on working capabilities already available in the open-source project.</p></div></div>
+      <div class="roadmap-heading"><div class="eyebrow">Already here · Shipped</div><div><h2>Already in<br>your hands.</h2><p>The foundation, plus the roadmap items already delivered and in use in the open-source project.</p></div></div>
       <div class="roadmap-grid">
         <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Isolated WordPress stacks</h3><p>Independent Nginx, PHP, MariaDB, Mailpit and Adminer services for every environment.</p></article>
         <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Blueprints and snapshots</h3><p>Repeatable starting states, database and media snapshots, restore controls and multiple PHP runtimes.</p></article>
+        <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Reusable site templates</h3><p>Capture a configured site — plugins, theme, media and content — as a versioned blueprint on your own server, then spawn fresh sites from it.</p></article>
+        <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Disposable-site lifecycle</h3><p>Give a site an optional lifetime; an hourly check removes expired sites, with a countdown badge and one-click extend or make-permanent.</p></article>
+        <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>WP-CLI console</h3><p>Run WP-CLI inside any site straight from the cockpit, with its output streamed back live.</p></article>
         <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Secure web cockpit</h3><p>Passkeys, TOTP fallback, recovery codes, HTTPS and loopback-only internal service ports.</p></article>
         <article class="roadmap-card shipped"><span class="status-pill is-shipped">Already here</span><h3>Verified updates</h3><p>Signed releases, dashboard updates and rollback without handing control to a hosted service.</p></article>
       </div>

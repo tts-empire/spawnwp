@@ -243,6 +243,8 @@ function updateBlueprintSelection() {
   php.value = item.php.default;
   const note = document.getElementById('blueprint-note');
   note.textContent = item.description;
+  const captured = document.getElementById('captured-panel');
+  if (captured) captured.hidden = item.schema_version !== 2;
   if (item.schema_version === 2 && item.premium_plugins && item.premium_plugins.length) {
     const names = item.premium_plugins.map(plugin => plugin.name).slice(0, 5).join(', ');
     const extra = item.premium_plugins.length > 5 ? ', …' : '';
@@ -1048,7 +1050,9 @@ function createProject(e) {
   if (php_settings === undefined) return;   // invalid input, message already shown
   const lifetime_days = parseInt(document.getElementById('new-lifetime').value, 10) || 0;
   const install_deploy_plugin = document.getElementById('new-install-deploy').checked;
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days, install_deploy_plugin }, 'out-new', ok => {
+  const capturedPanel = document.getElementById('captured-panel');
+  const deactivate_plugins = !!capturedPanel && !capturedPanel.hidden && document.getElementById('new-deactivate-plugins').checked;
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {

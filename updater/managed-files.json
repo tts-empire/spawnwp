@@ -32,6 +32,7 @@
     "scripts/apply-content-blueprint.sh",
     "scripts/bootstrap.sh",
     "scripts/blueprint.py",
+    "scripts/blueprint-safety-notice.php",
     "scripts/devkit.php",
     "scripts/destroy-project.sh",
     "scripts/image-gc.sh",

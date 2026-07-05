@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.5">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.6">
 </head>
 <body data-page="deploy">
   <header>
@@ -71,6 +71,14 @@
             </div>
           </div>
         </div>
+        <div class="captured-panel" id="captured-panel" hidden>
+          <p class="captured-warn">⚠ This blueprint reproduces a full captured site. A <strong>fresh administrator</strong> is created for the new site — the source site's user accounts and passwords are never included.</p>
+          <label class="deploy-optin">
+            <input id="new-deactivate-plugins" type="checkbox" checked>
+            <span>Start with all plugins deactivated</span>
+            <small>Recommended for captured sites: plugins are installed but left off, so you can reactivate them one at a time — a security or login plugin from the source can otherwise lock you out. Uncheck to start with them active, as captured.</small>
+          </label>
+        </div>
         <label class="deploy-optin">
           <input id="new-install-deploy" type="checkbox">
           <span>Install the SpawnWP Deploy plugin</span>
@@ -91,6 +99,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.5"></script>
+  <script src="/assets/cockpit.js?v=0.5.6"></script>
 </body>
 </html>

@@ -134,6 +134,20 @@ fi
 "${WP[@]}" option update spawnwp_blueprint_id "$BLUEPRINT_ID"
 "${WP[@]}" option update spawnwp_blueprint_version "$BLUEPRINT_VERSION"
 "${WP[@]}" option update spawnwp_blueprint_source "$BLUEPRINT_SOURCE"
+
+# Safety: a captured site can carry security/auth plugins (IP allow-lists,
+# passwordless login, lockouts) that would lock the owner out of the fresh
+# spawn. When requested, leave every plugin installed but INACTIVE so the owner
+# reactivates them one at a time; a mu-plugin notice explains this in wp-admin.
+if [ "${SPAWNWP_DEACTIVATE_PLUGINS:-0}" = "1" ]; then
+  echo "==> Deactivating all plugins (captured-blueprint safety)..."
+  active_list=$("${WP[@]}" plugin list --status=active --field=name --format=csv 2>/dev/null | paste -sd, - || true)
+  "${WP[@]}" plugin deactivate --all 2>&1 || true
+  "${WP[@]}" option update spawnwp_deactivated_plugins "$active_list"
+  install -D -o 33 -g 33 -m 0644 scripts/blueprint-safety-notice.php \
+    projects/primary/wp-content/mu-plugins/spawnwp-blueprint-safety.php
+fi
+
 "${WP[@]}" cache flush >/dev/null
 
 echo "==> Content blueprint applied successfully."

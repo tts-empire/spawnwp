@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.6
+
+- **Safer spawns from captured blueprints.** A captured site can carry security or
+  login plugins (IP allow-lists, passwordless login, lockouts) that would lock you out
+  of the new site. Spawning from a captured blueprint now **deactivates all plugins by
+  default** — they are installed but inactive — and a dismissible notice in the new
+  site reminds you to reactivate them one at a time. A checkbox on the Deploy page
+  turns this off to start with them active, as captured.
+- **Clearer credentials.** The Deploy page now states that a captured blueprint creates
+  a **fresh administrator** and never includes the source site's user accounts or
+  passwords, so you know to use the new site's own credentials.
+
 ## 0.5.5
 
 - **Fix: sites spawned from a captured content blueprint could boot with debug

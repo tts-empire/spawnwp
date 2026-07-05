@@ -75,6 +75,21 @@ external WordPress, install it by hand. Then:
 3. The blueprint appears under **Your blueprints** on the **Deploy** page, with its
    size and a capture summary, and behaves like any other blueprint.
 
+### Spawning from a captured blueprint
+
+Two things are specific to sites created from a captured blueprint:
+
+- **A fresh administrator is created.** The capture never includes the source site's
+  user accounts or passwords (the `users` and `usermeta` tables are excluded), so the
+  new site has only its own new admin — use the credentials shown under **🔑 WP
+  credentials** on the Manage page, not the source site's login.
+- **Plugins start deactivated by default.** A captured site can carry security or
+  login plugins (IP allow-lists, passwordless login, lockouts) that would otherwise
+  lock you out of the fresh site. On the Deploy page, *Start with all plugins
+  deactivated* is checked by default: the plugins are installed but inactive, and an
+  admin notice in the new site reminds you to **reactivate them one at a time** so a
+  problematic one is easy to spot. Uncheck it to start with them active, as captured.
+
 Content blueprints use manifest **schema v2** (`schema_version: 2`), are accepted
 only from `/etc/spawnwp/blueprints.d/`, and reference a payload archive under
 `/var/lib/spawnwp/blueprints/<id>/`. The manifest and payload are installed

@@ -26,6 +26,11 @@ if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
+# Preflight: run the same static checks CI runs (e.g. asset ?v= must match
+# VERSION) so a release can never be published with drift that CI would only
+# flag after the fact. set -e aborts the publish on any failure.
+bash "$ROOT/installer/tests/static.sh"
+
 python3 "$ROOT/updater/build-release.py" --version "$VERSION" --key "$KEY"
 
 if gh release view "$TAG" --repo tts-empire/spawnwp >/dev/null 2>&1; then

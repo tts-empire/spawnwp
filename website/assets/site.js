@@ -98,3 +98,28 @@
     }
   } catch (_error) { /* storage unavailable: skip the animation, never break */ }
 })();
+
+// Mobile navigation: the header collapses the primary nav behind a hamburger
+// (<=800px). Toggle it, keep aria-expanded in sync, and close on link tap,
+// outside click or Escape. Runs on every page that has the header.
+(() => {
+  const header = document.querySelector('.site-header');
+  const toggle = header?.querySelector('.nav-toggle');
+  const nav = header?.querySelector('nav');
+  if (!header || !toggle || !nav) return;
+
+  const setOpen = (open) => {
+    header.classList.toggle('nav-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  };
+
+  toggle.addEventListener('click', () => setOpen(!header.classList.contains('nav-open')));
+  nav.addEventListener('click', (event) => { if (event.target.closest('a')) setOpen(false); });
+  document.addEventListener('click', (event) => {
+    if (header.classList.contains('nav-open') && !header.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && header.classList.contains('nav-open')) { setOpen(false); toggle.focus(); }
+  });
+})();

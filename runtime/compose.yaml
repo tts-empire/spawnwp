@@ -55,12 +55,20 @@ services:
       WORDPRESS_DB_USER: ${DB_USER}
       WORDPRESS_DB_PASSWORD: ${DB_PASS}
       WORDPRESS_TABLE_PREFIX: ${DB_TABLE_PREFIX:-wp_}
-      WORDPRESS_DEBUG: "${WP_DEBUG:-false}"
-      WORDPRESS_DEBUG_LOG: "${WP_DEBUG:-false}"
-      WORDPRESS_DEBUG_DISPLAY: "false"
+      # Leave WORDPRESS_DEBUG EMPTY (not "false") when debug is off: the image's
+      # wp-config does define('WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG','')),
+      # and !!"false" is TRUE. The image ignores WORDPRESS_DEBUG_LOG/DISPLAY, so
+      # WP_DEBUG_LOG/DISPLAY are set below in WORDPRESS_CONFIG_EXTRA instead.
+      WORDPRESS_DEBUG: "${WP_DEBUG:-}"
       WORDPRESS_CONFIG_EXTRA: |
         define('DISALLOW_FILE_EDIT', true);
         define('DISABLE_WP_CRON', true);
+        // Debug logs to wp-content/debug.log; on-screen display follows the
+        // php.ini display_errors (the Deploy "display_errors" dev toggle) rather
+        // than WordPress's default-on, so a stray plugin notice never breaks the
+        // page by emitting output before headers.
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', null);
         define('WP_HOME', '${WP_HOME}');
         define('WP_SITEURL', '${WP_SITEURL}');
         define('SPAWNWP_DEPLOY_HEALTHCHECK_URL', 'http://nginx/');

@@ -4,6 +4,21 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.5
+
+- **Fix: sites spawned from a captured content blueprint could boot with debug
+  errors printed on the page** — a plugin notice was emitted before headers, giving
+  `Cannot modify header information - headers already sent` and a broken site. New
+  sites now start with `WP_DEBUG` genuinely off (unless the blueprint asks for it),
+  debug output goes to `wp-content/debug.log`, and on-screen display follows the
+  Deploy *display_errors* toggle instead of WordPress's default. Existing sites are
+  unaffected; a broken one is fixed with
+  `wp config set WP_DEBUG false --raw`.
+- Under the hood: `WORDPRESS_DEBUG` is left empty (not the string `"false"`, which the
+  WordPress image reads as truthy) when debug is off, and `WP_DEBUG_LOG` /
+  `WP_DEBUG_DISPLAY` are set in `WORDPRESS_CONFIG_EXTRA` (the image ignores the
+  matching env vars).
+
 ## 0.5.4
 
 - **SpawnWP Deploy plugin, environment-aware (0.3.0-dev)**: the plugin now detects

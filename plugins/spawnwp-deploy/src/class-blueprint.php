@@ -41,7 +41,7 @@ final class SpawnWP_Deploy_Blueprint {
 			'proof'             => base64_encode( sodium_crypto_sign_detached( $proof_data, $secret ) ),
 			'label'             => (string) wp_parse_url( $source_host, PHP_URL_HOST ),
 		);
-		$response    = wp_remote_post(
+		$response    = wp_safe_remote_post(
 			untrailingslashit( $data['server_url'] ) . '/api/ingest/pair',
 			array(
 				'timeout'   => 30,
@@ -296,7 +296,7 @@ final class SpawnWP_Deploy_Blueprint {
 			),
 			$extra_headers
 		);
-		$response  = wp_remote_request(
+		$response  = wp_safe_remote_request(
 			$connection['remote_url'] . $path,
 			array(
 				'method'      => $method,

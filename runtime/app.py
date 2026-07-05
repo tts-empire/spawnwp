@@ -38,23 +38,34 @@ async def application_authentication(request: Request, call_next):
         "/api/auth/fallback",
     } or path.startswith("/api/ingest/")  # signed-request auth lives in ingest.py
     active = None if public else auth_session(request)
-    if not public and not active:
-        if path.startswith("/api/"):
-            return JSONResponse({"detail": "Authentication required"}, status_code=401)
-        return RedirectResponse("/login", status_code=303)
-    if active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
-        return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
     destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
                    "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings"}
-    if active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
-        return JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
-    response = await call_next(request)
+    if not public and not active:
+        if path.startswith("/api/"):
+            response = JSONResponse({"detail": "Authentication required"}, status_code=401)
+        else:
+            response = RedirectResponse("/login", status_code=303)
+    elif active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
+        response = JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
+    elif active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
+        response = JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
+    else:
+        response = await call_next(request)
+    # Security headers on every response — including the fail-closed redirect and
+    # the 401/403 early returns above, not only the ones that reach call_next.
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)")
-    if path == "/login":
-        response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'")
+    # One policy for every response. The cockpit UI relies on inline event
+    # handlers and inline styles, so script/style keep 'unsafe-inline'; the rest
+    # is locked down to same-origin (no external scripts, connections or frames).
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; "
+        "base-uri 'none'; frame-ancestors 'none'",
+    )
     return response
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -814,6 +825,9 @@ def db_login(project: str):
         "pw": env.get("DB_PASS", ""),
         "db": env.get("DB_NAME", "wordpress"),
     })
+    # Neutralise a "</script>" breakout if any credential ever contained markup:
+    # these escapes are valid inside a JS string and inert in HTML parsing.
+    cfg = cfg.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     html = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Opening DB…</title>
 <style>body{background:#0f1117;color:#e2e8f0;font-family:system-ui;display:flex;

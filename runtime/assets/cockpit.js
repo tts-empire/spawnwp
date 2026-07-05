@@ -324,7 +324,7 @@ function statusClass(s) {
   return 'yellow';
 }
 function pctClass(p) { return p >= 90 ? 'crit' : (p >= 70 ? 'warn' : ''); }
-function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s) { return (s || '').replace(/[&<>"'`]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
 
 function showToast(msg, isErr) {
   const t = document.getElementById('toast');

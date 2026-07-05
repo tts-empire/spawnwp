@@ -35,7 +35,26 @@ final class SpawnWP_Deploy_Crypto {
 	}
 
 	private static function storage_key(): string {
-		$material = ( defined( 'AUTH_KEY' ) ? AUTH_KEY : '' ) . '|' . ( defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : '' );
+		$auth   = defined( 'AUTH_KEY' ) ? (string) AUTH_KEY : '';
+		$secure = defined( 'SECURE_AUTH_KEY' ) ? (string) SECURE_AUTH_KEY : '';
+		if ( '' === $auth && '' === $secure ) {
+			// Degenerate install with no WordPress salts: without this guard the
+			// key material would be a constant ('|'). Derive from a random secret
+			// generated once and stored (non-autoloaded) instead. Installs that
+			// have salts keep the exact previous derivation, so already-encrypted
+			// key material still decrypts with no migration.
+			$fallback = get_option( 'spawnwp_deploy_storage_key' );
+			if ( ! is_string( $fallback ) || '' === $fallback ) {
+				add_option( 'spawnwp_deploy_storage_key', base64_encode( random_bytes( 32 ) ), '', false );
+				$fallback = get_option( 'spawnwp_deploy_storage_key' );
+			}
+			if ( ! is_string( $fallback ) || '' === $fallback ) {
+				throw new RuntimeException( 'Unable to establish a key-storage secret.' );
+			}
+			$material = 'fallback|' . $fallback;
+		} else {
+			$material = $auth . '|' . $secure;
+		}
 		return hash_hkdf( 'sha256', $material, SODIUM_CRYPTO_SECRETBOX_KEYBYTES, 'spawnwp-deploy-storage-v1' );
 	}
 

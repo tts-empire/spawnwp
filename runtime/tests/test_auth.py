@@ -203,6 +203,34 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(client.get("/api/projects").status_code, 401)
             self.assertEqual(client.get("/api/version").status_code, 200)
 
+    def test_security_headers_present_on_every_response(self):
+        try:
+            from fastapi.testclient import TestClient
+        except (ImportError, RuntimeError) as exc:
+            self.skipTest(f"FastAPI test client unavailable: {exc}")
+        app_module = importlib.import_module("app")
+        with TestClient(app_module.app, base_url="https://cockpit.example.com",
+                        follow_redirects=False) as client:
+            # The login page (200) and the fail-closed redirect off /manage (303)
+            # must both carry the hardened headers, including a CSP — which used
+            # to be set only on /login.
+            for response in (client.get("/login"), client.get("/manage")):
+                self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+                self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+                csp = response.headers["Content-Security-Policy"]
+                self.assertIn("default-src 'self'", csp)
+                self.assertIn("frame-ancestors 'none'", csp)
+                self.assertIn("object-src 'none'", csp)
+
+    def test_frontend_escaper_covers_the_single_quote(self):
+        # esc() feeds values into single-quoted inline handlers; guard against a
+        # regression that drops the single-quote (or backtick) from its char set.
+        cockpit_js = Path(__file__).resolve().parents[1] / "assets" / "cockpit.js"
+        source = cockpit_js.read_text(encoding="utf-8")
+        line = next(l for l in source.splitlines() if l.startswith("function esc("))
+        self.assertIn("&#39;", line)
+        self.assertIn("&#96;", line)
+
     def test_enrollment_page_explains_authenticator_and_recovery(self):
         page = self.auth.LOGIN_HTML
         self.assertIn("Step 1 of 3", page)

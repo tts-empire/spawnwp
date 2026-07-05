@@ -275,7 +275,7 @@ final class SpawnWP_Deploy_Admin {
 			'source_url'        => untrailingslashit( home_url() ),
 			'proof'             => base64_encode( sodium_crypto_sign_detached( $proof_data, $secret ) ),
 		);
-		$response   = wp_remote_post(
+		$response   = wp_safe_remote_post(
 			trailingslashit( $data['target_url'] ) . 'wp-json/' . SpawnWP_Deploy_REST::NS . '/pair',
 			array(
 				'timeout'   => 30,
@@ -393,7 +393,7 @@ final class SpawnWP_Deploy_Admin {
 			),
 			$extra_headers
 		);
-		$response  = wp_remote_request(
+		$response  = wp_safe_remote_request(
 			trailingslashit( $connection['remote_url'] ) . 'wp-json' . $path,
 			array(
 				'method'      => $method,

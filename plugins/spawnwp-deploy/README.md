@@ -18,7 +18,7 @@ Download the preview package and verification files from
 
 - WordPress single-site, same exact core version on source and target
 - Same PHP major/minor on source and target
-- PHP 8.1+, sodium and zip extensions
+- PHP 7.4+, sodium and zip extensions
 - HTTPS with a publicly trusted certificate
 - WordPress REST API reachable without an additional HTTP password
 - Direct write access to wp-content, plugins and themes
@@ -53,3 +53,13 @@ empty target and must be tested with rollback enabled.
 - WordPress Multisite
 - remote object-storage uploads
 - staging sync or blueprints
+
+## Changelog
+
+### 0.3.1-dev
+
+- **PHP 7.4 support.** The minimum PHP requirement drops from 8.1 to 7.4 so the plugin
+  can run on the older WordPress hosts it is deployed to. The code used no PHP 8.x
+  syntax; the only 8.0 dependencies were `str_starts_with`/`str_contains`, now covered
+  by guarded polyfills (in addition to the WordPress core polyfills available since
+  5.9). Verified with `php -l` and the smoke test on WordPress 6.8 / PHP 7.4.

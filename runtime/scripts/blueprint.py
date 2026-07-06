@@ -16,6 +16,7 @@ BLUEPRINT_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 WPORG_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 DIR_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+WP_PIN = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 CREATED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 PAYLOAD_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -58,8 +59,9 @@ def _validate_identity(raw: dict, source: Path) -> None:
         raise BlueprintError("php.allowed contains an unsupported version")
     if php["default"] not in allowed:
         raise BlueprintError("php.default must be present in php.allowed")
-    if raw["wordpress"] != "latest":
-        raise BlueprintError("wordpress must be latest")
+    wordpress = raw["wordpress"]
+    if wordpress != "latest" and (not isinstance(wordpress, str) or not WP_PIN.fullmatch(wordpress)):
+        raise BlueprintError("wordpress must be 'latest' or a MAJOR.MINOR[.PATCH] version")
 
 
 def _validate_v1(raw: dict, source: Path) -> dict:
@@ -175,7 +177,8 @@ def discover() -> tuple[dict[str, dict], list[dict]]:
     return found, errors
 
 
-def resolve(blueprint_id: str, php_version: str | None) -> dict:
+def resolve(blueprint_id: str, php_version: str | None,
+            wordpress_version: str | None = None) -> dict:
     found, errors = discover()
     if blueprint_id not in found:
         details = next((e["error"] for e in errors if Path(e["file"]).stem == blueprint_id), None)
@@ -185,7 +188,13 @@ def resolve(blueprint_id: str, php_version: str | None) -> dict:
     if selected not in item["php"]["allowed"]:
         raise BlueprintError(f"PHP {selected} is not allowed by blueprint {blueprint_id}")
     item["selected_php"] = selected
-    item["wordpress_series"] = "6" if selected == "7.4" else "7"
+    # The captured WordPress version (or "latest") is the default; the spawn may
+    # override it (e.g. to "latest"). The core is fetched on the fly at build time,
+    # so any published version works — the base image is keyed on PHP only.
+    selected_wp = wordpress_version or item["wordpress"]
+    if selected_wp != "latest" and not WP_PIN.fullmatch(selected_wp):
+        raise BlueprintError(f"invalid WordPress version: {selected_wp}")
+    item["selected_wp"] = selected_wp
     if item["schema_version"] == 2:
         item["payload_path"] = str(PAYLOAD_DIR / item["id"] / item["payload"]["file"])
     return item
@@ -200,8 +209,7 @@ def shell_values(item: dict) -> dict[str, str]:
         "BLUEPRINT_VERSION": item["version"],
         "BLUEPRINT_SCHEMA": str(item["schema_version"]),
         "PHP_VERSION": item["selected_php"],
-        "WP_VERSION": item["wordpress"],
-        "WORDPRESS_SERIES": item["wordpress_series"],
+        "WP_VERSION": item["selected_wp"],
         "WP_DEBUG_VALUE": "true" if item.get("debug") else "",
         "BLUEPRINT_PLUGINS": " ".join(item["wporg_plugins"] if v2 else item["plugins"]),
         "BLUEPRINT_THEME": item["theme"] or "",
@@ -223,6 +231,7 @@ def main() -> int:
     resolve_parser = commands.add_parser("resolve")
     resolve_parser.add_argument("blueprint_id")
     resolve_parser.add_argument("--php")
+    resolve_parser.add_argument("--wordpress")
     resolve_parser.add_argument("--output", type=Path)
     resolve_parser.add_argument("--shell", action="store_true")
     stdin_parser = commands.add_parser("validate-stdin")
@@ -244,7 +253,7 @@ def main() -> int:
             item = validate(raw, CUSTOM_DIR / args.filename, check_payload=not args.skip_payload)
             print(json.dumps(item, separators=(",", ":")))
             return 0
-        item = resolve(args.blueprint_id, args.php)
+        item = resolve(args.blueprint_id, args.php, args.wordpress)
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(item, indent=2) + "\n", encoding="utf-8")

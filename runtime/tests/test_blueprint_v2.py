@@ -121,7 +121,9 @@ class BlueprintV2Tests(unittest.TestCase):
             (v2_manifest(wporg_plugins=["Bad_Slug"]), "WordPress.org-style"),
             (v2_manifest(premium_plugins=[{"name": "X"}]), "exactly name, slug and version"),
             (v2_manifest(created_at="yesterday"), "created_at"),
-            (v2_manifest(wordpress="6.5"), "wordpress must be latest"),
+            (v2_manifest(wordpress="6.x"), "MAJOR.MINOR"),
+            (v2_manifest(wordpress="latest-ish"), "MAJOR.MINOR"),
+            (v2_manifest(wordpress=6.5), "MAJOR.MINOR"),
         ]
         for manifest, fragment in cases:
             with self.subTest(fragment=fragment):
@@ -153,6 +155,28 @@ class BlueprintV2Tests(unittest.TestCase):
         self.assertEqual(values["BLUEPRINT_CAPTURE_DATABASE"], "1")
         self.assertEqual(values["WP_DEBUG_VALUE"], "")
         self.assertEqual(values["BLUEPRINT_DEVKIT"], "0")
+
+    def test_pinned_wordpress_captured_and_resolved(self):
+        self.install(v2_manifest(wordpress="6.5.2"))
+        item = blueprint.resolve("agency-base", None)
+        self.assertEqual(item["selected_wp"], "6.5.2")
+        values = blueprint.shell_values(item)
+        self.assertEqual(values["WP_VERSION"], "6.5.2")
+        self.assertNotIn("WORDPRESS_SERIES", values)
+
+    def test_wordpress_override_at_spawn(self):
+        self.install(v2_manifest(wordpress="6.5.2"))
+        latest = blueprint.shell_values(blueprint.resolve("agency-base", None, "latest"))
+        self.assertEqual(latest["WP_VERSION"], "latest")
+        pinned = blueprint.shell_values(blueprint.resolve("agency-base", None, "6.6"))
+        self.assertEqual(pinned["WP_VERSION"], "6.6")
+        with self.assertRaises(blueprint.BlueprintError):
+            blueprint.resolve("agency-base", None, "not-a-version")
+
+    def test_wordpress_latest_default_still_works(self):
+        self.install(v2_manifest())  # wordpress: "latest"
+        values = blueprint.shell_values(blueprint.resolve("agency-base", None))
+        self.assertEqual(values["WP_VERSION"], "latest")
 
     def test_shell_values_v1_unchanged(self):
         self.copy_builtin("development")

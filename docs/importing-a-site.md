@@ -95,6 +95,10 @@ Two things are specific to sites spawned from a captured blueprint (details unde
 
 Also worth knowing:
 
+- **The origin's WordPress version is reproduced.** The blueprint pins the source site's
+  exact WordPress version (e.g. `6.5.2`), so spawned sites start on the same release
+  rather than the latest. On the **Deploy** page you can keep it (default) or choose
+  **Latest**. Pinning freezes core security updates — apply them inside the spawned site.
 - The source site URL is rewritten to a fixed placeholder **before upload** and never
   reaches the server; every spawned site rewrites it to its own URL.
 - Plugins that are **not from WordPress.org** are flagged at capture time and on the Deploy

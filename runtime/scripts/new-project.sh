@@ -10,9 +10,10 @@ install -d -m 0700 "$DOCKER_CONFIG"
 NAME="${1:-}"
 BLUEPRINT="${2:-development}"
 PHP_OVERRIDE="${3:-}"
+WP_OVERRIDE="${4:-}"
 if [ -z "$NAME" ]; then
-  echo "Usage: $0 <project-name> [blueprint] [php-version]" >&2
-  echo "  Example: $0 demo-site development 8.3" >&2
+  echo "Usage: $0 <project-name> [blueprint] [php-version] [wordpress-version]" >&2
+  echo "  Example: $0 demo-site development 8.3 6.5.2" >&2
   exit 1
 fi
 if [[ ! "$NAME" =~ ^[a-z0-9][a-z0-9-]{0,30}$ ]]; then
@@ -29,6 +30,9 @@ fi
 RESOLVE_ARGS=(resolve "$BLUEPRINT" --output /tmp/spawnwp-blueprint-$$.json --shell)
 if [ -n "$PHP_OVERRIDE" ]; then
   RESOLVE_ARGS+=(--php "$PHP_OVERRIDE")
+fi
+if [ -n "$WP_OVERRIDE" ]; then
+  RESOLVE_ARGS+=(--wordpress "$WP_OVERRIDE")
 fi
 eval "$(python3 scripts/blueprint.py "${RESOLVE_ARGS[@]}")"
 RESOLVED_BLUEPRINT="/tmp/spawnwp-blueprint-$$.json"
@@ -128,7 +132,6 @@ cat > "${PROJ_DIR}/.env" <<EOF
 COMPOSE_PROJECT_NAME=${NAME}
 PHP_VERSION=${PHP_VERSION}
 WP_VERSION=${WP_VERSION}
-WORDPRESS_SERIES=${WORDPRESS_SERIES}
 WP_DEBUG=${WP_DEBUG_VALUE}
 SPAWNWP_BLUEPRINT=${BLUEPRINT_ID}
 SPAWNWP_BLUEPRINT_VERSION=${BLUEPRINT_VERSION}
@@ -254,7 +257,7 @@ IMAGE="wp-dev-php:${PHP_VERSION}"
 # zz-site.ini is a runtime mount (per-site values), not part of the image:
 # keep it out of the hash or every custom PHP setting would force a rebuild.
 CONTEXT_HASH=$( { cd docker/php && find . -type f ! -name 'zz-site.ini' -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
-                  echo "series=${WORDPRESS_SERIES} wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
+                  echo "wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
 NEED_BUILD=0

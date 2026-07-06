@@ -208,8 +208,9 @@ async function loadBlueprints() {
       renderGroup('Custom manifests', customManifests),
     ].join('');
     catalog.querySelectorAll('.blueprint-option').forEach(option => option.addEventListener('click', () => selectBlueprint(option.dataset.blueprint)));
-    document.getElementById('new-php').addEventListener('change', updateExpectedTime);
+    document.getElementById('new-php').addEventListener('change', () => { refreshWordpressCompat(); updateExpectedTime(); });
     document.getElementById('new-lifetime').addEventListener('change', updateExpectedTime);
+    document.getElementById('new-wordpress').addEventListener('change', refreshWordpressCompat);
     selectBlueprint(select.value);
     const errors = payload.errors || [];
     const alert = document.getElementById('blueprint-errors');
@@ -250,7 +251,47 @@ function updateBlueprintSelection() {
     const extra = item.premium_plugins.length > 5 ? ', …' : '';
     note.textContent += ` — ⚠ includes ${item.premium_plugins.length} premium/custom plugin${item.premium_plugins.length === 1 ? '' : 's'} (${names}${extra}) that may require new license keys or re-activation.`;
   }
+  populateWordpressField(item);
   updateExpectedTime();
+}
+
+// Captured blueprints can pin the origin's WordPress version. Offer that pinned
+// version (default) or "Latest"; hide the control for blueprints that track latest.
+function populateWordpressField(item) {
+  const field = document.getElementById('new-wordpress-field');
+  const select = document.getElementById('new-wordpress');
+  if (!field || !select) return;
+  const pinned = item && item.wordpress && item.wordpress !== 'latest' ? item.wordpress : null;
+  if (!pinned) {
+    field.hidden = true;
+    select.innerHTML = '';
+    return;
+  }
+  field.hidden = false;
+  select.innerHTML =
+    `<option value="${esc(pinned)}">WordPress ${esc(pinned)} (as captured)</option>` +
+    `<option value="latest">Latest</option>`;
+  select.value = pinned;
+  refreshWordpressCompat();
+}
+
+// Soft, non-blocking advisory: a much older captured WordPress on a modern PHP may
+// misbehave. We warn and let the spawn proceed (the origin's PHP is the safe default).
+function refreshWordpressCompat() {
+  const help = document.getElementById('new-wordpress-help');
+  const select = document.getElementById('new-wordpress');
+  if (!help || !select) return;
+  const wp = select.value;
+  const php = document.getElementById('new-php').value;
+  const wpMajor = wp === 'latest' ? null : parseInt(wp.split('.')[0], 10);
+  const phpNum = parseFloat(php);
+  if (wpMajor !== null && wpMajor < 6 && phpNum >= 8.0) {
+    help.textContent = `⚠ WordPress ${wp} predates PHP ${php}; it may misbehave. Consider PHP 7.4 or a newer WordPress.`;
+    help.classList.add('field-warning');
+  } else {
+    help.textContent = "Captured blueprints reproduce the origin's WordPress version.";
+    help.classList.remove('field-warning');
+  }
 }
 
 // The launch bar's live estimate: the real number for the CURRENT choice, so the
@@ -1052,7 +1093,9 @@ function createProject(e) {
   const install_deploy_plugin = document.getElementById('new-install-deploy').checked;
   const capturedPanel = document.getElementById('captured-panel');
   const deactivate_plugins = !!capturedPanel && !capturedPanel.hidden && document.getElementById('new-deactivate-plugins').checked;
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins }, 'out-new', ok => {
+  const wpField = document.getElementById('new-wordpress-field');
+  const wordpress_version = wpField && !wpField.hidden ? document.getElementById('new-wordpress').value : null;
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, wordpress_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {

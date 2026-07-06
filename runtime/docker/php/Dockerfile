@@ -1,6 +1,8 @@
 ARG PHP_VERSION=8.3
-ARG WORDPRESS_SERIES=7
-FROM wordpress:${WORDPRESS_SERIES}-php${PHP_VERSION}-fpm
+# Key the base image on PHP only (a tag that is always published). The exact
+# WordPress core is fetched on the fly below, so the base image's bundled WP
+# version is irrelevant — this decouples the captured WP version from image tags.
+FROM wordpress:php${PHP_VERSION}-fpm
 
 ARG PHP_VERSION
 ARG WORDPRESS_VERSION=latest
@@ -29,9 +31,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -sS https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp \
     && chmod +x /usr/local/bin/wp
 
-# The official PHP 7.4 image is frozen with an obsolete WordPress core. Keep its
-# EOL runtime only, then seed new volumes with the requested current core.
-RUN if [ "$PHP_VERSION" = "7.4" ]; then \
+# Seed the exact requested WordPress core into the image so spawned sites mirror
+# the captured origin. Runs when a specific version is pinned (any PHP), and also
+# for PHP 7.4 whose base image ships a frozen, obsolete core that must be refreshed
+# to the current release when "latest" is requested.
+RUN if [ "$WORDPRESS_VERSION" != "latest" ] || [ "$PHP_VERSION" = "7.4" ]; then \
         php -d memory_limit=-1 /usr/local/bin/wp core download --allow-root --force --path=/usr/src/wordpress --version="$WORDPRESS_VERSION"; \
     fi
 

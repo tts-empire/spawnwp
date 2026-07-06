@@ -36,7 +36,6 @@ services:
       context: ./docker/php
       args:
         PHP_VERSION: ${PHP_VERSION:-8.3}
-        WORDPRESS_SERIES: ${WORDPRESS_SERIES:-7}
         WORDPRESS_VERSION: ${WP_VERSION:-latest}
         SPAWNWP_CONTEXT_HASH: ${SPAWNWP_CONTEXT_HASH:-dev}
     image: wp-dev-php:${PHP_VERSION:-8.3}

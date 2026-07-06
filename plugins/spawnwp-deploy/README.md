@@ -56,6 +56,14 @@ empty target and must be tested with rollback enabled.
 
 ## Changelog
 
+### 0.3.2-dev
+
+- **Capture the source WordPress version.** A captured blueprint now records the origin
+  site's exact WordPress version (e.g. `6.5.2`) instead of always `latest`, so sites
+  spawned from it reproduce the origin. The spawn can still override it to `latest` from
+  the cockpit. Beta/RC suffixes are reduced to the numeric core; an unreadable version
+  falls back to `latest`.
+
 ### 0.3.1-dev
 
 - **PHP 7.4 support.** The minimum PHP requirement drops from 8.1 to 7.4 so the plugin

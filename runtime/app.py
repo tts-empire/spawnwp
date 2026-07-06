@@ -103,10 +103,13 @@ def blueprint_catalog() -> dict:
         raise HTTPException(500, "Blueprint catalog returned invalid JSON") from exc
 
 
-def validate_blueprint_choice(blueprint_id: str, php_version: str | None) -> None:
+def validate_blueprint_choice(blueprint_id: str, php_version: str | None,
+                              wordpress_version: str | None = None) -> None:
     cmd = ["python3", str(BLUEPRINT_TOOL), "resolve", blueprint_id]
     if php_version:
         cmd.extend(["--php", php_version])
+    if wordpress_version:
+        cmd.extend(["--wordpress", wordpress_version])
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=PRIMARY_PROJECT)
     if result.returncode != 0:
         raise HTTPException(400, result.stderr.strip().removeprefix("ERROR: ").strip())
@@ -622,6 +625,7 @@ class NewProject(BaseModel):
     name: str
     blueprint: str = "development"
     php_version: str | None = None
+    wordpress_version: str | None = None   # override the blueprint's pinned WP version (e.g. "latest")
     php_settings: PhpIniSettings | None = None
     lifetime_days: int = 0   # 0 = permanent; otherwise the site self-destructs
     install_deploy_plugin: bool = False   # opt-in: bundle the SpawnWP Deploy plugin
@@ -635,7 +639,7 @@ def new_project(body: NewProject):
         raise HTTPException(400, "Invalid blueprint id")
     if not 0 <= body.lifetime_days <= 365:
         raise HTTPException(400, "lifetime_days must be between 0 and 365")
-    validate_blueprint_choice(body.blueprint, body.php_version)
+    validate_blueprint_choice(body.blueprint, body.php_version, body.wordpress_version)
     guard_not_busy()
     if is_project(PROJECTS_ROOT / body.name):
         raise HTTPException(409, f"Project '{body.name}' already exists")
@@ -647,7 +651,7 @@ def new_project(body: NewProject):
     if body.deactivate_plugins:
         env["SPAWNWP_DEACTIVATE_PLUGINS"] = "1"
     return sse_response(
-        ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or ""],
+        ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or "", body.wordpress_version or ""],
         PRIMARY_PROJECT,
         env or None,
     )

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.7">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.8">
 </head>
 <body data-page="deploy">
   <header>
@@ -39,6 +39,7 @@
         <div class="deploy-fields">
           <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
           <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select><small class="field-help">Switchable later from Manage.</small></label>
+          <label id="new-wordpress-field" hidden><span>WordPress</span><select id="new-wordpress" aria-label="WordPress version"></select><small class="field-help" id="new-wordpress-help">Captured blueprints reproduce the origin's WordPress version.</small></label>
           <label><span>Lifetime</span><select id="new-lifetime" aria-describedby="lifetime-help">
             <option value="0" selected>Permanent</option>
             <option value="1">1 day</option>
@@ -99,6 +100,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.7"></script>
+  <script src="/assets/cockpit.js?v=0.5.8"></script>
 </body>
 </html>

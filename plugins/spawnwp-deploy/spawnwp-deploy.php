@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpawnWP Deploy
  * Description: Capture a configured site as a reusable SpawnWP blueprint, and optionally publish a finished site once to a separate, empty WordPress install.
- * Version: 0.3.1-dev
+ * Version: 0.3.2-dev
  * Requires at least: 6.8
  * Requires PHP: 7.4
  * Author: SpawnWP
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SPAWNWP_DEPLOY_VERSION', '0.3.1-dev' );
+define( 'SPAWNWP_DEPLOY_VERSION', '0.3.2-dev' );
 define( 'SPAWNWP_DEPLOY_FILE', __FILE__ );
 define( 'SPAWNWP_DEPLOY_DIR', plugin_dir_path( __FILE__ ) );
 

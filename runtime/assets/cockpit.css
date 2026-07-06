@@ -214,6 +214,7 @@
   .deploy-form .field-help { display: block; margin-top: 6px; color: var(--muted); font-size: var(--font-small); line-height: 1.45; text-transform: none; min-height: 16px; }
   .deploy-form input.input-error { border-color: var(--red); }
   .deploy-form .field-help.input-error { color: var(--red); }
+  .deploy-form .field-help.field-warning { color: var(--yellow); }
   .update-actions { display:flex; align-items:center; gap:14px; margin:18px 0; }
   .update-actions span { color:var(--muted); font-size:12px; }
 

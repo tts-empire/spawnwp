@@ -116,6 +116,11 @@ Defaults and guarantees:
   re-capture.
 - The allowed PHP versions are chosen at capture time; the default pins to the
   source site's PHP version.
+- The **source site's WordPress version is captured and pinned** (e.g. `6.5.2`), so
+  spawned sites reproduce the origin rather than always installing the latest release.
+  On the **Deploy** page you can keep the captured version (default) or switch to
+  **Latest**. The exact core is fetched at build time, so any published version works;
+  pinning freezes core security updates, which you then apply inside the spawned site.
 
 The payload never leaves your server and is not part of telemetry. Content
 blueprints can be deleted — manifest and payload — from **System → Content

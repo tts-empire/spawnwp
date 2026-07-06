@@ -4,6 +4,24 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.8
+
+- **Captured blueprints mirror the origin's WordPress version.** A captured content
+  blueprint now records the source site's exact WordPress version (e.g. `6.5.2`) instead
+  of always installing the latest release. On the Deploy page you keep the captured
+  version (default) or switch to Latest, just like the PHP version. The exact core is
+  fetched at build time and the base image is keyed on PHP only, so any published version
+  works. Built-in blueprints still track `latest`; the bundled Deploy plugin is `0.3.2-dev`.
+
+## 0.5.7
+
+- **Security hardening.** A source-level audit of the cockpit and the Deploy plugin found
+  no critical or high-severity issues; this release tightens the remaining defense-in-depth
+  edges. The cockpit sends a strict Content-Security-Policy on every response, escapes single
+  quotes and backticks in output, and hardens the Adminer sign-in bridge. The Deploy plugin
+  routes outbound requests through WordPress's SSRF-guarded `wp_safe_remote_*` API and stores
+  its connection keys more robustly. No configuration changes and no migrations.
+
 ## 0.5.6
 
 - **Safer spawns from captured blueprints.** A captured site can carry security or

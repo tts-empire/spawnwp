@@ -18,16 +18,14 @@ fi
 # WP build args: same values new-project.sh uses (blueprints share them), read
 # from the primary .env with the compose defaults as fallback, so the context
 # hash stamped here matches the one the create gate computes.
-WORDPRESS_SERIES=$(grep -E '^WORDPRESS_SERIES=' .env 2>/dev/null | cut -d= -f2)
 WP_VERSION=$(grep -E '^WP_VERSION=' .env 2>/dev/null | cut -d= -f2)
-export WORDPRESS_SERIES="${WORDPRESS_SERIES:-7}"
 export WP_VERSION="${WP_VERSION:-latest}"
 export PHP_VERSION="$VER"
 
 IMAGE="wp-dev-php:${VER}"
 # zz-site.ini is a runtime mount, excluded from the hash exactly as in new-project.sh.
 CONTEXT_HASH=$( { cd docker/php && find . -type f ! -name 'zz-site.ini' -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
-                  echo "series=${WORDPRESS_SERIES} wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
+                  echo "wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 
 echo "==> Refreshing ${IMAGE}: pulling the latest base and rebuilding..."

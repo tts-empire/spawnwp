@@ -255,6 +255,14 @@ final class SpawnWP_Deploy_Blueprint {
 	private static function build_manifest( array $fields ): array {
 		$inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 		$theme     = get_stylesheet();
+		// Pin the source site's exact WordPress version so sites spawned from this
+		// blueprint mirror the origin. Keep only the numeric MAJOR.MINOR[.PATCH]
+		// core (drop -beta/-RC suffixes the server would reject); fall back to
+		// 'latest' if the version is unreadable. The spawn can still override it.
+		$wordpress = 'latest';
+		if ( preg_match( '/^\d+\.\d+(?:\.\d+)?/', (string) get_bloginfo( 'version' ), $matches ) ) {
+			$wordpress = $matches[0];
+		}
 		return array(
 			'schema_version'  => 2,
 			'id'              => $fields['id'],
@@ -265,7 +273,7 @@ final class SpawnWP_Deploy_Blueprint {
 				'default' => $fields['php_default'],
 				'allowed' => $fields['php_allowed'],
 			),
-			'wordpress'       => 'latest',
+			'wordpress'       => $wordpress,
 			'created_at'      => gmdate( 'Y-m-d\TH:i:s\Z' ),
 			'capture'         => $fields['capture'],
 			'wporg_plugins'   => array_slice( $inventory['wporg'], 0, 64 ),

@@ -163,14 +163,12 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
 
         original = env_path.read_text()
         previous = env_value(original, "PHP_VERSION", "8.3")
-        previous_series = env_value(original, "WORDPRESS_SERIES", "7")
         image = f"wp-dev-php:{version}"
         cached = subprocess.run(
             ["docker", "image", "inspect", image], capture_output=True,
         ).returncode == 0
         emit("start", previous=previous, target=version, first_download=not cached)
         updated = replace_env(original, "PHP_VERSION", version)
-        updated = replace_env(updated, "WORDPRESS_SERIES", "6" if version == "7.4" else "7")
         write_atomic(env_path, updated)
 
         started = False
@@ -193,7 +191,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
             return 0
         except Exception as exc:
             write_atomic(env_path, original)
-            emit("log", line=f"Restored PHP_VERSION={previous} and WORDPRESS_SERIES={previous_series}")
+            emit("log", line=f"Restored PHP_VERSION={previous}")
             if started:
                 run_simple(["docker", "compose", "up", "-d", "php"], project)
             emit("error", message=str(exc), previous=previous)

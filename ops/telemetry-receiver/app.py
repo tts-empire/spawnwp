@@ -133,6 +133,23 @@ def connection():
             db.execute(f"ALTER TABLE installations ADD COLUMN {column} TEXT")
         except sqlite3.OperationalError:
             pass
+    # Append-only archive of every accepted heartbeat. The `installations` table
+    # keeps only the latest cumulative snapshot per host (ON CONFLICT overwrites);
+    # this table keeps each dated beat so a later analysis tool can reconstruct the
+    # time-series and correlate spawn timings with the reporting host's hardware.
+    # Same pseudonymous installation_hash, same 90-day retention (see purge()).
+    db.execute("""CREATE TABLE IF NOT EXISTS heartbeats_raw (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts INTEGER NOT NULL,
+        installation_hash TEXT NOT NULL,
+        spawnwp_version TEXT NOT NULL,
+        os_family TEXT NOT NULL,
+        architecture TEXT NOT NULL,
+        metrics_json TEXT,
+        hardware_json TEXT
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_heartbeats_raw_ts ON heartbeats_raw(ts)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_heartbeats_raw_hash ON heartbeats_raw(installation_hash)")
     return db
 
 
@@ -145,6 +162,7 @@ def installation_hash(identifier):
 
 def purge(db, now=None):
     cutoff = int(now or time.time()) - RETENTION_SECONDS
+    db.execute("DELETE FROM heartbeats_raw WHERE ts < ?", (cutoff,))
     return db.execute("DELETE FROM installations WHERE last_seen < ?", (cutoff,)).rowcount
 
 
@@ -169,12 +187,18 @@ def receive(payload: UsageEvent | DisableEvent, response: Response):
         purge(db, now)
         if payload.event == "disable":
             db.execute("DELETE FROM installations WHERE installation_hash = ?", (identifier,))
+            db.execute("DELETE FROM heartbeats_raw WHERE installation_hash = ?", (identifier,))
         else:
             metrics_json = (json.dumps(payload.metrics, sort_keys=True, separators=(",", ":"))
                             if payload.metrics is not None else None)
             hardware_json = (json.dumps(payload.hardware.model_dump(), sort_keys=True,
                                         separators=(",", ":"))
                              if payload.hardware is not None else None)
+            db.execute("""INSERT INTO heartbeats_raw
+                (ts, installation_hash, spawnwp_version, os_family, architecture, metrics_json, hardware_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (now, identifier, payload.spawnwp_version, payload.os_family,
+                 payload.architecture, metrics_json, hardware_json))
             db.execute("""INSERT INTO installations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 ON CONFLICT(installation_hash) DO UPDATE SET
                 last_seen=excluded.last_seen, spawnwp_version=excluded.spawnwp_version,

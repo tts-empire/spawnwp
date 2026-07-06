@@ -36,9 +36,31 @@ class ReceiverTests(unittest.TestCase):
         self.assertEqual(202, self.client.post("/api/v1/telemetry", json=self.payload(identifier)).status_code)
         with receiver.connection() as db:
             self.assertEqual((1, 2), db.execute("SELECT count(*),heartbeat_count FROM installations").fetchone())
+        with receiver.connection() as db:
+            self.assertEqual(2, db.execute("SELECT count(*) FROM heartbeats_raw").fetchone()[0])
         disable = {"installation_id": str(identifier), "event": "disable", "timestamp": datetime.now(timezone.utc).isoformat()}
         self.assertEqual(202, self.client.post("/api/v1/telemetry", json=disable).status_code)
-        with receiver.connection() as db: self.assertEqual(0, db.execute("SELECT count(*) FROM installations").fetchone()[0])
+        with receiver.connection() as db:
+            self.assertEqual(0, db.execute("SELECT count(*) FROM installations").fetchone()[0])
+            self.assertEqual(0, db.execute("SELECT count(*) FROM heartbeats_raw").fetchone()[0])
+
+    def test_raw_archive_keeps_dated_beats_and_purges_by_age(self):
+        import json as _json, time as _time
+        payload = self.payload()
+        payload["metrics"] = {"create_warm_count": 3, "create_warm_seconds_sum": 90}
+        payload["hardware"] = {"cpu_count": 8, "ram_gb": 16, "disk_total_gb": 200,
+                               "disk_free_gb": 80, "docker_images_gb": 6,
+                               "build_cache_gb": 1, "php_versions": 2}
+        self.assertEqual(202, self.client.post("/api/v1/telemetry", json=payload).status_code)
+        with receiver.connection() as db:
+            ts, metrics_json, hardware_json = db.execute(
+                "SELECT ts,metrics_json,hardware_json FROM heartbeats_raw").fetchone()
+            self.assertEqual(16, _json.loads(hardware_json)["ram_gb"])
+            self.assertEqual(3, _json.loads(metrics_json)["create_warm_count"])
+            # Age one raw row past the retention window, then confirm purge drops it.
+            db.execute("UPDATE heartbeats_raw SET ts = ?", (ts - receiver.RETENTION_SECONDS - 1,))
+            receiver.purge(db, now=ts)
+            self.assertEqual(0, db.execute("SELECT count(*) FROM heartbeats_raw").fetchone()[0])
 
     def test_rejects_extra_fields_and_old_timestamps(self):
         payload = self.payload(); payload["domain"] = "example.com"

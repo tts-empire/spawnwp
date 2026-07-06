@@ -71,6 +71,7 @@ nav:
       - Using the cockpit: using-the-cockpit.md
       - Blueprints: blueprints.md
       - WordPress development: wordpress-development.md
+      - Import an existing site: importing-a-site.md
       - Publishing a finished site: deploying-a-site.md
       - CLI reference: cli-reference.md
   - Reference:

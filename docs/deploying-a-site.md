@@ -25,7 +25,7 @@ source WordPress site inside SpawnWP to a **separate, fresh and empty WordPress
 installation**.
 
 !!! warning "Optional public-preview plugin"
-    The plugin is currently `0.3.0-dev`. Test it with disposable sites and keep an
+    The plugin is currently `0.3.1-dev`. Test it with disposable sites and keep an
     independent backup. Do not use it for a destination that already contains content
     or live user data.
 
@@ -35,6 +35,11 @@ Publishing a finished site out, described below, is its secondary role: it is of
 only on sites running inside a SpawnWP cockpit, and on an external destination the
 plugin instead offers to *receive* a published site.
 
+!!! tip "Bringing an existing site into SpawnWP?"
+    If your goal is to pull a WordPress site you already run into your SpawnWP lab, follow
+    the step-by-step [Import an existing WordPress site](importing-a-site.md) guide — it
+    captures the site as a reusable blueprint you can spawn fresh environments from.
+
 ## When this plugin fits
 
 Use SpawnWP Deploy when all of these are true:
@@ -43,7 +48,7 @@ Use SpawnWP Deploy when all of these are true:
 - the destination is a separate, fresh WordPress installation;
 - source and destination are WordPress single-site;
 - both use the exact same WordPress core and PHP major/minor versions;
-- both have PHP 8.1+, `sodium`, ZIP, trusted HTTPS and a reachable REST API;
+- both have PHP 7.4+, `sodium`, ZIP, trusted HTTPS and a reachable REST API;
 - both use directly writable local plugins, themes and uploads.
 
 The transfer limit is 2 GiB. Multisite, object-storage uploads, database triggers or

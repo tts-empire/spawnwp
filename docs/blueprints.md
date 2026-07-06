@@ -60,6 +60,10 @@ hiding valid blueprints.
 
 ## Content blueprints (captured from a site)
 
+!!! tip "Looking for a walkthrough?"
+    This section is the reference for how capture works. For a goal-oriented, step-by-step
+    guide, see [Import an existing WordPress site](importing-a-site.md).
+
 Since 0.4.0 a blueprint can also be **captured from an already-configured WordPress
 site** with the [SpawnWP Deploy plugin](deploying-a-site.md) — this is the plugin's
 primary job since `0.3.0-dev`. On a site created inside SpawnWP you can add the plugin

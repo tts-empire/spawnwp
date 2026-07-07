@@ -168,6 +168,8 @@
   .main-nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
   .update-dot { width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); }
   #header-clock { margin-left: auto; }
+  .header-docs { color: var(--muted); font-size: 12px; text-decoration: none; font-weight: 650; }
+  .header-docs:hover { color: var(--accent); }
   .header-logout { padding: 5px 9px; background: transparent; color: var(--muted); border-color: var(--border); font-size: 11px; }
   .loading-copy { color: var(--muted); }
 

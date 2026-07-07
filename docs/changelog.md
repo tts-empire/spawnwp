@@ -4,6 +4,12 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.12
+
+- **Docs link in the cockpit header.** Every cockpit page now has a **Docs ↗** link in the
+  header that opens the SpawnWP documentation in a new tab — quick access to the guides
+  (including the file browser) without leaving your work.
+
 ## 0.5.11
 
 - **File browser: a single, clearer scrollbar.** In the per-site file browser the panel's

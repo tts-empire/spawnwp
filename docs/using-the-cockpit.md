@@ -88,6 +88,7 @@ Each site card has:
 | **🗄 DB ▸** | Open Adminer, **already logged in** to this site's database |
 | **✉️ Mailpit ▸** | Open this site's captured-mail inbox |
 | **🔑 WP credentials** | Reveal the WordPress admin user/password (with copy) |
+| **📂 Files** | Open the [file browser](#the-file-browser) for this site |
 | **⌨ WP-CLI** | Open the [WP-CLI console](#the-wp-cli-console) for this site |
 | **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4) |
 | **🗑 Destroy** | Permanently delete the site (enabled only when it's Down) |
@@ -148,6 +149,34 @@ container. That model has a few practical consequences:
     site's container, never on the host, and a cockpit session is required. Commands
     only affect the site whose card you opened, and a disposable site is always one
     snapshot (or one re-spawn) away from a clean state.
+
+## The file browser
+
+The **📂 Files** button on a site card opens a file browser for that site, rooted at the
+WordPress document root (`/var/www/html`). Use it to read and edit the files that live
+outside WordPress's own media library and editor — `wp-config.php`, `.htaccess`,
+mu-plugins, drop-ins, a plugin's `.env`, or a debug log — without opening an SSH session.
+
+- **Browse.** Click a folder to open it; the breadcrumb walks back up. Directories are
+  listed first, then files, each with its size and modification time.
+- **View & edit.** Click a text file to open it in an inline editor. Save writes it back
+  in place. Files larger than 1 MiB, and binary files, are offered as a download instead.
+- **Download.** The **⬇** action streams any file out as-is, at any size.
+- **Upload, New folder, Rename, Delete.** Drop a file into the current folder, create
+  subfolders, move/rename, or remove files and folders.
+
+Everything runs **inside that one site's PHP container**, as the web user (`www-data`), so
+uploaded and edited files get the ownership WordPress needs and nothing can reach the host
+or another site — the container boundary is the jail. Browsing, viewing and downloading
+are always available; the write actions (**save, upload, delete, rename, new folder**) are
+sensitive and prompt for a recent Passkey confirmation the same way Destroy and Restore do.
+
+!!! note "Scope and safety"
+    The browser is not a sandbox: editing a file in the docroot changes your live site,
+    and writing PHP into a folder the server executes runs that code — by design, it is
+    your site. It only ever touches the site whose card you opened, never the host, and a
+    disposable site is always one snapshot (or one re-spawn) away from a clean state. Take
+    a **💾 Snapshot** before a risky edit.
 
 ## The System tab
 

@@ -4,6 +4,15 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.9
+
+- **Per-site file browser in the cockpit.** Each site card gains a **📂 Files** action that
+  browses, views, edits, uploads and downloads the site's files, rooted at the WordPress
+  document root. Every operation runs inside that site's own PHP container as `www-data`, so
+  the container boundary is the jail — nothing can reach the host or another site. Browsing
+  and downloading are always available; writes (save, upload, delete, rename, new folder)
+  require a recent Passkey confirmation, like Destroy and Restore.
+
 ## 0.5.8
 
 - **Captured blueprints mirror the origin's WordPress version.** A captured content

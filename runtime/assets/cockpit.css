@@ -335,3 +335,28 @@
 
   /* Temporary-site badges next to the status badge on Manage cards. */
   .card-badges { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* Per-site file manager panel rendered inside a site's output box (Manage). */
+  .fm-panel { padding: 10px 12px; font-size: var(--font-control); }
+  .fm-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .fm-crumb { font-family: monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .fm-crumb a { color: var(--accent); text-decoration: none; }
+  .fm-crumb a:hover { text-decoration: underline; }
+  .fm-actions { display: inline-flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .fm-table { width: 100%; border-collapse: collapse; }
+  .fm-table td { padding: 6px 8px; border-bottom: 1px solid var(--surface2); vertical-align: middle; }
+  .fm-table tr:last-child td { border-bottom: none; }
+  .fm-name a { color: var(--text); text-decoration: none; word-break: break-all; }
+  .fm-name a:hover { color: var(--accent); }
+  .fm-size { font-family: monospace; color: var(--muted); white-space: nowrap; text-align: right; width: 1%; }
+  .fm-time { color: var(--muted); font-size: 12px; white-space: nowrap; width: 1%; }
+  .fm-row-actions { white-space: nowrap; text-align: right; width: 1%; }
+  .fm-empty { padding: 14px; color: var(--muted); text-align: center; }
+  .fm-editor { padding: 4px 2px; }
+  .fm-editor-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .fm-editor-head a { color: var(--accent); text-decoration: none; flex-shrink: 0; }
+  .fm-editor-title { font-family: monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .fm-textarea { width: 100%; min-height: 320px; resize: vertical; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: monospace; font-size: 12px; line-height: 1.5; tab-size: 2; }
+  .fm-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .fm-binary { color: var(--muted); margin: 8px 0; }
+  .fm-editor .btn-primary, .fm-editor .btn-neutral { margin-top: 8px; }

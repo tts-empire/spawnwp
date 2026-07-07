@@ -654,6 +654,7 @@ function renderTop(p) {
       ${p.mail_url ? `<button class="btn-db btn-sm" onclick="window.open('${esc(p.mail_url)}','_blank','noopener')" title="Open Mailpit (captured mail)">✉️ Mailpit ▸</button>` : ''}
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
       <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
+      <button class="btn-neutral btn-sm" onclick="showFiles('${p.name}')" title="Browse, edit and upload this site's files">📂 Files</button>
       <button class="btn-neutral btn-sm" onclick="toggleWpCli('${p.name}')" title="Run WP-CLI commands inside this site">⌨ WP-CLI</button>
       ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
@@ -1220,6 +1221,212 @@ async function applyPhpIni(name, btn) {
     btn.disabled = false;
     btn.textContent = 'Apply (restarts php, ~2s)';
   }
+}
+
+// ── Per-site file manager (jailed inside the site's php container) ────────────
+// File names are arbitrary, so handlers are attached in JS (never interpolated
+// into inline onclick, which only ever carries the slug-validated site name).
+const FM_VIEW_CAP = 1024 * 1024;   // matches the backend inline-view cap (1 MiB)
+
+async function showFiles(name, path = '') {
+  const body = getOutputBox(`out-${name}`);
+  appendLine(body, '📂 Loading files…');
+  let data;
+  try {
+    const res = await fetch(`${BASE}/files/${encodeURIComponent(name)}?path=${encodeURIComponent(path)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+    data = await res.json();
+  } catch (e) { body.textContent = ''; appendLine(body, '❌ ' + e.message, true); return; }
+  body.textContent = '';
+
+  const panel = document.createElement('div');
+  panel.className = 'fm-panel';
+
+  const bar = document.createElement('div');
+  bar.className = 'fm-bar';
+  const crumb = document.createElement('div');
+  crumb.className = 'fm-crumb';
+  const crumbLink = (label, p) => {
+    const a = document.createElement('a');
+    a.href = '#'; a.textContent = label;
+    a.onclick = e => { e.preventDefault(); showFiles(name, p); };
+    return a;
+  };
+  crumb.appendChild(crumbLink('🏠 ' + name, ''));
+  let acc = '';
+  (data.path ? data.path.split('/') : []).forEach(seg => {
+    acc = acc ? acc + '/' + seg : seg;
+    crumb.append(' / '); crumb.appendChild(crumbLink(seg, acc));
+  });
+  bar.appendChild(crumb);
+
+  const actions = document.createElement('div');
+  actions.className = 'fm-actions';
+  const mkBtn = (label, cls, title, fn) => {
+    const b = document.createElement('button');
+    b.className = cls; b.textContent = label; if (title) b.title = title;
+    b.onclick = fn; return b;
+  };
+  actions.append(
+    mkBtn('⬆ Upload', 'btn-neutral btn-sm sensitive', 'Upload a file here', () => fmUpload(name, data.path)),
+    mkBtn('📁 New folder', 'btn-neutral btn-sm sensitive', 'Create a folder here', () => fmMkdir(name, data.path)),
+    mkBtn('⟳', 'icon-btn', 'Refresh', () => showFiles(name, data.path)),
+  );
+  bar.appendChild(actions);
+  panel.appendChild(bar);
+
+  const table = document.createElement('table');
+  table.className = 'fm-table';
+  for (const ent of data.entries) {
+    const join = data.path ? data.path + '/' + ent.name : ent.name;
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'fm-name';
+    const icon = ent.type === 'dir' ? '📁' : ent.type === 'link' ? '🔗' : '📄';
+    const a = document.createElement('a');
+    a.href = '#'; a.textContent = `${icon} ${ent.name}`;
+    a.onclick = ent.type === 'dir'
+      ? (e => { e.preventDefault(); showFiles(name, join); })
+      : (e => { e.preventDefault(); fmView(name, join, ent.size); });
+    nameTd.appendChild(a);
+
+    const sizeTd = document.createElement('td');
+    sizeTd.className = 'fm-size';
+    sizeTd.textContent = ent.type === 'dir' ? '—' : humanBytes(ent.size);
+
+    const timeTd = document.createElement('td');
+    timeTd.className = 'fm-time';
+    timeTd.textContent = ent.mtime
+      ? new Date(ent.mtime * 1000).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
+      : '';
+
+    const actTd = document.createElement('td');
+    actTd.className = 'fm-row-actions';
+    if (ent.type !== 'dir') {
+      actTd.appendChild(mkBtn('⬇', 'icon-btn', 'Download', () => fmDownload(name, join)));
+    }
+    actTd.appendChild(mkBtn('✎', 'icon-btn sensitive', 'Rename / move', () => fmRename(name, join, data.path)));
+    actTd.appendChild(mkBtn('🗑', 'icon-btn sensitive', 'Delete', () => fmDelete(name, join, ent.type, data.path)));
+
+    tr.append(nameTd, sizeTd, timeTd, actTd);
+    table.appendChild(tr);
+  }
+  panel.appendChild(table);
+  if (!data.entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'fm-empty'; empty.textContent = 'Empty folder';
+    panel.appendChild(empty);
+  }
+  body.appendChild(panel);
+}
+
+function fmDownload(name, path) {
+  const a = document.createElement('a');
+  a.href = `${BASE}/files/${encodeURIComponent(name)}/download?path=${encodeURIComponent(path)}`;
+  a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+}
+
+async function fmView(name, path, size) {
+  if (size > FM_VIEW_CAP) { showToast('File too large to view — downloading instead'); fmDownload(name, path); return; }
+  let data;
+  try {
+    const res = await fetch(`${BASE}/files/${encodeURIComponent(name)}/read?path=${encodeURIComponent(path)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+    data = await res.json();
+  } catch (e) { showToast(e.message, true); return; }
+  const body = document.getElementById(`out-${name}-body`);
+  body.textContent = '';
+  const dir = path.split('/').slice(0, -1).join('/');
+  const wrap = document.createElement('div');
+  wrap.className = 'fm-editor';
+  const head = document.createElement('div');
+  head.className = 'fm-editor-head';
+  const back = document.createElement('a');
+  back.href = '#'; back.textContent = '← Back'; back.onclick = e => { e.preventDefault(); showFiles(name, dir); };
+  const title = document.createElement('span');
+  title.className = 'fm-editor-title'; title.textContent = path;
+  head.append(back, title);
+  wrap.appendChild(head);
+  if (data.binary) {
+    const p = document.createElement('p');
+    p.className = 'fm-binary'; p.textContent = 'Binary file — use Download to save it.';
+    const dl = document.createElement('button');
+    dl.className = 'btn-neutral btn-sm'; dl.textContent = '⬇ Download'; dl.onclick = () => fmDownload(name, path);
+    wrap.append(p, dl);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.className = 'fm-textarea'; ta.spellcheck = false; ta.value = data.content;
+    const save = document.createElement('button');
+    save.className = 'btn-primary btn-sm sensitive'; save.textContent = '💾 Save';
+    save.onclick = () => fmSave(name, path, ta, save);
+    wrap.append(ta, save);
+  }
+  body.appendChild(wrap);
+}
+
+async function fmSave(name, path, ta, btn) {
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/write`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, content: ta.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    showToast(`Saved ${path}`);
+  } catch (e) { showToast(e.message, true); }
+  btn.disabled = false; btn.textContent = '💾 Save';
+}
+
+async function fmMkdir(name, dir) {
+  const folder = prompt('New folder name:');
+  if (!folder) return;
+  await fmMutate(name, 'mkdir', { path: dir ? dir + '/' + folder : folder }, dir, `Created ${folder}`);
+}
+
+async function fmRename(name, path, dir) {
+  const to = prompt('Rename / move to (path relative to the site root):', path);
+  if (!to || to === path) return;
+  await fmMutate(name, 'rename', { path, to }, dir, `Moved to ${to}`);
+}
+
+async function fmDelete(name, path, type, dir) {
+  if (!confirm(`Delete ${type === 'dir' ? 'folder' : 'file'} "${path}"? This cannot be undone.`)) return;
+  await fmMutate(name, 'delete', { path }, dir, `Deleted ${path}`);
+}
+
+async function fmMutate(name, verb, payload, dir, okMsg) {
+  try {
+    const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/${verb}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    showToast(okMsg);
+    showFiles(name, dir);
+  } catch (e) { showToast(e.message, true); }
+}
+
+function fmUpload(name, dir) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('path', dir || '');
+    fd.append('file', file);
+    showToast(`Uploading ${file.name}…`);
+    try {
+      const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/upload`, { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      showToast(`Uploaded ${file.name}`);
+      showFiles(name, dir);
+    } catch (e) { showToast(e.message, true); }
+  };
+  input.click();
 }
 
 // ── Temporary sites: expiry badge + extend/make-permanent ────────────────────

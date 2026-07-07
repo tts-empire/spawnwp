@@ -1,6 +1,8 @@
 import asyncio
+import base64
 import json
 import os
+import posixpath
 import re
 import shlex
 import shutil
@@ -9,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,6 +30,17 @@ app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(ingest_router)
 
+# POST endpoints that require a *recent* passkey re-auth (step-up), beyond a
+# valid session. Static high-impact actions plus the per-site file-manager
+# writes (whose paths carry a {project} segment, matched by regex).
+DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
+                     "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings"}
+FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir)$")
+
+
+def requires_recent_auth(path: str) -> bool:
+    return path in DESTRUCTIVE_PATHS or bool(FILE_WRITE_RE.match(path))
+
 
 @app.middleware("http")
 async def application_authentication(request: Request, call_next):
@@ -38,8 +51,6 @@ async def application_authentication(request: Request, call_next):
         "/api/auth/fallback",
     } or path.startswith("/api/ingest/")  # signed-request auth lives in ingest.py
     active = None if public else auth_session(request)
-    destructive = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
-                   "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings"}
     if not public and not active:
         if path.startswith("/api/"):
             response = JSONResponse({"detail": "Authentication required"}, status_code=401)
@@ -47,7 +58,7 @@ async def application_authentication(request: Request, call_next):
             response = RedirectResponse("/login", status_code=303)
     elif active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
         response = JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
-    elif active and request.method == "POST" and path in destructive and int(__import__("time").time()) - active["recent_auth"] > 600:
+    elif active and request.method == "POST" and requires_recent_auth(path) and int(__import__("time").time()) - active["recent_auth"] > 600:
         response = JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     else:
         response = await call_next(request)
@@ -1052,6 +1063,262 @@ def set_php_ini(project: str, body: PhpIniSettings):
     if result.returncode != 0:
         raise HTTPException(500, output.splitlines()[-1] if output else "Failed to apply PHP settings")
     return {"project": proj.name, "settings": body.model_dump(), "output": output}
+
+
+# ── Per-site file manager (jailed inside the site's php container) ────────────
+# Every operation runs `docker compose exec -T -u www-data php <op>` rooted at
+# /var/www/html. The container boundary IS the jail: a path-traversal bug cannot
+# reach the host or another site, and running as www-data (uid 33) keeps files
+# owned the way php-fpm needs. Reads are open; writes/uploads/deletes go through
+# the middleware's recent-auth step-up (see requires_recent_auth / FILE_WRITE_RE).
+
+DOCROOT = "/var/www/html"
+FILE_VIEW_CAP = 1024 * 1024        # inline text view / editor cap: 1 MiB
+FILE_UPLOAD_CAP = 2 * 1024 ** 3    # single-file upload cap: 2 GiB
+
+
+def jail_path(rel: str) -> str:
+    """Resolve a client path relative to the container docroot.
+
+    Rejects absolute paths, NUL/newline, and anything that escapes the docroot
+    after normalisation. Returns an absolute in-container path under DOCROOT.
+    """
+    rel = rel or ""
+    if any(c in rel for c in ("\x00", "\n", "\r")):
+        raise HTTPException(400, "Invalid path")
+    if rel.startswith("/"):
+        raise HTTPException(400, "Path must be relative to the site root")
+    normalized = posixpath.normpath(rel)
+    if normalized in (".", ""):
+        return DOCROOT
+    if normalized == ".." or normalized.startswith("../"):
+        raise HTTPException(400, "Path escapes the site root")
+    return f"{DOCROOT}/{normalized}"
+
+
+def _rel(path: str) -> str:
+    """The normalised relative path echoed back to the client ('' = root)."""
+    norm = posixpath.normpath(path or "")
+    return "" if norm in (".", "") else norm
+
+
+def _php_exec(proj: Path, argv: list[str], input_bytes: bytes | None = None):
+    """Run a command inside the site's php container as www-data (argv, no shell)."""
+    return subprocess.run(
+        ["docker", "compose", "exec", "-T", "-u", "www-data", "php", *argv],
+        cwd=proj, input=input_bytes, capture_output=True, timeout=120,
+    )
+
+
+def _exec_error(result) -> HTTPException:
+    err = (result.stderr.decode(errors="replace") if isinstance(result.stderr, bytes)
+           else (result.stderr or "")).strip()
+    low = err.lower()
+    if "not running" in low or "no container" in low:
+        return HTTPException(409, "The site is down: bring it Up to browse its files")
+    if "no such file" in low or "cannot stat" in low or "not found" in low:
+        return HTTPException(404, "Path not found")
+    return HTTPException(400, err.splitlines()[-1] if err else "File operation failed")
+
+
+class FilePath(BaseModel):
+    path: str
+
+
+class FileWrite(BaseModel):
+    path: str
+    content: str
+
+
+class FileRename(BaseModel):
+    path: str
+    to: str
+
+
+@app.get("/api/files/{project}")
+def files_list(project: str, path: str = ""):
+    """List one directory level inside the site's docroot."""
+    proj = resolve_project(project)
+    target = jail_path(path)
+    result = _php_exec(proj, [
+        "find", target, "-maxdepth", "1", "-mindepth", "1",
+        "-printf", "%y\\t%s\\t%T@\\t%m\\t%f\\n",
+    ])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    entries = []
+    for line in result.stdout.decode(errors="replace").splitlines():
+        parts = line.split("\t")
+        if len(parts) != 5:
+            continue
+        typ, size, mtime, mode, name = parts
+        entries.append({
+            "name": name,
+            "type": "dir" if typ == "d" else "link" if typ == "l" else "file",
+            "size": int(size) if size.isdigit() else 0,
+            "mtime": float(mtime) if mtime.replace(".", "", 1).isdigit() else 0,
+            "mode": mode,
+        })
+    entries.sort(key=lambda e: (e["type"] != "dir", e["name"].lower()))
+    return {"project": proj.name, "path": _rel(path), "entries": entries}
+
+
+def _stat_kind_size(proj: Path, target: str) -> tuple[str, int]:
+    info = _php_exec(proj, ["stat", "-c", "%F\t%s", target])
+    if info.returncode != 0:
+        raise _exec_error(info)
+    kind, _, size = info.stdout.decode(errors="replace").strip().partition("\t")
+    return kind, int(size) if size.isdigit() else 0
+
+
+@app.get("/api/files/{project}/read")
+def files_read(project: str, path: str):
+    """Return a text file's content for inline viewing/editing (capped)."""
+    proj = resolve_project(project)
+    if _rel(path) == "":
+        raise HTTPException(400, "Not a file")
+    target = jail_path(path)
+    kind, size = _stat_kind_size(proj, target)
+    if "directory" in kind:
+        raise HTTPException(400, "Path is a directory")
+    if size > FILE_VIEW_CAP:
+        raise HTTPException(413, "File too large to view inline — download it instead")
+    data = _php_exec(proj, ["base64", target])
+    if data.returncode != 0:
+        raise _exec_error(data)
+    raw = base64.b64decode(data.stdout)
+    try:
+        return {"project": proj.name, "path": _rel(path), "binary": False,
+                "size": len(raw), "content": raw.decode("utf-8")}
+    except UnicodeDecodeError:
+        return {"project": proj.name, "path": _rel(path), "binary": True,
+                "size": len(raw), "content": ""}
+
+
+@app.get("/api/files/{project}/download")
+def files_download(project: str, path: str):
+    """Stream a file out as an attachment (raw bytes, any size)."""
+    proj = resolve_project(project)
+    if _rel(path) == "":
+        raise HTTPException(400, "Not a file")
+    target = jail_path(path)
+    kind, _ = _stat_kind_size(proj, target)
+    if "directory" in kind:
+        raise HTTPException(400, "Path is a directory")
+
+    def stream():
+        proc = subprocess.Popen(
+            ["docker", "compose", "exec", "-T", "-u", "www-data", "php", "cat", target],
+            cwd=proj, stdout=subprocess.PIPE,
+        )
+        try:
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            proc.stdout.close()
+            proc.wait()
+
+    safe = posixpath.basename(target).replace('"', "").replace("\\", "") or "download"
+    return StreamingResponse(
+        stream(), media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+    )
+
+
+@app.post("/api/files/{project}/write")
+def files_write(project: str, body: FileWrite):
+    proj = resolve_project(project)
+    if _rel(body.path) == "":
+        raise HTTPException(400, "Provide a file path")
+    target = jail_path(body.path)
+    guard_not_busy()
+    data = body.content.encode("utf-8")
+    if len(data) > FILE_VIEW_CAP:
+        raise HTTPException(413, "Content too large for the editor")
+    result = _php_exec(proj, ["dd", "of=" + target, "status=none"], input_bytes=data)
+    if result.returncode != 0:
+        raise _exec_error(result)
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": _rel(body.path), "bytes": len(data)}
+
+
+@app.post("/api/files/{project}/upload")
+async def files_upload(project: str, path: str = Form(""), file: UploadFile = File(...)):
+    proj = resolve_project(project)
+    name = posixpath.basename(file.filename or "").strip()
+    if not name or name in (".", ".."):
+        raise HTTPException(400, "Invalid upload filename")
+    target = jail_path(posixpath.join(_rel(path), name))
+    guard_not_busy()
+    proc = subprocess.Popen(
+        ["docker", "compose", "exec", "-T", "-u", "www-data", "php",
+         "dd", "of=" + target, "status=none"],
+        cwd=proj, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    total = 0
+    try:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > FILE_UPLOAD_CAP:
+                proc.kill()
+                raise HTTPException(413, "Upload exceeds the 2 GiB per-file limit")
+            proc.stdin.write(chunk)
+    finally:
+        if proc.stdin and not proc.stdin.closed:
+            proc.stdin.close()
+    stderr = proc.stderr.read() if proc.stderr else b""
+    if proc.wait() != 0:
+        raise _exec_error(subprocess.CompletedProcess(proc.args, proc.returncode, b"", stderr))
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": _rel(posixpath.join(_rel(path), name)), "bytes": total}
+
+
+@app.post("/api/files/{project}/mkdir")
+def files_mkdir(project: str, body: FilePath):
+    proj = resolve_project(project)
+    if _rel(body.path) == "":
+        raise HTTPException(400, "Provide a folder path")
+    target = jail_path(body.path)
+    guard_not_busy()
+    result = _php_exec(proj, ["mkdir", "-p", "--", target])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": _rel(body.path)}
+
+
+@app.post("/api/files/{project}/rename")
+def files_rename(project: str, body: FileRename):
+    proj = resolve_project(project)
+    if _rel(body.path) == "" or _rel(body.to) == "":
+        raise HTTPException(400, "Refusing to move the site root")
+    src, dst = jail_path(body.path), jail_path(body.to)
+    guard_not_busy()
+    result = _php_exec(proj, ["mv", "--", src, dst])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": _rel(body.path), "to": _rel(body.to)}
+
+
+@app.post("/api/files/{project}/delete")
+def files_delete(project: str, body: FilePath):
+    proj = resolve_project(project)
+    if _rel(body.path) == "":
+        raise HTTPException(400, "Refusing to delete the site root")
+    target = jail_path(body.path)
+    guard_not_busy()
+    result = _php_exec(proj, ["rm", "-rf", "--", target])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": _rel(body.path)}
 
 
 # ── System info: PHP image inventory + manual lifecycle ───────────────────────

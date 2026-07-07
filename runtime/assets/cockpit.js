@@ -752,6 +752,7 @@ function getOutputBox(id) {
   const vis = document.getElementById(id + '-visual');
   if (vis) { vis.style.display = 'none'; vis.innerHTML = ''; }
   const body = document.getElementById(id + '-body');
+  body.classList.remove('fm-mode');   // reset: other consumers use the capped box
   body.textContent = '';
   body.style.display = '';
   return body;
@@ -1238,6 +1239,7 @@ async function showFiles(name, path = '') {
     data = await res.json();
   } catch (e) { body.textContent = ''; appendLine(body, '❌ ' + e.message, true); return; }
   body.textContent = '';
+  body.classList.add('fm-mode');
 
   const panel = document.createElement('div');
   panel.className = 'fm-panel';
@@ -1312,12 +1314,15 @@ async function showFiles(name, path = '') {
     tr.append(nameTd, sizeTd, timeTd, actTd);
     table.appendChild(tr);
   }
-  panel.appendChild(table);
+  const list = document.createElement('div');
+  list.className = 'fm-list';
+  list.appendChild(table);
   if (!data.entries.length) {
     const empty = document.createElement('div');
     empty.className = 'fm-empty'; empty.textContent = 'Empty folder';
-    panel.appendChild(empty);
+    list.appendChild(empty);
   }
+  panel.appendChild(list);
   body.appendChild(panel);
 }
 
@@ -1337,6 +1342,7 @@ async function fmView(name, path, size) {
   } catch (e) { showToast(e.message, true); return; }
   const body = document.getElementById(`out-${name}-body`);
   body.textContent = '';
+  body.classList.add('fm-mode');
   const dir = path.split('/').slice(0, -1).join('/');
   const wrap = document.createElement('div');
   wrap.className = 'fm-editor';

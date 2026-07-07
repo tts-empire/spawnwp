@@ -337,6 +337,10 @@
   .card-badges { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 
   /* Per-site file manager panel rendered inside a site's output box (Manage). */
+  /* In file-manager mode the outer output box stops scrolling: the inner list
+     (.fm-list) or the editor textarea owns the single scrollbar. */
+  .output-body.fm-mode { max-height: none; overflow: visible; padding: 0; }
+  .fm-list { max-height: 360px; overflow-y: auto; }
   .fm-panel { padding: 10px 12px; font-size: var(--font-control); }
   .fm-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .fm-crumb { font-family: monospace; font-size: 12px; color: var(--muted); word-break: break-all; }

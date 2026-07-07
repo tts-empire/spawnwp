@@ -4,6 +4,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.11
+
+- **File browser: a single, clearer scrollbar.** In the per-site file browser the panel's
+  inner content now owns scrolling — the folder list scrolls under a fixed breadcrumb, and
+  the file editor scrolls in its textarea — instead of nesting a second scrollbar inside the
+  card's output box. No more two near-identical vertical scrollbars side by side.
+
 ## 0.5.10
 
 - **Fix: the file browser upload no longer requires an extra dependency.** The 0.5.9 upload

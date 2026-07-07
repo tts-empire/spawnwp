@@ -4,6 +4,15 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.10
+
+- **Fix: the file browser upload no longer requires an extra dependency.** The 0.5.9 upload
+  endpoint used multipart form data, which needs `python-multipart` — not present in the
+  cockpit environment — so the cockpit failed to start after updating. Uploads now send the
+  file as the raw request body, removing the dependency. Update straight from 0.5.8 or
+  earlier to get the file browser working; anyone who landed on 0.5.9 should update to this
+  release.
+
 ## 0.5.9
 
 - **Per-site file browser in the cockpit.** Each site card gains a **📂 Files** action that

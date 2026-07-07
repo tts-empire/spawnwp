@@ -1414,12 +1414,11 @@ function fmUpload(name, dir) {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append('path', dir || '');
-    fd.append('file', file);
     showToast(`Uploading ${file.name}…`);
     try {
-      const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/upload`, { method: 'POST', body: fd });
+      const url = `${BASE}/files/${encodeURIComponent(name)}/upload`
+        + `?path=${encodeURIComponent(dir || '')}&filename=${encodeURIComponent(file.name)}`;
+      const res = await sensitiveFetch(url, { method: 'POST', body: file });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || res.statusText);
       showToast(`Uploaded ${file.name}`);

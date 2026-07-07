@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -1246,9 +1246,11 @@ def files_write(project: str, body: FileWrite):
 
 
 @app.post("/api/files/{project}/upload")
-async def files_upload(project: str, path: str = Form(""), file: UploadFile = File(...)):
+async def files_upload(project: str, request: Request, path: str = "", filename: str = ""):
+    # The file rides in the raw request body (no multipart, so no python-multipart
+    # dependency); the destination folder and name come as query parameters.
     proj = resolve_project(project)
-    name = posixpath.basename(file.filename or "").strip()
+    name = posixpath.basename(filename or "").strip()
     if not name or name in (".", ".."):
         raise HTTPException(400, "Invalid upload filename")
     target = jail_path(posixpath.join(_rel(path), name))
@@ -1260,10 +1262,9 @@ async def files_upload(project: str, path: str = Form(""), file: UploadFile = Fi
     )
     total = 0
     try:
-        while True:
-            chunk = await file.read(1024 * 1024)
+        async for chunk in request.stream():
             if not chunk:
-                break
+                continue
             total += len(chunk)
             if total > FILE_UPLOAD_CAP:
                 proc.kill()

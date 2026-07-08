@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Manage · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.12">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.13">
 </head>
 <body data-page="manage">
   <header>
@@ -20,6 +20,10 @@
   </header>
   <main>
     <div class="sys-banner" id="sys-banner"><span id="sys-banner-text">System under load</span></div>
+    <div class="passkey-nudge" id="passkey-nudge" hidden>
+      <div class="passkey-nudge-text"><strong>Add a passkey for faster sign-in.</strong> You're signed in with your password and authenticator code. A passkey uses this device's PIN or biometrics, your phone, or a security key — and resists phishing.</div>
+      <div class="passkey-nudge-actions"><button class="btn-primary btn-sm" type="button" id="passkey-nudge-add" onclick="addPasskey()">Add a passkey</button><button class="btn-neutral btn-sm" type="button" onclick="dismissPasskeyNudge()">Not now</button></div>
+    </div>
     <section class="resource-summary" aria-label="Host resources">
       <div class="resource-ring" id="kpi-ram"><div class="ring"><div class="ring-core"><strong id="host-ram-pct">0%</strong></div></div><div><span>RAM</span><small id="host-ram-text">Loading</small></div></div>
       <div class="resource-ring" id="kpi-disk"><div class="ring"><div class="ring-core"><strong id="host-disk-pct">0%</strong></div></div><div><span>Disk</span><small id="host-disk-text">Loading</small></div></div>
@@ -32,6 +36,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.12"></script>
+  <script src="/assets/cockpit.js?v=0.5.13"></script>
 </body>
 </html>

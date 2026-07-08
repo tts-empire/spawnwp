@@ -261,9 +261,18 @@ class SetupStart(BaseModel):
 
 class CeremonyFinish(BaseModel):
     ceremony: str
-    credential: dict
+    # Optional: an administrator without a platform authenticator (e.g. no Windows
+    # Hello) may complete activation with password + TOTP alone and add a passkey
+    # later from the cockpit. When present, the passkey is registered here.
+    credential: dict | None = None
     totp: str = Field(pattern=r"^\d{6}$")
     passkey_name: str = Field(default="Primary passkey", min_length=1, max_length=64)
+
+
+class PasskeyRegister(BaseModel):
+    ceremony: str
+    credential: dict
+    passkey_name: str = Field(default="Passkey", min_length=1, max_length=64)
 
 
 class PasskeyFinish(BaseModel):
@@ -280,8 +289,14 @@ class FallbackLogin(BaseModel):
 @router.get("/state")
 def auth_state(request: Request):
     active = session(request)
+    has_passkey = False
+    if active:
+        with db() as connection:
+            has_passkey = connection.execute(
+                "SELECT 1 FROM passkeys WHERE admin_id=? LIMIT 1", (active["admin_id"],)
+            ).fetchone() is not None
     return {"enrolled": is_enrolled(), "authenticated": bool(active),
-            "username": active["username"] if active else None}
+            "username": active["username"] if active else None, "has_passkey": has_passkey}
 
 
 @router.post("/setup/start")
@@ -300,6 +315,7 @@ def setup_start(body: SetupStart, request: Request):
     user_id = secrets.token_bytes(32)
     options = generate_registration_options(
         rp_id=rp_id, rp_name="SpawnWP", user_name=body.username, user_id=user_id,
+        timeout=180000,
         authenticator_selection=AuthenticatorSelectionCriteria(
             resident_key=ResidentKeyRequirement.PREFERRED,
             user_verification=UserVerificationRequirement.REQUIRED,
@@ -336,13 +352,15 @@ def setup_finish(body: CeremonyFinish, request: Request, response: Response):
                 "app that supports SHA-256 (Aegis, 2FAS, 1Password, Bitwarden) instead of "
                 "typing the secret by hand."
             ))
-        try:
-            verified = verify_registration_response(
-                credential=body.credential, expected_challenge=challenge["challenge"],
-                expected_rp_id=rp_id, expected_origin=origin, require_user_verification=True,
-            )
-        except Exception as exc:
-            raise HTTPException(400, "Passkey registration failed") from exc
+        verified = None
+        if body.credential is not None:
+            try:
+                verified = verify_registration_response(
+                    credential=body.credential, expected_challenge=challenge["challenge"],
+                    expected_rp_id=rp_id, expected_origin=origin, require_user_verification=True,
+                )
+            except Exception as exc:
+                raise HTTPException(400, "Passkey registration failed") from exc
         now = int(time.time())
         cursor = connection.execute(
             "INSERT INTO admins(user_id,username,password_hash,totp_secret,last_totp_step,created_at) VALUES(?,?,?,?,?,?)",
@@ -350,11 +368,12 @@ def setup_finish(body: CeremonyFinish, request: Request, response: Response):
              payload["totp"], totp.timecode(__import__("datetime").datetime.now()), now),
         )
         admin_id = cursor.lastrowid
-        connection.execute(
-            "INSERT INTO passkeys(admin_id,credential_id,public_key,sign_count,transports,name,created_at) VALUES(?,?,?,?,?,?,?)",
-            (admin_id, verified.credential_id, verified.credential_public_key, verified.sign_count,
-             json.dumps(body.credential.get("response", {}).get("transports", [])), body.passkey_name, now),
-        )
+        if verified is not None:
+            connection.execute(
+                "INSERT INTO passkeys(admin_id,credential_id,public_key,sign_count,transports,name,created_at) VALUES(?,?,?,?,?,?,?)",
+                (admin_id, verified.credential_id, verified.credential_public_key, verified.sign_count,
+                 json.dumps(body.credential.get("response", {}).get("transports", [])), body.passkey_name, now),
+            )
         codes = [f"{secrets.token_hex(4)}-{secrets.token_hex(4)}" for _ in range(10)]
         connection.executemany("INSERT INTO recovery_codes(admin_id,code_hash) VALUES(?,?)",
                                [(admin_id, _digest(code)) for code in codes])
@@ -373,7 +392,7 @@ def passkey_start(request: Request):
     rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
     options = generate_authentication_options(
         rp_id=rp_id, allow_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in rows],
-        user_verification=UserVerificationRequirement.REQUIRED,
+        user_verification=UserVerificationRequirement.REQUIRED, timeout=180000,
     )
     return {"ceremony": _challenge("login", options.challenge, {}),
             "publicKey": json.loads(options_to_json(options))}
@@ -421,7 +440,7 @@ def reauth_start(request: Request):
     options = generate_authentication_options(
         rp_id=rp_id,
         allow_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in rows],
-        user_verification=UserVerificationRequirement.REQUIRED,
+        user_verification=UserVerificationRequirement.REQUIRED, timeout=180000,
     )
     token = request.cookies.get(COOKIE, "")
     payload = {"admin_id": active["admin_id"], "session_hash": _digest(token)}
@@ -479,6 +498,79 @@ def reauth_finish(body: PasskeyFinish, request: Request):
         )
         _audit(connection, "reauth_success", request, "passkey")
     return {"ok": True, "recent_auth": now}
+
+
+@router.post("/passkey/register/start")
+def passkey_register_start(request: Request):
+    # Add a passkey to an already-enrolled administrator (e.g. one who activated
+    # with password + TOTP only). Session + CSRF are enforced by the app middleware;
+    # this is deliberately NOT gated by the passkey step-up, since the caller may
+    # have no passkey yet to re-authenticate with.
+    active = session(request, touch=False)
+    if not active:
+        raise HTTPException(401, "Authentication required")
+    with db() as connection:
+        admin = connection.execute("SELECT * FROM admins WHERE id=?", (active["admin_id"],)).fetchone()
+        existing = connection.execute(
+            "SELECT credential_id FROM passkeys WHERE admin_id=?", (active["admin_id"],)
+        ).fetchall()
+    rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
+    options = generate_registration_options(
+        rp_id=rp_id, rp_name="SpawnWP", user_name=admin["username"], user_id=admin["user_id"],
+        timeout=180000,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+        exclude_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in existing],
+    )
+    token = request.cookies.get(COOKIE, "")
+    payload = {"admin_id": active["admin_id"], "session_hash": _digest(token)}
+    return {"ceremony": _challenge("register", options.challenge, payload),
+            "publicKey": json.loads(options_to_json(options))}
+
+
+@router.post("/passkey/register/finish")
+def passkey_register_finish(body: PasskeyRegister, request: Request):
+    active = session(request, touch=False)
+    if not active:
+        raise HTTPException(401, "Authentication required")
+    token = request.cookies.get(COOKIE, "")
+    session_hash = _digest(token)
+    with db(immediate=True) as connection:
+        challenge = _consume_challenge(connection, body.ceremony, "register")
+    payload = json.loads(challenge["payload"])
+    if payload.get("admin_id") != active["admin_id"] or not hmac.compare_digest(
+        payload.get("session_hash", ""), session_hash
+    ):
+        with db(immediate=True) as connection:
+            _audit(connection, "passkey_register_rejected", request, "session mismatch")
+        raise HTTPException(400, "Registration ceremony does not belong to this session")
+    rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
+    origin = f"https://{rp_id}"
+    try:
+        verified = verify_registration_response(
+            credential=body.credential, expected_challenge=challenge["challenge"],
+            expected_rp_id=rp_id, expected_origin=origin, require_user_verification=True,
+        )
+    except Exception as exc:
+        with db(immediate=True) as connection:
+            _audit(connection, "passkey_register_rejected", request, "passkey")
+        raise HTTPException(400, "Passkey registration failed") from exc
+    now = int(time.time())
+    try:
+        with db(immediate=True) as connection:
+            connection.execute(
+                "INSERT INTO passkeys(admin_id,credential_id,public_key,sign_count,transports,name,created_at) VALUES(?,?,?,?,?,?,?)",
+                (active["admin_id"], verified.credential_id, verified.credential_public_key,
+                 verified.sign_count,
+                 json.dumps(body.credential.get("response", {}).get("transports", [])),
+                 body.passkey_name, now),
+            )
+            _audit(connection, "passkey_registered", request)
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(400, "This passkey is already registered") from exc
+    return {"ok": True}
 
 
 @router.post("/fallback")
@@ -547,10 +639,10 @@ LOGIN_HTML = r"""<!doctype html><html lang=en><head><meta charset=utf-8><meta na
 <section id=login><button onclick=passkey()>Sign in with passkey</button><form onsubmit='fallback(event)'><label>Username</label><input id=user autocomplete=username required><label>Password</label><input id=pass type=password autocomplete=current-password required><label>Authenticator code or recovery code</label><input id=second autocomplete=one-time-code required><button class=alt>Sign in with password</button></form></section>
 <section id=setup class=hide>
 <form id=identity onsubmit='startSetup(event)'><p class=step>Step 1 of 3 · Administrator</p><h2>Create cockpit access</h2><p>Use the one-time activation code from the installation report. Then choose the password used when signing in without a passkey; a TOTP or recovery code will also be required.</p><label>One-time activation code</label><input id=boot type=password autocomplete=off required><label>Administrator username</label><input id=newuser autocomplete=username pattern='[A-Za-z0-9_.-]{3,32}' required><label>Password (14+ characters)</label><input id=newpass type=password autocomplete=new-password minlength=14 required><p class=help>Used only when signing in without a passkey. A TOTP or recovery code is also required.</p><button>Continue</button></form>
-<div id=totp class=hide><p class=step>Step 2 of 3 · Two-factor protection</p><h2>Add an authenticator app</h2><p>Scan this QR code with any TOTP authenticator. Examples include 2FAS, Aegis (Android), Google Authenticator, Microsoft Authenticator, 1Password and Bitwarden.</p><img id=qr alt='QR code for the SpawnWP authenticator account'><div class=notice><p class=help>Cannot scan the QR code? Add an account manually with this secret:</p><div class=secret><code id=secret></code></div><button type=button class='alt small' onclick="copyValue('secret',this)">Copy secret</button></div><label>6-digit code shown by the authenticator app</label><input id=otp inputmode=numeric autocomplete=one-time-code pattern='[0-9]{6}' minlength=6 maxlength=6 required><h2>Create a passkey</h2><p>Your browser will ask to save a passkey using this device, its PIN or biometrics, a security key, or your password manager. This is the normal sign-in method.</p><button id=finish type=button onclick=finishSetup()>Verify code and create passkey</button></div>
+<div id=totp class=hide><p class=step>Step 2 of 3 · Two-factor protection</p><h2>Add an authenticator app</h2><p>Scan this QR code with any TOTP authenticator. Examples include 2FAS, Aegis (Android), Google Authenticator, Microsoft Authenticator, 1Password and Bitwarden.</p><img id=qr alt='QR code for the SpawnWP authenticator account'><div class=notice><p class=help>Cannot scan the QR code? Add an account manually with this secret:</p><div class=secret><code id=secret></code></div><button type=button class='alt small' onclick="copyValue('secret',this)">Copy secret</button></div><label>6-digit code shown by the authenticator app</label><input id=otp inputmode=numeric autocomplete=one-time-code pattern='[0-9]{6}' minlength=6 maxlength=6 required><h2>Create a passkey</h2><p>After the code, your browser opens your system's security prompt. Choose Windows Hello, your phone, a security key, or your password manager, and don't close the prompt until the passkey is saved. This is the normal sign-in method.</p><p class='notice help hide' id=pk-hint></p><button id=finish type=button onclick=finishSetup()>Verify code and create passkey</button><button id=skip type=button class=alt onclick=skipPasskey()>Skip — activate with password + code</button><p class=help>No authenticator to hand? Skip now and add a passkey later from the cockpit — sign-in stays available with your password and authenticator code.</p></div>
 <div id=recovery class=hide><p class=step>Step 3 of 3 · Recovery</p><h2>Save your recovery codes</h2><p>Each code works once, together with your password. They will not be shown again. Store them outside this server, preferably in a password manager.</p><div class=codes id=codes></div><button type=button class=alt onclick="copyValue('codes',this)">Copy all recovery codes</button><button onclick="location.href='/manage'">I have stored the codes</button></div>
 </section><p class=err id=err aria-live=polite></p></main><script>
-let ceremony,creation;const $=id=>document.getElementById(id);function b64(v){let s=btoa(String.fromCharCode(...new Uint8Array(v)));return s.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}function bytes(v){v=v.replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(v),c=>c.charCodeAt(0))}function prep(o){o.challenge=bytes(o.challenge);if(o.user)o.user.id=bytes(o.user.id);if(o.excludeCredentials)o.excludeCredentials.forEach(x=>x.id=bytes(x.id));if(o.allowCredentials)o.allowCredentials.forEach(x=>x.id=bytes(x.id));return o}function cred(c){return{id:c.id,rawId:b64(c.rawId),type:c.type,authenticatorAttachment:c.authenticatorAttachment,clientExtensionResults:c.getClientExtensionResults(),response:{clientDataJSON:b64(c.response.clientDataJSON),attestationObject:c.response.attestationObject?b64(c.response.attestationObject):undefined,authenticatorData:c.response.authenticatorData?b64(c.response.authenticatorData):undefined,signature:c.response.signature?b64(c.response.signature):undefined,userHandle:c.response.userHandle?b64(c.response.userHandle):null,transports:c.response.getTransports?c.response.getTransports():[]}}}async function api(url,data){let r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})});let j=await r.json();if(!r.ok)throw Error(j.detail||'Authentication failed');return j}function fail(e){$('err').textContent=e.message||e}function clearError(){$('err').textContent=''}async function copyValue(id,button){try{await navigator.clipboard.writeText($(id).textContent);let old=button.textContent;button.textContent='Copied';setTimeout(()=>button.textContent=old,1500)}catch(e){fail(Error('Copy failed. Select the text and copy it manually.'))}}async function state(){let s=await fetch('/api/auth/state').then(r=>r.json());if(s.authenticated)location.href='/manage';else if(!s.enrolled){$('login').classList.add('hide');$('setup').classList.remove('hide');$('intro').textContent='One-time administrator activation'}}async function startSetup(e){e.preventDefault();clearError();try{let j=await api('/api/auth/setup/start',{bootstrap_code:$('boot').value,username:$('newuser').value,password:$('newpass').value});ceremony=j.ceremony;creation=j.publicKey;$('secret').textContent=j.totp_secret;$('qr').src=j.totp_qr;e.target.classList.add('hide');$('totp').classList.remove('hide');$('otp').focus()}catch(e){fail(e)}}async function finishSetup(){clearError();if(!$('otp').checkValidity()){$('otp').reportValidity();return}if(!window.PublicKeyCredential){fail(Error('This browser cannot create passkeys. Use a current browser with WebAuthn support.'));return}let button=$('finish');button.disabled=true;button.textContent='Waiting for passkey…';try{let c=await navigator.credentials.create({publicKey:prep(structuredClone(creation))});if(!c)throw Error('Passkey creation was cancelled.');let j=await api('/api/auth/setup/finish',{ceremony,credential:cred(c),totp:$('otp').value,passkey_name:'Primary passkey'});$('totp').classList.add('hide');$('recovery').classList.remove('hide');$('codes').textContent=j.recovery_codes.join('\n')}catch(e){fail(e)}finally{button.disabled=false;button.textContent='Verify code and create passkey'}}async function passkey(){clearError();try{let j=await api('/api/auth/passkey/start',{});let c=await navigator.credentials.get({publicKey:prep(j.publicKey)});await api('/api/auth/passkey/finish',{ceremony:j.ceremony,credential:cred(c)});location.href='/manage'}catch(e){fail(e)}}async function fallback(e){e.preventDefault();clearError();try{await api('/api/auth/fallback',{username:$('user').value,password:$('pass').value,second_factor:$('second').value});location.href='/manage'}catch(e){fail(e)}}state().catch(fail);
+let ceremony,creation;const $=id=>document.getElementById(id);function b64(v){let s=btoa(String.fromCharCode(...new Uint8Array(v)));return s.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}function bytes(v){v=v.replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(v),c=>c.charCodeAt(0))}function prep(o){o.challenge=bytes(o.challenge);if(o.user)o.user.id=bytes(o.user.id);if(o.excludeCredentials)o.excludeCredentials.forEach(x=>x.id=bytes(x.id));if(o.allowCredentials)o.allowCredentials.forEach(x=>x.id=bytes(x.id));return o}function cred(c){return{id:c.id,rawId:b64(c.rawId),type:c.type,authenticatorAttachment:c.authenticatorAttachment,clientExtensionResults:c.getClientExtensionResults(),response:{clientDataJSON:b64(c.response.clientDataJSON),attestationObject:c.response.attestationObject?b64(c.response.attestationObject):undefined,authenticatorData:c.response.authenticatorData?b64(c.response.authenticatorData):undefined,signature:c.response.signature?b64(c.response.signature):undefined,userHandle:c.response.userHandle?b64(c.response.userHandle):null,transports:c.response.getTransports?c.response.getTransports():[]}}}async function api(url,data){let r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})});let j=await r.json();if(!r.ok)throw Error(j.detail||'Authentication failed');return j}function fail(e){$('err').textContent=e.message||e}function clearError(){$('err').textContent=''}function passkeyError(e){let n=e&&e.name;if(n==='NotAllowedError')return Error("Passkey creation was cancelled or timed out. Complete the browser's security prompt; if this computer has no Windows Hello/PIN, set one up or use your phone or a security key — or skip and add a passkey later.");if(n==='SecurityError')return Error('Passkeys need a valid HTTPS address. Open the cockpit over its HTTPS URL.');if(n==='InvalidStateError')return Error('A passkey already exists for this device.');if(n==='NotSupportedError')return Error('This browser or device cannot create this passkey. Try Microsoft Edge or Google Chrome.');return e}function secureOk(){if(!window.isSecureContext){fail(Error('Passkeys require a valid HTTPS connection. Open the cockpit over its HTTPS address.'));return false}if(!window.PublicKeyCredential){fail(Error('This browser cannot create passkeys. Use a current browser with WebAuthn support.'));return false}return true}async function hintPlatform(){try{if(window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable){let ok=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();if(!ok){let h=$('pk-hint');h.textContent='This device has no built-in passkey (e.g. Windows Hello). You will be asked to use your phone or a security key — or skip and add a passkey later.';h.classList.remove('hide')}}}catch(e){}}async function copyValue(id,button){try{await navigator.clipboard.writeText($(id).textContent);let old=button.textContent;button.textContent='Copied';setTimeout(()=>button.textContent=old,1500)}catch(e){fail(Error('Copy failed. Select the text and copy it manually.'))}}async function state(){let s=await fetch('/api/auth/state').then(r=>r.json());if(s.authenticated)location.href='/manage';else if(!s.enrolled){$('login').classList.add('hide');$('setup').classList.remove('hide');$('intro').textContent='One-time administrator activation'}}async function startSetup(e){e.preventDefault();clearError();try{let j=await api('/api/auth/setup/start',{bootstrap_code:$('boot').value,username:$('newuser').value,password:$('newpass').value});ceremony=j.ceremony;creation=j.publicKey;$('secret').textContent=j.totp_secret;$('qr').src=j.totp_qr;e.target.classList.add('hide');$('totp').classList.remove('hide');$('otp').focus();hintPlatform()}catch(e){fail(e)}}async function finishSetup(){clearError();if(!$('otp').checkValidity()){$('otp').reportValidity();return}if(!secureOk())return;let button=$('finish');button.disabled=true;button.textContent='Waiting for passkey…';try{let c=await navigator.credentials.create({publicKey:prep(structuredClone(creation))});if(!c)throw Error('Passkey creation was cancelled.');let j=await api('/api/auth/setup/finish',{ceremony,credential:cred(c),totp:$('otp').value,passkey_name:'Primary passkey'});$('totp').classList.add('hide');$('recovery').classList.remove('hide');$('codes').textContent=j.recovery_codes.join('\n')}catch(e){fail(passkeyError(e))}finally{button.disabled=false;button.textContent='Verify code and create passkey'}}async function skipPasskey(){clearError();if(!$('otp').checkValidity()){$('otp').reportValidity();return}let button=$('skip');button.disabled=true;try{let j=await api('/api/auth/setup/finish',{ceremony,totp:$('otp').value});$('totp').classList.add('hide');$('recovery').classList.remove('hide');$('codes').textContent=j.recovery_codes.join('\n')}catch(e){fail(e)}finally{button.disabled=false}}async function passkey(){clearError();if(!secureOk())return;try{let j=await api('/api/auth/passkey/start',{});let c=await navigator.credentials.get({publicKey:prep(j.publicKey)});await api('/api/auth/passkey/finish',{ceremony:j.ceremony,credential:cred(c)});location.href='/manage'}catch(e){fail(passkeyError(e))}}async function fallback(e){e.preventDefault();clearError();try{await api('/api/auth/fallback',{username:$('user').value,password:$('pass').value,second_factor:$('second').value});location.href='/manage'}catch(e){fail(e)}}state().catch(fail);
 </script></body></html>"""
 
 

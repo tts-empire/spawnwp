@@ -46,6 +46,34 @@ function serializeCredential(value) {
     },
   };
 }
+// Registration (create) flavours: convert user.id + excludeCredentials, and
+// serialize the attestation response (not the authentication assertion).
+function prepareCreationPublicKey(options) {
+  options.challenge = webauthnBytes(options.challenge);
+  if (options.user) options.user.id = webauthnBytes(options.user.id);
+  if (options.excludeCredentials) options.excludeCredentials.forEach(item => { item.id = webauthnBytes(item.id); });
+  return options;
+}
+function serializeAttestation(value) {
+  return {
+    id: value.id, rawId: webauthnB64(value.rawId), type: value.type,
+    authenticatorAttachment: value.authenticatorAttachment,
+    clientExtensionResults: value.getClientExtensionResults(),
+    response: {
+      clientDataJSON: webauthnB64(value.response.clientDataJSON),
+      attestationObject: webauthnB64(value.response.attestationObject),
+      transports: value.response.getTransports ? value.response.getTransports() : [],
+    },
+  };
+}
+function passkeyErrorMessage(error) {
+  const name = error && error.name;
+  if (name === 'NotAllowedError') return "Passkey creation was cancelled or timed out. Complete the browser's security prompt; if this computer has no Windows Hello/PIN, set one up or use your phone or a security key.";
+  if (name === 'SecurityError') return 'Passkeys need a valid HTTPS address.';
+  if (name === 'InvalidStateError') return 'This passkey is already registered on this device.';
+  if (name === 'NotSupportedError') return 'This browser or device cannot create this passkey. Try Microsoft Edge or Google Chrome.';
+  return (error && error.message) || String(error);
+}
 
 function reauthDialog() {
   let dialog = document.getElementById('reauth-dialog');
@@ -379,6 +407,49 @@ function showToast(msg, isErr) {
 async function logoutCockpit() {
   await fetch(`${BASE}/auth/logout`, { method: 'POST' });
   location.href = '/login';
+}
+
+// Administrators who activated with password + code have no passkey yet. Nudge
+// them (once per session) to add one, using the same hardened create() flow.
+async function checkPasskeyNudge() {
+  const banner = document.getElementById('passkey-nudge');
+  if (!banner || sessionStorage.getItem('passkey-nudge-dismissed')) return;
+  try {
+    const state = await fetch(`${BASE}/auth/state`, { cache: 'no-store' }).then(response => response.json());
+    if (state.authenticated && state.has_passkey === false) banner.hidden = false;
+  } catch (error) { /* non-blocking */ }
+}
+function dismissPasskeyNudge() {
+  sessionStorage.setItem('passkey-nudge-dismissed', '1');
+  const banner = document.getElementById('passkey-nudge');
+  if (banner) banner.hidden = true;
+}
+async function addPasskey() {
+  const button = document.getElementById('passkey-nudge-add');
+  if (!window.isSecureContext) { showToast('Passkeys require a valid HTTPS connection'); return; }
+  if (!window.PublicKeyCredential) { showToast('This browser cannot create passkeys'); return; }
+  button.disabled = true;
+  button.textContent = 'Waiting for passkey…';
+  try {
+    const startResponse = await fetch(`${BASE}/auth/passkey/register/start`, { method: 'POST' });
+    const start = await startResponse.json();
+    if (!startResponse.ok) throw new Error(start.detail || 'Unable to start passkey registration');
+    const credential = await navigator.credentials.create({ publicKey: prepareCreationPublicKey(start.publicKey) });
+    if (!credential) throw new Error('Passkey creation was cancelled');
+    const finishResponse = await fetch(`${BASE}/auth/passkey/register/finish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ceremony: start.ceremony, credential: serializeAttestation(credential), passkey_name: 'Passkey' }),
+    });
+    const finish = await finishResponse.json();
+    if (!finishResponse.ok) throw new Error(finish.detail || 'Passkey registration failed');
+    showToast('Passkey added — you can now sign in with it');
+    dismissPasskeyNudge();
+  } catch (error) {
+    showToast(passkeyErrorMessage(error));
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Add a passkey';
+  }
 }
 
 async function loadUpdateStatus() {
@@ -1747,7 +1818,7 @@ async function deleteContentBlueprint(id) {
 updateClock();
 loadPlatform();
 if (document.body.dataset.page === 'deploy') loadBlueprints();
-if (document.body.dataset.page === 'manage') loadProjects();
+if (document.body.dataset.page === 'manage') { loadProjects(); checkPasskeyNudge(); }
 if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCapture(); }
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();

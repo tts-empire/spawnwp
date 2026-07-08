@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.13
+
+- **Activation no longer requires a passkey up front.** On a device without a built-in
+  authenticator (e.g. a PC with no Windows Hello/PIN), you can now finish administrator
+  activation with your password and authenticator code, and **add a passkey later** from a
+  one-click banner in the cockpit. Previously the setup screen forced passkey creation, so
+  such machines could get stuck with *“The operation either timed out or was not allowed.”*
+- **Sturdier passkey prompts.** The WebAuthn timeout is raised from 60s to 180s, the setup
+  screen warns up front when a device has no built-in passkey, blocks early on non-HTTPS
+  contexts, and replaces raw browser errors with guidance (what to do on cancel/timeout,
+  missing Windows Hello, or an unsupported browser).
+
 ## 0.5.12
 
 - **Docs link in the cockpit header.** Every cockpit page now has a **Docs ↗** link in the

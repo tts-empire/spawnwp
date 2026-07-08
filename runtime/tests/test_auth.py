@@ -1,3 +1,4 @@
+import hashlib
 import importlib
 import os
 import tempfile
@@ -8,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import pyotp
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, Response
 from starlette.requests import Request
@@ -240,6 +242,107 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("Google Authenticator", page)
         self.assertIn("Verify code and create passkey", page)
         self.assertIn("Copy all recovery codes", page)
+
+    def test_enrollment_page_offers_passkey_less_path_and_hardening(self):
+        page = self.auth.LOGIN_HTML
+        # Skip button + its handler let an admin activate without a passkey.
+        self.assertIn("skipPasskey", page)
+        self.assertIn("Skip — activate with password + code", page)
+        # Hardening: platform hint, secure-context guard, error mapping.
+        self.assertIn("pk-hint", page)
+        self.assertIn("hintPlatform", page)
+        self.assertIn("isSecureContext", page)
+        self.assertIn("passkeyError", page)
+
+    # ── Passkey-less activation and later passkey registration ───────────────
+    def enroll_without_passkey(self):
+        """Run the real setup flow to completion with NO passkey (password +
+        TOTP only) and return an authenticated (request, token, csrf)."""
+        code = self.auth.create_bootstrap()
+        start = self.auth.setup_start(
+            self.auth.SetupStart(bootstrap_code=code, username="admin", password="x" * 14),
+            self.request(),
+        )
+        otp = pyotp.TOTP(start["totp_secret"], digest=hashlib.sha256).now()
+        response = Response()
+        result = self.auth.setup_finish(
+            self.auth.CeremonyFinish(ceremony=start["ceremony"], totp=otp), self.request(), response,
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["recovery_codes"]), 10)
+        cookies = SimpleCookie()
+        for value in response.headers.getlist("set-cookie"):
+            cookies.load(value)
+        token = cookies[self.auth.COOKIE].value
+        csrf = cookies[self.auth.CSRF_COOKIE].value
+        request = self.request(f"{self.auth.COOKIE}={token}; {self.auth.CSRF_COOKIE}={csrf}", csrf)
+        return request
+
+    def test_activation_without_passkey_creates_admin_and_no_passkey(self):
+        request = self.enroll_without_passkey()
+        self.assertTrue(self.auth.is_enrolled())
+        with self.auth.db() as connection:
+            self.assertIsNone(connection.execute("SELECT 1 FROM passkeys").fetchone())
+        state = self.auth.auth_state(request)
+        self.assertTrue(state["authenticated"])
+        self.assertFalse(state["has_passkey"])
+
+    def test_activation_still_requires_a_valid_totp(self):
+        code = self.auth.create_bootstrap()
+        start = self.auth.setup_start(
+            self.auth.SetupStart(bootstrap_code=code, username="admin", password="x" * 14),
+            self.request(),
+        )
+        with self.assertRaises(HTTPException) as raised:
+            self.auth.setup_finish(
+                self.auth.CeremonyFinish(ceremony=start["ceremony"], totp="000000"),
+                self.request(), Response(),
+            )
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertFalse(self.auth.is_enrolled())
+
+    def test_register_passkey_after_activation_sets_has_passkey(self):
+        request = self.enroll_without_passkey()
+        start = self.auth.passkey_register_start(request)
+        with mock.patch.object(self.auth, "verify_registration_response",
+                               return_value=SimpleNamespace(credential_id=b"cid",
+                                                            credential_public_key=b"pk", sign_count=1)):
+            result = self.auth.passkey_register_finish(
+                self.auth.PasskeyRegister(ceremony=start["ceremony"],
+                                          credential={"id": "x", "response": {}}, passkey_name="Test"),
+                request,
+            )
+        self.assertTrue(result["ok"])
+        self.assertTrue(self.auth.auth_state(request)["has_passkey"])
+
+    def test_register_passkey_requires_a_session(self):
+        with self.assertRaises(HTTPException) as raised:
+            self.auth.passkey_register_start(self.request())
+        self.assertEqual(401, raised.exception.status_code)
+
+    def test_register_passkey_rejects_challenge_from_another_session(self):
+        request = self.enroll_without_passkey()
+        start = self.auth.passkey_register_start(request)
+        # A different session for the SAME admin must not consume this ceremony
+        # (the challenge is bound to the originating session's hash).
+        with self.auth.db() as connection:
+            admin_id = connection.execute("SELECT id FROM admins LIMIT 1").fetchone()[0]
+        foreign = Response()
+        self.auth._set_session(foreign, admin_id)
+        cookies = SimpleCookie()
+        for value in foreign.headers.getlist("set-cookie"):
+            cookies.load(value)
+        token = cookies[self.auth.COOKIE].value
+        csrf = cookies[self.auth.CSRF_COOKIE].value
+        foreign_request = self.request(
+            f"{self.auth.COOKIE}={token}; {self.auth.CSRF_COOKIE}={csrf}", csrf)
+        with self.assertRaises(HTTPException) as raised:
+            self.auth.passkey_register_finish(
+                self.auth.PasskeyRegister(ceremony=start["ceremony"],
+                                          credential={"id": "x", "response": {}}),
+                foreign_request,
+            )
+        self.assertEqual(400, raised.exception.status_code)
 
 
 if __name__ == "__main__":

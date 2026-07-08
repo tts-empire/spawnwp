@@ -267,17 +267,33 @@ final class SpawnWP_Deploy_Package {
 			if ( 'plugins' === $kind && in_array( $top, self::DEV_PLUGINS, true ) ) {
 				continue;
 			}
-			if ( self::excluded_path( $relative ) ) {
+			if ( self::excluded_path( $relative, $kind ) ) {
 				continue;
 			}
 			$zip->addFile( $file->getPathname(), $archive_root . '/' . $relative );
 		}
 	}
 
-	private static function excluded_path( string $path ): bool {
+	/**
+	 * Decide whether a relative path should be left out of the package.
+	 *
+	 * Exclusions are kind-aware. Dev/log artefacts (`.git`, `node_modules`,
+	 * `*debug.log`/`*error.log`) are dropped anywhere. The cache/backup/upgrade
+	 * temp directories are user-content concerns, so they are only stripped from
+	 * the `uploads` tree — never from `plugins`, where a source directory named
+	 * e.g. `Upgrade/`, `Cache/` or `Backup/` is legitimate plugin code. Matching
+	 * those names inside plugins used to silently drop autoloaded classes (e.g.
+	 * MetaBox AIO's `MBB\Upgrade\Manager`), breaking the deployed site.
+	 */
+	private static function excluded_path( string $path, string $kind ): bool {
 		$parts = explode( '/', strtolower( $path ) );
+		$always = array( '.git', 'node_modules' );
+		$uploads_only = array( 'cache', 'backups', 'backup', 'upgrade', 'upgrade-temp-backup' );
 		foreach ( $parts as $part ) {
-			if ( in_array( $part, array( 'cache', 'backups', 'backup', 'upgrade', 'upgrade-temp-backup', '.git', 'node_modules' ), true ) ) {
+			if ( in_array( $part, $always, true ) ) {
+				return true;
+			}
+			if ( 'uploads' === $kind && in_array( $part, $uploads_only, true ) ) {
 				return true;
 			}
 		}

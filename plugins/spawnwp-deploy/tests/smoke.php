@@ -66,6 +66,25 @@ foreach ( array( 'class-blueprint.php', 'class-admin.php' ) as $source_file ) {
 	$assert( ! str_contains( $src, 'wp_remote_post(' ) && ! str_contains( $src, 'wp_remote_request(' ), "Outbound requests use the SSRF-guarded API in {$source_file}" );
 }
 
+// Package exclusions must be kind-aware: plugin source directories named
+// Upgrade/Cache/Backup are legitimate code and must survive, while user-content
+// temp/cache dirs are still stripped from uploads. Regression for the MetaBox
+// AIO deploy fatal (MBB\Upgrade\Manager dropped from meta-box-builder).
+$excluded_path = new ReflectionMethod( 'SpawnWP_Deploy_Package', 'excluded_path' );
+$excluded_path->setAccessible( true );
+$excluded = static function ( string $path, string $kind ) use ( $excluded_path ): bool {
+	return (bool) $excluded_path->invoke( null, $path, $kind );
+};
+$assert( false === $excluded( 'meta-box-aio/vendor/meta-box/meta-box-builder/src/Upgrade/Manager.php', 'plugins' ), 'Plugin source dir "Upgrade/" is kept (MetaBox AIO regression)' );
+$assert( false === $excluded( 'acme/src/Cache/Store.php', 'plugins' ), 'Plugin source dir "Cache/" is kept' );
+$assert( false === $excluded( 'acme/inc/Backup/Job.php', 'plugins' ), 'Plugin source dir "Backup/" is kept' );
+$assert( true === $excluded( '2026/07/cache/thumb.jpg', 'uploads' ), 'Uploads cache/ is still excluded' );
+$assert( true === $excluded( 'backups/dump.zip', 'uploads' ), 'Uploads backups/ is still excluded' );
+$assert( true === $excluded( 'site/upgrade/tmp.txt', 'uploads' ), 'Uploads upgrade/ is still excluded' );
+$assert( true === $excluded( 'acme/.git/config', 'plugins' ), 'Dev artefact .git is excluded everywhere' );
+$assert( true === $excluded( 'acme/node_modules/x.js', 'plugins' ), 'Dev artefact node_modules is excluded everywhere' );
+$assert( true === $excluded( 'acme/debug.log', 'plugins' ), 'debug.log is excluded everywhere' );
+
 if ( $failures ) {
 	throw new RuntimeException( count( $failures ) . ' SpawnWP Deploy smoke test(s) failed.' );
 }

@@ -19,6 +19,76 @@ let PLATFORM = {};
 let UPDATE_RUNNING = false;
 let REAUTH_PROMISE = null;
 const PHP_SWITCH_ACTIVE = new Set();
+const DESTROYING = new Set();     // sites whose destroy log is still streaming
+let PROJECT_FILTER = '';          // current Manage search query (lowercased)
+
+// ── Collapse (per-site, remembered) ───────────────────────────────────────────
+const COLLAPSE_KEY = 'spawnwp_collapsed_sites';
+function collapsedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+function saveCollapsed(set) {
+  try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set])); } catch (e) { /* ignore */ }
+}
+function applyCollapsed(name) {
+  const card = document.getElementById(`card-${name}`);
+  if (card) card.classList.toggle('collapsed', collapsedSet().has(name));
+}
+function toggleCollapse(name) {
+  const card = document.getElementById(`card-${name}`);
+  if (!card) return;
+  const set = collapsedSet();
+  const collapsed = card.classList.toggle('collapsed');
+  if (collapsed) set.add(name); else set.delete(name);
+  saveCollapsed(set);
+}
+function collapseAll() {
+  const set = collapsedSet();
+  document.querySelectorAll('#projects-list .card').forEach(c => {
+    c.classList.add('collapsed');
+    set.add(c.id.replace('card-', ''));
+  });
+  saveCollapsed(set);
+}
+function expandAll() {
+  const set = collapsedSet();
+  document.querySelectorAll('#projects-list .card').forEach(c => {
+    c.classList.remove('collapsed');
+    set.delete(c.id.replace('card-', ''));
+  });
+  saveCollapsed(set);
+}
+
+// ── Filter (text search over name / URL / blueprint) ──────────────────────────
+function filterProjects(query) {
+  PROJECT_FILTER = (query || '').trim().toLowerCase();
+  applyProjectFilter();
+}
+function applyProjectFilter() {
+  const el = document.getElementById('projects-list');
+  if (!el) return;
+  const q = PROJECT_FILTER;
+  let visible = 0;
+  el.querySelectorAll('.card').forEach(c => {
+    const hit = !q || (c.dataset.filter || '').includes(q);
+    c.classList.toggle('filtered-out', !hit);
+    if (hit) visible++;
+  });
+  let hint = document.getElementById('projects-nomatch');
+  const hasCards = el.querySelector('.card') !== null;
+  if (q && hasCards && visible === 0) {
+    if (!hint) {
+      hint = document.createElement('p');
+      hint.id = 'projects-nomatch';
+      hint.className = 'projects-notice';
+      el.appendChild(hint);
+    }
+    hint.textContent = `No sites match “${q}”.`;
+  } else if (hint) {
+    hint.remove();
+  }
+}
 
 function webauthnB64(value) {
   const encoded = btoa(String.fromCharCode(...new Uint8Array(value)));
@@ -596,23 +666,30 @@ async function changeTelemetry(toggle) {
 async function loadProjects() {
   const el = document.getElementById('projects-list');
   if (!el) return;
+  const hasCards = el.querySelector('.card') !== null;
   let projects;
   try {
     const res = await fetch(`${BASE}/projects`, { cache: 'no-store' });
     if (!res.ok) {
-      el.innerHTML = `<p style="color:var(--red)">Error ${res.status} while loading.${res.status === 401 ? ' Sign in again.' : ''}</p>`;
+      // Keep the last-good cards on a transient error; only take over the list
+      // when we have nothing to show yet.
+      showProjectsNotice(`Error ${res.status} while refreshing.${res.status === 401 ? ' Sign in again.' : ''}`, hasCards);
       return;
     }
     projects = await res.json();
   } catch (e) {
-    el.innerHTML = `<p style="color:var(--red)">Network error: ${e.message}.</p>`;
+    showProjectsNotice(`Network error while refreshing: ${e.message}.`, hasCards);
     return;
   }
-
-  if (!projects.length) { el.innerHTML = '<p style="color:var(--muted)">No projects found.</p>'; return; }
-
-  // Drop the placeholder once
-  if (el.querySelector('p')) el.innerHTML = '';
+  // A successful but empty poll while cards exist is almost always a transient
+  // blip (the host always has at least the dev site): keep the cards rather than
+  // blanking the dashboard. A site actually removed leaves the others in the
+  // list (non-empty), and a destroy removes its own card when its stream ends.
+  if (!projects.length && hasCards) {
+    showProjectsNotice('Refreshing…', true, false);
+    return;
+  }
+  clearProjectsNotice();
 
   const seen = new Set();
   for (const p of projects) {
@@ -636,24 +713,74 @@ async function loadProjects() {
           <div class="output-body" id="out-${p.name}-body"></div>
         </div>`;
       el.appendChild(card);
+      applyCollapsed(p.name);
     }
     const signature = JSON.stringify(p);
     if (projectSignatures[p.name] !== signature) {
       document.getElementById(`top-${p.name}`).innerHTML = renderTop(p);
+      card.dataset.filter = [p.name, p.url, p.blueprint && p.blueprint.name]
+        .filter(Boolean).join(' ').toLowerCase();
       projectSignatures[p.name] = signature;
     }
     if (!(p.name in dbCache)) loadDbInfo(p.name);
     else applyDbInfo(p.name);
   }
-  // Remove cards for projects that disappeared
+  // Remove cards for projects that disappeared — but never yank a card whose
+  // destroy is still streaming its log; it is removed when that stream ends.
   el.querySelectorAll('.card').forEach(c => {
     const n = c.id.replace('card-', '');
-    if (!seen.has(n)) {
+    if (!seen.has(n) && !DESTROYING.has(n)) {
       c.remove();
       delete projectSignatures[n];
       delete dbCache[n];
     }
   });
+  // Drop the initial "Loading…" placeholder once we have a real answer.
+  el.querySelectorAll('.loading-copy').forEach(p => p.remove());
+  updateProjectsEmptyState();
+  applyProjectFilter();
+}
+
+// Non-destructive status line above the list: preserves existing cards during a
+// transient empty/error poll, so the dashboard never blanks out on its own.
+function showProjectsNotice(msg, keepCards, isErr = true) {
+  const el = document.getElementById('projects-list');
+  if (!el) return;
+  const cls = 'projects-notice' + (isErr ? ' projects-notice-err' : '');
+  if (keepCards) {
+    let notice = document.getElementById('projects-notice');
+    if (!notice) {
+      notice = document.createElement('p');
+      notice.id = 'projects-notice';
+      el.prepend(notice);
+    }
+    notice.className = cls;
+    notice.textContent = msg;
+  } else {
+    el.innerHTML = `<p class="${cls}">${esc(msg)}</p>`;
+  }
+}
+function clearProjectsNotice() {
+  const notice = document.getElementById('projects-notice');
+  if (notice) notice.remove();
+}
+// Show the friendly "no sites" line only when there really are zero cards.
+function updateProjectsEmptyState() {
+  const el = document.getElementById('projects-list');
+  if (!el) return;
+  const hasCards = el.querySelector('.card') !== null;
+  let empty = document.getElementById('projects-empty');
+  if (!hasCards) {
+    if (!empty) {
+      empty = document.createElement('p');
+      empty.id = 'projects-empty';
+      empty.className = 'projects-notice';
+      empty.textContent = 'No sites yet.';
+      el.appendChild(empty);
+    }
+  } else if (empty) {
+    empty.remove();
+  }
 }
 
 function updateClock() {
@@ -707,7 +834,7 @@ function renderTop(p) {
 
   return `<div class="card-header">
       <div>
-        <div class="card-title">${esc(p.name)}</div>
+        <div class="card-title"><button class="collapse-toggle" type="button" title="Collapse / expand this site" aria-label="Collapse or expand" onclick="toggleCollapse('${p.name}')">▾</button>${esc(p.name)}</div>
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
       </div>
@@ -1646,10 +1773,24 @@ function destroyProject(name) {
   const typed = prompt(`Final confirmation: type the site name “${name}” exactly to destroy it.`);
   if (typed === null) return;
   if (typed.trim() !== name) { showToast('Name mismatch: destruction cancelled', true); return; }
+  // Keep the card (and its live destroy log) on screen while the stream runs;
+  // loadProjects skips removing a card that is in DESTROYING.
+  DESTROYING.add(name);
   const stopRefresh = monitorProjectRefresh();
   streamSSE(`${BASE}/destroy`, { name, confirm: name }, `out-${name}`, ok => {
+    DESTROYING.delete(name);
     stopRefresh();
-    if (ok) showToast(`Site "${name}" destroyed`);
+    if (ok) {
+      showToast(`Site "${name}" destroyed`);
+      // Remove the now-gone site once its log has finished streaming.
+      const card = document.getElementById(`card-${name}`);
+      if (card) card.remove();
+      delete projectSignatures[name];
+      delete dbCache[name];
+      const set = collapsedSet();
+      if (set.delete(name)) saveCollapsed(set);
+      updateProjectsEmptyState();
+    }
   });
 }
 

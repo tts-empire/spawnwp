@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.14
+
+- **The Manage dashboard no longer blanks out.** Bringing a site Down or Destroying it could
+  momentarily empty the whole sites list until you reloaded. Cards now stay on screen through a
+  transient refresh error, and a destroyed site keeps its live progress log until the operation
+  finishes before the card is removed cleanly.
+- **Collapse sites.** A chevron next to each site name collapses its card to a one-line summary
+  and expands it again; the state is remembered in your browser. New Collapse all / Expand all
+  buttons act on the whole list.
+- **Filter sites.** A search box above the list narrows it as you type, matching name, URL or
+  blueprint.
+
 ## 0.5.13
 
 - **Activation no longer requires a passkey up front.** On a device without a built-in

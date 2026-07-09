@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Manage · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.13">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.14">
 </head>
 <body data-page="manage">
   <header>
@@ -31,11 +31,20 @@
       <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
     </section>
     <section class="section">
-      <div class="section-title">Active sites</div>
+      <div class="sites-toolbar">
+        <div class="section-title">Active sites</div>
+        <div class="sites-controls">
+          <input type="search" class="sites-search" id="sites-search" placeholder="Filter sites…"
+                 spellcheck="false" autocomplete="off" aria-label="Filter sites by name, URL or blueprint"
+                 oninput="filterProjects(this.value)">
+          <button class="btn-neutral btn-sm" type="button" onclick="collapseAll()" title="Collapse every site">Collapse all</button>
+          <button class="btn-neutral btn-sm" type="button" onclick="expandAll()" title="Expand every site">Expand all</button>
+        </div>
+      </div>
       <div id="projects-list"><p class="loading-copy">Loading…</p></div>
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.13"></script>
+  <script src="/assets/cockpit.js?v=0.5.14"></script>
 </body>
 </html>

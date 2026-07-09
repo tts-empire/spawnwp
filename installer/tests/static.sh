@@ -50,6 +50,12 @@ grep -q 'UPDATE sessions SET recent_auth' "$ROOT/runtime/auth.py"
 grep -q 'php-switch-progress.py' "$ROOT/updater/managed-files.json"
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
 grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
+# Manage dashboard: resilient refresh + collapse + filter (0.5.14).
+grep -q 'function filterProjects' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'function toggleCollapse' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'const DESTROYING = new Set' "$ROOT/runtime/assets/cockpit.js"
+grep -q '.card.collapsed .actions' "$ROOT/runtime/assets/cockpit.css"
+grep -q 'oninput="filterProjects(this.value)"' "$ROOT/runtime/manage.html"
 if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then
   echo "active runtime must not reference the removed cockpit network allow-list" >&2
   exit 1

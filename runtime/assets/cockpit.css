@@ -25,12 +25,31 @@
   .section-title { display: flex; align-items: center; gap: 9px; font-size: var(--font-small); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 12px; }
   .section-title::before { content: ""; width: 18px; height: 2px; background: var(--accent); }
 
+  /* Manage "Active sites" toolbar: title left, search + collapse controls right. */
+  .sites-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .sites-toolbar .section-title { margin-bottom: 0; }
+  .sites-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sites-search { min-width: 170px; padding: 6px 10px; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  .sites-search:focus { outline: none; border-color: var(--accent); }
+
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.2); }
   .card:hover { border-color: var(--border-strong); }
+  .card.filtered-out { display: none; }
   .card-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .card-title { font-weight: 650; font-size: var(--font-title); }
   .card-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .card-meta a:hover { color: var(--text) !important; }
+
+  /* Collapse: chevron in the title toggles a compact one-line view. */
+  .collapse-toggle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 6px; padding: 0; vertical-align: -3px; color: var(--muted); background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; transition: transform .15s ease, color .15s ease; }
+  .collapse-toggle:hover { color: var(--text); }
+  .card.collapsed .collapse-toggle { transform: rotate(-90deg); }
+  .card.collapsed .svc-table,
+  .card.collapsed .actions,
+  .card.collapsed .card-meta { display: none; }
+
+  .projects-notice { color: var(--muted); }
+  .projects-notice-err { color: var(--red); }
 
   .badge { display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 8px; border: 1px solid currentColor; border-radius: 4px; font-size: 11px; font-weight: 650; }
   .badge-green { background: #101d16; color: var(--green); }

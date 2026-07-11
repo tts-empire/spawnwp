@@ -4,6 +4,20 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.16
+
+- **Group your sites.** Each site can carry a free-text **group** label (a client, a project, a
+  batch). Set it when you create the site — the Deploy form has an optional **Group** field — or
+  change it any time from the new **🏷 Group** button on Manage. The field suggests labels already
+  in use, so you don't end up with near-duplicates.
+- **Grouped view on Manage.** A new selector switches between the flat list (default) and a
+  grouped view, where sites are bucketed under their group heading with a site count, sorted A→Z
+  and **Ungrouped** last. Group headings are collapsible and stay collapsed across reloads, so a
+  long list folds down to a few lines. The search box matches group labels too, and hides groups
+  left with no matching site.
+- The label is stored in the site's own `.env` and is purely cosmetic — existing sites start
+  ungrouped and nothing changes until you label them.
+
 ## 0.5.15
 
 - **Easier to collapse a site.** The collapse control on the Manage dashboard is now the whole

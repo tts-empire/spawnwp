@@ -79,7 +79,167 @@ function expandAll() {
   saveCollapsed(set);
 }
 
-// ── Filter (text search over name / URL / blueprint) ──────────────────────────
+// ── Grouping (manual per-site label, stored server-side in the site's .env) ────
+const GROUPBY_KEY = 'spawnwp_group_by';          // 'none' | 'group'
+const GROUPS_COLLAPSE_KEY = 'spawnwp_collapsed_groups';
+const UNGROUPED = 'Ungrouped';
+let GROUP_NAMES = [];   // known labels, for the datalist
+
+function groupBy() {
+  try { return localStorage.getItem(GROUPBY_KEY) === 'group' ? 'group' : 'none'; }
+  catch (e) { return 'none'; }
+}
+function setGroupBy(mode) {
+  try { localStorage.setItem(GROUPBY_KEY, mode === 'group' ? 'group' : 'none'); } catch (e) { /* ignore */ }
+  loadProjects();
+}
+function collapsedGroups() {
+  try { return new Set(JSON.parse(localStorage.getItem(GROUPS_COLLAPSE_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+// The label is never interpolated into an inline handler (a hand-edited .env
+// could carry quotes): handlers read it back from the section's dataset.
+function toggleGroupFromEl(el) {
+  const section = el.closest('.group-section');
+  if (!section) return;
+  const label = section.dataset.group;
+  const set = collapsedGroups();
+  const collapsed = section.classList.toggle('collapsed');
+  if (collapsed) set.add(label); else set.delete(label);
+  try { localStorage.setItem(GROUPS_COLLAPSE_KEY, JSON.stringify([...set])); } catch (e) { /* ignore */ }
+  el.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+function groupKeyFromEl(event, el) {
+  if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault();
+    toggleGroupFromEl(el);
+  }
+}
+
+// Arrange the existing cards into group sections. Cards are MOVED (appendChild),
+// never re-created: that preserves each card's output box and WP-CLI console.
+function layoutProjects(projects) {
+  const el = document.getElementById('projects-list');
+  if (!el) return;
+  const mode = groupBy();
+
+  if (mode === 'none') {
+    el.querySelectorAll('.group-section').forEach(section => {
+      section.querySelectorAll('.card').forEach(card => el.appendChild(card));
+      section.remove();
+    });
+    for (const p of projects) {
+      const card = document.getElementById(`card-${p.name}`);
+      if (card) el.appendChild(card);   // restore API order
+    }
+    return;
+  }
+
+  const collapsed = collapsedGroups();
+  const buckets = new Map();
+  for (const p of projects) {
+    const label = (p.group || '').trim() || UNGROUPED;
+    if (!buckets.has(label)) buckets.set(label, []);
+    buckets.get(label).push(p);
+  }
+  // Named groups A→Z, "Ungrouped" always last.
+  const labels = [...buckets.keys()].filter(l => l !== UNGROUPED).sort((a, b) => a.localeCompare(b));
+  if (buckets.has(UNGROUPED)) labels.push(UNGROUPED);
+
+  const sectionFor = label =>
+    [...el.querySelectorAll('.group-section')].find(s => s.dataset.group === label);
+
+  for (const label of labels) {
+    let section = sectionFor(label);
+    if (!section) {
+      section = document.createElement('section');
+      section.className = 'group-section';
+      section.dataset.group = label;   // set as a property: never HTML-parsed
+      section.innerHTML = `<div class="group-head" role="button" tabindex="0" aria-expanded="true"
+          title="Collapse / expand this group"
+          onclick="toggleGroupFromEl(this)" onkeydown="groupKeyFromEl(event, this)">
+          <span class="collapse-toggle" aria-hidden="true">▾</span>
+          <span class="group-name">${esc(label)}</span>
+          <span class="group-count"></span>
+        </div>`;
+      if (collapsed.has(label)) section.classList.add('collapsed');
+    }
+    el.appendChild(section);   // (re)order sections
+    section.querySelector('.group-count').textContent =
+      `${buckets.get(label).length} site${buckets.get(label).length === 1 ? '' : 's'}`;
+    section.querySelector('.group-head').setAttribute(
+      'aria-expanded', section.classList.contains('collapsed') ? 'false' : 'true');
+    for (const p of buckets.get(label)) {
+      const card = document.getElementById(`card-${p.name}`);
+      if (card) section.appendChild(card);   // moves the card, keeping its state
+    }
+  }
+  // Drop group sections that no longer have any site.
+  el.querySelectorAll('.group-section').forEach(section => {
+    if (!labels.includes(section.dataset.group)) {
+      section.querySelectorAll('.card').forEach(card => card.remove());
+      section.remove();
+    }
+  });
+}
+
+// Edit a site's group: inline field in the card's output box, with a datalist of
+// the labels already in use (avoids typo-groups like "Client A" vs "client a").
+function showGroup(name) {
+  const card = document.getElementById(`card-${name}`);
+  const current = (card && card.dataset.group) || '';
+  const body = getOutputBox(`out-${name}`);
+  appendLine(body, `🏷 Group for "${name}". Leave empty to remove it from any group.`);
+  const wrap = document.createElement('div');
+  wrap.className = 'php-inline-form';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = current;
+  input.placeholder = 'e.g. Client A';
+  input.setAttribute('list', 'group-names');
+  input.maxLength = 32;
+  const save = document.createElement('button');
+  save.className = 'btn-primary btn-sm';
+  save.textContent = 'Save';
+  save.onclick = async () => {
+    save.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/group/${encodeURIComponent(name)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group: input.value.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      showToast(data.group ? `"${name}" moved to “${data.group}”` : `"${name}" removed from its group`);
+      closeBox(`out-${name}`);
+      loadProjects();
+    } catch (e) {
+      showToast(e.message, true);
+      save.disabled = false;
+    }
+  };
+  input.onkeydown = e => { if (e.key === 'Enter') save.click(); };
+  wrap.append(input, save);
+  body.appendChild(wrap);
+  input.focus();
+}
+
+// Deploy page: it never lists projects, so fetch just the labels for the datalist.
+async function loadGroupNames() {
+  try {
+    const res = await fetch(`${BASE}/projects`, { cache: 'no-store' });
+    if (res.ok) refreshGroupNames(await res.json());
+  } catch (e) { /* the field still works as free text */ }
+}
+
+// Keep the datalist in sync with the labels actually in use.
+function refreshGroupNames(projects) {
+  GROUP_NAMES = [...new Set(projects.map(p => (p.group || '').trim()).filter(Boolean))].sort();
+  const list = document.getElementById('group-names');
+  if (list) list.innerHTML = GROUP_NAMES.map(g => `<option value="${esc(g)}"></option>`).join('');
+}
+
+// ── Filter (text search over name / URL / blueprint / group) ──────────────────
 function filterProjects(query) {
   PROJECT_FILTER = (query || '').trim().toLowerCase();
   applyProjectFilter();
@@ -93,6 +253,11 @@ function applyProjectFilter() {
     const hit = !q || (c.dataset.filter || '').includes(q);
     c.classList.toggle('filtered-out', !hit);
     if (hit) visible++;
+  });
+  // A group whose sites are all filtered out disappears with them.
+  el.querySelectorAll('.group-section').forEach(section => {
+    const shown = section.querySelectorAll('.card:not(.filtered-out)').length;
+    section.classList.toggle('filtered-out', shown === 0);
   });
   let hint = document.getElementById('projects-nomatch');
   const hasCards = el.querySelector('.card') !== null;
@@ -737,8 +902,9 @@ async function loadProjects() {
     const signature = JSON.stringify(p);
     if (projectSignatures[p.name] !== signature) {
       document.getElementById(`top-${p.name}`).innerHTML = renderTop(p);
-      card.dataset.filter = [p.name, p.url, p.blueprint && p.blueprint.name]
+      card.dataset.filter = [p.name, p.url, p.blueprint && p.blueprint.name, p.group]
         .filter(Boolean).join(' ').toLowerCase();
+      card.dataset.group = (p.group || '').trim();
       projectSignatures[p.name] = signature;
     }
     if (!(p.name in dbCache)) loadDbInfo(p.name);
@@ -756,6 +922,8 @@ async function loadProjects() {
   });
   // Drop the initial "Loading…" placeholder once we have a real answer.
   el.querySelectorAll('.loading-copy').forEach(p => p.remove());
+  refreshGroupNames(projects);
+  layoutProjects(projects);
   updateProjectsEmptyState();
   applyProjectFilter();
 }
@@ -872,6 +1040,7 @@ function renderTop(p) {
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
       <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
       <button class="btn-neutral btn-sm" onclick="showFiles('${p.name}')" title="Browse, edit and upload this site's files">📂 Files</button>
+      <button class="btn-neutral btn-sm" onclick="showGroup('${p.name}')" title="Group this site on the dashboard">🏷 Group</button>
       <button class="btn-neutral btn-sm" onclick="toggleWpCli('${p.name}')" title="Run WP-CLI commands inside this site">⌨ WP-CLI</button>
       ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
@@ -1314,7 +1483,9 @@ function createProject(e) {
   const deactivate_plugins = !!capturedPanel && !capturedPanel.hidden && document.getElementById('new-deactivate-plugins').checked;
   const wpField = document.getElementById('new-wordpress-field');
   const wordpress_version = wpField && !wpField.hidden ? document.getElementById('new-wordpress').value : null;
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, wordpress_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins }, 'out-new', ok => {
+  const groupField = document.getElementById('new-group');
+  const group = groupField ? groupField.value.trim() : '';
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, wordpress_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins, group }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {
@@ -1977,8 +2148,13 @@ async function deleteContentBlueprint(id) {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 updateClock();
 loadPlatform();
-if (document.body.dataset.page === 'deploy') loadBlueprints();
-if (document.body.dataset.page === 'manage') { loadProjects(); checkPasskeyNudge(); }
+if (document.body.dataset.page === 'deploy') { loadBlueprints(); loadGroupNames(); }
+if (document.body.dataset.page === 'manage') {
+  const groupbySelect = document.getElementById('sites-groupby');
+  if (groupbySelect) groupbySelect.value = groupBy();   // restore the remembered mode
+  loadProjects();
+  checkPasskeyNudge();
+}
 if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCapture(); }
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();

@@ -56,6 +56,16 @@ grep -q 'function toggleCollapse' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'function collapseKey' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'card-title" role="button"' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'const DESTROYING = new Set' "$ROOT/runtime/assets/cockpit.js"
+# Site grouping (0.5.16): label stored per site in its .env, never interpolated
+# into an inline handler (a hand-edited .env could carry quotes).
+grep -q 'function layoutProjects' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'function toggleGroupFromEl' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'onclick="toggleGroupFromEl(this)"' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'SPAWNWP_GROUP' "$ROOT/runtime/scripts/new-project.sh"
+grep -q '@app.post("/api/group/{project}")' "$ROOT/runtime/app.py"
+grep -q 'GROUP_RE' "$ROOT/runtime/app.py"
+grep -q 'id="sites-groupby"' "$ROOT/runtime/manage.html"
+grep -q 'id="new-group"' "$ROOT/runtime/deploy.html"
 grep -q '.card.collapsed .actions' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'oninput="filterProjects(this.value)"' "$ROOT/runtime/manage.html"
 if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then

@@ -127,6 +127,9 @@ def validate_blueprint_choice(blueprint_id: str, php_version: str | None,
 
 SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9\-]{0,30}$')
 SNAP_RE = re.compile(r'^\d{8}-\d{6}$')   # timestamp snapshot: YYYYMMDD-HHMMSS
+# Manage-dashboard group label: free text, but no '=' or newline (would corrupt
+# the site's .env) and no leading separator.
+GROUP_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 ._\-]{0,31}$')
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -399,6 +402,7 @@ def list_projects():
         result.append({
             "name": proj.name,
             "url": env.get("WP_HOME", ""),
+            "group": env.get("SPAWNWP_GROUP", ""),
             "expires_at": expires_at,
             "days_left": days_left,
             "php": env.get("PHP_VERSION", "?"),
@@ -641,6 +645,7 @@ class NewProject(BaseModel):
     lifetime_days: int = 0   # 0 = permanent; otherwise the site self-destructs
     install_deploy_plugin: bool = False   # opt-in: bundle the SpawnWP Deploy plugin
     deactivate_plugins: bool = False   # captured blueprints: leave plugins inactive
+    group: str = ""   # optional Manage-dashboard group label
 
 @app.post("/api/new-project")
 def new_project(body: NewProject):
@@ -654,7 +659,13 @@ def new_project(body: NewProject):
     guard_not_busy()
     if is_project(PROJECTS_ROOT / body.name):
         raise HTTPException(409, f"Project '{body.name}' already exists")
+    group = body.group.strip()
+    if group and not GROUP_RE.match(group):
+        raise HTTPException(400, "Invalid group: use letters, digits, spaces, dots, hyphens "
+                                 "or underscores (max 32 characters)")
     env = body.php_settings.validated().as_env() if body.php_settings else {}
+    if group:
+        env["SPAWNWP_GROUP"] = group
     if body.lifetime_days:
         env["SPAWNWP_SITE_LIFETIME_DAYS"] = str(body.lifetime_days)
     if body.install_deploy_plugin:
@@ -1011,6 +1022,30 @@ def set_expiry(project: str, body: SiteExpiry):
         lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_days * 86400}")
     env_file.write_text("\n".join(lines) + "\n")
     return {"project": proj.name, "lifetime_days": body.lifetime_days}
+
+
+# ── Site group: a free-text label used to group sites on the Manage dashboard ──
+# Stored per site in its .env; purely cosmetic (nothing in the stack reads it but
+# the cockpit). The charset is restricted so the label can never break .env
+# parsing or Compose variable substitution.
+
+class SiteGroup(BaseModel):
+    group: str   # "" clears the group (site becomes ungrouped)
+
+
+@app.post("/api/group/{project}")
+def set_group(project: str, body: SiteGroup):
+    proj = resolve_project(project)
+    group = body.group.strip()
+    if group and not GROUP_RE.match(group):
+        raise HTTPException(400, "Invalid group: use letters, digits, spaces, dots, hyphens "
+                                 "or underscores (max 32 characters)")
+    env_file = proj / ".env"
+    lines = [l for l in env_file.read_text().splitlines() if not l.startswith("SPAWNWP_GROUP=")]
+    if group:
+        lines.append(f"SPAWNWP_GROUP={group}")
+    env_file.write_text("\n".join(lines) + "\n")
+    return {"project": proj.name, "group": group}
 
 
 # ── Per-site PHP settings: read / apply on an existing site ───────────────────

@@ -47,10 +47,23 @@
   .card-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .collapse-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; color: var(--muted); font-size: 18px; line-height: 1; transition: transform .15s ease, color .12s ease; }
   .card-title:hover .collapse-toggle { color: var(--accent); }
-  .card.collapsed .collapse-toggle { transform: rotate(-90deg); }
+  .card.collapsed .collapse-toggle,
+  .group-section.collapsed .collapse-toggle { transform: rotate(-90deg); }
   .card.collapsed .svc-table,
   .card.collapsed .actions,
   .card.collapsed .card-meta { display: none; }
+
+  /* Grouping: sites bucketed by their label, each bucket collapsible. */
+  .sites-groupby { padding: 6px 10px; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  .group-section { margin-bottom: 18px; }
+  .group-section.filtered-out { display: none; }
+  .group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; cursor: pointer; user-select: none; border-radius: 6px; transition: color .12s ease; }
+  .group-head:hover { color: var(--accent); }
+  .group-head:hover .collapse-toggle { color: var(--accent); }
+  .group-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .group-name { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+  .group-count { color: var(--muted); font-size: 12px; }
+  .group-section.collapsed .card { display: none; }
 
   .projects-notice { color: var(--muted); }
   .projects-notice-err { color: var(--red); }

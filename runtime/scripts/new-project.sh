@@ -161,6 +161,13 @@ if [[ "$LIFETIME_DAYS" =~ ^[0-9]+$ ]] && [ "$LIFETIME_DAYS" -gt 0 ]; then
   echo "==> Temporary site: it will be destroyed automatically around $(date -d "@${EXPIRES}" '+%Y-%m-%d %H:%M') (${LIFETIME_DAYS} day(s) from now)."
 fi
 
+# Optional Manage-dashboard group label (cosmetic; only the cockpit reads it).
+# The cockpit validates the charset before setting it.
+if [ -n "${SPAWNWP_GROUP:-}" ]; then
+  echo "SPAWNWP_GROUP=${SPAWNWP_GROUP}" >> "${PROJ_DIR}/.env"
+  echo "==> Group: ${SPAWNWP_GROUP}"
+fi
+
 cp env.example "${PROJ_DIR}/.env.example"
 cp gitignore.template "${PROJ_DIR}/.gitignore"
 

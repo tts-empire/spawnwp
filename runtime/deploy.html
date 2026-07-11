@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.15">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.16">
 </head>
 <body data-page="deploy">
   <header>
@@ -48,6 +48,8 @@
             <option value="7">7 days</option>
             <option value="30">30 days</option>
           </select><small class="field-help" id="lifetime-help">Temporary sites are destroyed when they expire — no backups kept.</small></label>
+          <label><span>Group <small>(optional)</small></span><input id="new-group" type="text" maxlength="32" placeholder="e.g. Client A" list="group-names" autocomplete="off"><small class="field-help">Groups the site on the Manage dashboard. Changeable later.</small></label>
+          <datalist id="group-names"></datalist>
         </div>
         <input id="new-blueprint" type="hidden" value="development">
         <div class="php-panel">
@@ -101,6 +103,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.15"></script>
+  <script src="/assets/cockpit.js?v=0.5.16"></script>
 </body>
 </html>

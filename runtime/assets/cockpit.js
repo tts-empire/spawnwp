@@ -165,6 +165,11 @@ function layoutProjects(projects) {
       if (collapsed.has(label)) section.classList.add('collapsed');
     }
     el.appendChild(section);   // (re)order sections
+    // The heading carries the group's colour too — that's what makes a long list
+    // scannable at a glance.
+    const color = buckets.get(label)[0].group_color || 0;
+    section.classList.remove('group-c1', 'group-c2', 'group-c3', 'group-c4', 'group-c5', 'group-c6');
+    if (color) section.classList.add(`group-c${color}`);
     section.querySelector('.group-count').textContent =
       `${buckets.get(label).length} site${buckets.get(label).length === 1 ? '' : 's'}`;
     section.querySelector('.group-head').setAttribute(
@@ -183,45 +188,116 @@ function layoutProjects(projects) {
   });
 }
 
-// Edit a site's group: inline field in the card's output box, with a datalist of
-// the labels already in use (avoids typo-groups like "Client A" vs "client a").
-function showGroup(name) {
+// ── Group chip: the label IS the editor ───────────────────────────────────────
+// Click the chip beside the status badge and it turns into an input, in place.
+// Nothing here touches the output box: that is the site's log console, and its
+// "output" header / copy icon are meaningless around a form.
+
+// Cards being edited: loadProjects must not re-render them, or a 1.5s poll would
+// wipe the input from under the user's fingers (same guard idea as DESTROYING).
+const EDITING_GROUP = new Set();
+
+function groupChip(p) {
+  const color = p.group_color ? ` group-c${p.group_color}` : '';
+  return p.group
+    ? `<button class="badge badge-group${color}" type="button" title="Click to edit this site's group"
+         onclick="editGroup('${p.name}')">🏷 ${esc(p.group)}</button>`
+    : `<button class="badge badge-group badge-group-empty" type="button" title="Put this site in a group"
+         onclick="editGroup('${p.name}')">＋ Group</button>`;
+}
+
+function editGroup(name) {
   const card = document.getElementById(`card-${name}`);
-  const current = (card && card.dataset.group) || '';
-  const body = getOutputBox(`out-${name}`);
-  appendLine(body, `🏷 Group for "${name}". Leave empty to remove it from any group.`);
-  const wrap = document.createElement('div');
-  wrap.className = 'php-inline-form';
+  const chip = card && card.querySelector('.badge-group');
+  if (!chip || EDITING_GROUP.has(name)) return;
+  const current = (card.dataset.group || '').trim();
+  const currentColor = parseInt(card.dataset.groupColor || '0', 10) || 0;
+  EDITING_GROUP.add(name);
+
+  const editor = document.createElement('span');
+  editor.className = 'group-edit';
+
   const input = document.createElement('input');
   input.type = 'text';
   input.value = current;
   input.placeholder = 'e.g. Client A';
   input.setAttribute('list', 'group-names');
   input.maxLength = 32;
-  const save = document.createElement('button');
-  save.className = 'btn-primary btn-sm';
-  save.textContent = 'Save';
-  save.onclick = async () => {
-    save.disabled = true;
+  editor.appendChild(input);
+
+  // Swatches apply instantly (no Save) — but only to a group that exists: you
+  // cannot colour a label that hasn't been saved yet.
+  const swatches = document.createElement('span');
+  swatches.className = 'group-swatches';
+  if (current) {
+    for (let c = 0; c <= 6; c++) {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = `swatch${c ? ` group-c${c}` : ' swatch-none'}${c === currentColor ? ' selected' : ''}`;
+      dot.title = c ? `Colour ${c}` : 'No colour';
+      dot.onmousedown = e => e.preventDefault();   // keep focus: don't blur-save
+      dot.onclick = () => setGroupColor(current, c, name);
+      swatches.appendChild(dot);
+    }
+  } else {
+    swatches.className += ' group-swatches-hint';
+    swatches.textContent = 'name the group first to colour it';
+  }
+  editor.appendChild(swatches);
+
+  // Invalidate the cached signature: closing the editor usually leaves the
+  // project data unchanged (cancel, or a save with no edit), and loadProjects
+  // only re-renders on a changed signature — without this the editor would stay
+  // open forever and the chip would never come back.
+  const done = () => {
+    EDITING_GROUP.delete(name);
+    delete projectSignatures[name];
+    loadProjects();
+  };
+  let closed = false;
+  const save = async () => {
+    if (closed) return;
+    closed = true;
+    const value = input.value.trim();
+    if (value === current) { done(); return; }
     try {
       const res = await fetch(`${BASE}/group/${encodeURIComponent(name)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group: input.value.trim() }),
+        body: JSON.stringify({ group: value }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || res.statusText);
       showToast(data.group ? `"${name}" moved to “${data.group}”` : `"${name}" removed from its group`);
-      closeBox(`out-${name}`);
-      loadProjects();
     } catch (e) {
       showToast(e.message, true);
-      save.disabled = false;
     }
+    done();
   };
-  input.onkeydown = e => { if (e.key === 'Enter') save.click(); };
-  wrap.append(input, save);
-  body.appendChild(wrap);
+  input.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); closed = true; done(); }   // cancel
+  };
+  input.onblur = save;
+
+  chip.replaceWith(editor);
   input.focus();
+  input.select();
+}
+
+async function setGroupColor(group, color, name) {
+  try {
+    const res = await fetch(`${BASE}/group-colors`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group, color }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+  } catch (e) {
+    showToast(e.message, true);
+  }
+  EDITING_GROUP.delete(name);
+  delete projectSignatures[name];   // re-clicking the current colour changes nothing: force the redraw
+  loadProjects();
 }
 
 // Deploy page: it never lists projects, so fetch just the labels for the datalist.
@@ -900,11 +976,18 @@ async function loadProjects() {
       applyCollapsed(p.name);
     }
     const signature = JSON.stringify(p);
-    if (projectSignatures[p.name] !== signature) {
+    // Never re-render a card whose group is being edited: it would destroy the
+    // open input mid-typing. The next poll after the edit closes picks it up.
+    if (projectSignatures[p.name] !== signature && !EDITING_GROUP.has(p.name)) {
       document.getElementById(`top-${p.name}`).innerHTML = renderTop(p);
       card.dataset.filter = [p.name, p.url, p.blueprint && p.blueprint.name, p.group]
         .filter(Boolean).join(' ').toLowerCase();
       card.dataset.group = (p.group || '').trim();
+      card.dataset.groupColor = String(p.group_color || 0);
+      // The card border carries the group colour (grey when ungrouped/uncoloured).
+      card.className = 'card' + (p.group_color ? ` group-c${p.group_color}` : '')
+        + (card.classList.contains('collapsed') ? ' collapsed' : '')
+        + (card.classList.contains('filtered-out') ? ' filtered-out' : '');
       projectSignatures[p.name] = signature;
     }
     if (!(p.name in dbCache)) loadDbInfo(p.name);
@@ -1025,7 +1108,7 @@ function renderTop(p) {
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
       </div>
-      <span class="card-badges">${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
+      <span class="card-badges">${groupChip(p)}${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
     </div>
     ${table}
     <div class="actions">
@@ -1040,7 +1123,6 @@ function renderTop(p) {
       <button class="btn-neutral btn-sm" onclick="showWpAdmin('${p.name}')">🔑 WP credentials</button>
       <button class="btn-neutral btn-sm" onclick="showPhpIni('${p.name}')" title="memory_limit, upload sizes, execution time…">⚙️ PHP settings</button>
       <button class="btn-neutral btn-sm" onclick="showFiles('${p.name}')" title="Browse, edit and upload this site's files">📂 Files</button>
-      <button class="btn-neutral btn-sm" onclick="showGroup('${p.name}')" title="Group this site on the dashboard">🏷 Group</button>
       <button class="btn-neutral btn-sm" onclick="toggleWpCli('${p.name}')" title="Run WP-CLI commands inside this site">⌨ WP-CLI</button>
       ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
       <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">

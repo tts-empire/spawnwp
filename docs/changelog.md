@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.17
+
+- **The group is now a click-to-edit chip.** In 0.5.16 the 🏷 Group button opened the site's *log
+  console* to hold a text field — complete with an "output" header and a copy icon around a form —
+  and after saving, the group was nowhere visible on the card. Now each site shows its group as a
+  chip beside the Running/Down badge (visible even when collapsed), and clicking it edits the name
+  in place: Enter saves, Escape cancels. Ungrouped sites show a **＋ Group** chip.
+- **Group colours.** The editor offers six colours, applied instantly with no Save step. The colour
+  shows on the chip, on the group heading, and on the **card border** — so you can spot a client's
+  sites at a glance even with grouping switched off. The colour belongs to the group (not the
+  site), and is stored server-side so it's the same from any browser.
+
 ## 0.5.16
 
 - **Group your sites.** Each site can carry a free-text **group** label (a client, a project, a

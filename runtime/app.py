@@ -131,6 +131,26 @@ SNAP_RE = re.compile(r'^\d{8}-\d{6}$')   # timestamp snapshot: YYYYMMDD-HHMMSS
 # the site's .env) and no leading separator.
 GROUP_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 ._\-]{0,31}$')
 
+# Group colours are a property of the group, not of a site: keeping them in one
+# map (rather than per-site) is what stops the same group showing three colours.
+GROUP_COLORS_FILE = Path(os.environ.get("SPAWNWP_GROUP_COLORS", "/var/lib/spawnwp/group-colors.json"))
+GROUP_COLOR_MAX = 6   # palette size; 0 = no colour
+
+
+def group_colors() -> dict[str, int]:
+    """group label -> palette index (1..6). A missing or corrupt file means no colours."""
+    try:
+        data = json.loads(GROUP_COLORS_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {
+        str(label): int(color)
+        for label, color in data.items()
+        if isinstance(color, int) and 1 <= color <= GROUP_COLOR_MAX
+    }
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def run(cmd: list[str], cwd: Path) -> str:
@@ -352,6 +372,7 @@ def telemetry_enable():
 @app.get("/api/projects")
 def list_projects():
     result = []
+    colors = group_colors()
     for proj in get_projects():
         env = {}
         env_file = proj / ".env"
@@ -399,10 +420,12 @@ def list_projects():
             expires_at = int(env["SPAWNWP_EXPIRES"])
             days_left = max(0, round((expires_at - _time.time()) / 86400, 1))
 
+        group = env.get("SPAWNWP_GROUP", "")
         result.append({
             "name": proj.name,
             "url": env.get("WP_HOME", ""),
-            "group": env.get("SPAWNWP_GROUP", ""),
+            "group": group,
+            "group_color": colors.get(group, 0) if group else 0,
             "expires_at": expires_at,
             "days_left": days_left,
             "php": env.get("PHP_VERSION", "?"),
@@ -1046,6 +1069,42 @@ def set_group(project: str, body: SiteGroup):
         lines.append(f"SPAWNWP_GROUP={group}")
     env_file.write_text("\n".join(lines) + "\n")
     return {"project": proj.name, "group": group}
+
+
+class GroupColor(BaseModel):
+    group: str
+    color: int   # 1..6 = palette entry; 0 clears the colour
+
+
+@app.post("/api/group-colors")
+def set_group_color(body: GroupColor):
+    """Colour a group (not a site): purely cosmetic, shared across browsers."""
+    group = body.group.strip()
+    if not GROUP_RE.match(group):
+        raise HTTPException(400, "Invalid group")
+    if not 0 <= body.color <= GROUP_COLOR_MAX:
+        raise HTTPException(400, f"color must be between 0 and {GROUP_COLOR_MAX}")
+
+    colors = group_colors()
+    if body.color:
+        colors[group] = body.color
+    else:
+        colors.pop(group, None)
+
+    # Garbage-collect labels no site uses any more (renamed or destroyed sites).
+    in_use = set()
+    for proj in get_projects():
+        env_file = proj / ".env"
+        if not env_file.exists():
+            continue
+        for line in env_file.read_text().splitlines():
+            if line.startswith("SPAWNWP_GROUP="):
+                in_use.add(line.partition("=")[2].strip())
+    colors = {label: color for label, color in colors.items() if label in in_use}
+
+    GROUP_COLORS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    GROUP_COLORS_FILE.write_text(json.dumps(colors, indent=2, sort_keys=True) + "\n")
+    return {"group": group, "color": colors.get(group, 0)}
 
 
 # ── Per-site PHP settings: read / apply on an existing site ───────────────────

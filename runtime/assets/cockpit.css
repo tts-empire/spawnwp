@@ -53,6 +53,58 @@
   .card.collapsed .actions,
   .card.collapsed .card-meta { display: none; }
 
+  /* Group colours. Muted on purpose: six saturated borders at once are noise —
+     this is an accent, not a highlight. Index 0 = no colour (stays grey). */
+  :root {
+    --g1: 91,141,239;    /* blue   */
+    --g2: 63,164,106;    /* green  */
+    --g3: 217,164,65;    /* amber  */
+    --g4: 212,99,111;    /* rose   */
+    --g5: 154,110,224;   /* purple */
+    --g6: 63,169,181;    /* teal   */
+  }
+  .group-c1 { --gc: var(--g1); }
+  .group-c2 { --gc: var(--g2); }
+  .group-c3 { --gc: var(--g3); }
+  .group-c4 { --gc: var(--g4); }
+  .group-c5 { --gc: var(--g5); }
+  .group-c6 { --gc: var(--g6); }
+
+  /* The card border carries the group colour — this is what makes same-client
+     sites recognisable in the FLAT list, and it survives collapsing.
+     .card:hover repaints the border, so brighten the tint instead of losing it. */
+  .card.group-c1, .card.group-c2, .card.group-c3,
+  .card.group-c4, .card.group-c5, .card.group-c6 { border-color: rgba(var(--gc), .55); }
+  .card.group-c1:hover, .card.group-c2:hover, .card.group-c3:hover,
+  .card.group-c4:hover, .card.group-c5:hover, .card.group-c6:hover { border-color: rgba(var(--gc), .95); }
+
+  /* The chip beside the status badge: the label IS the editor (click it). */
+  .badge-group { cursor: pointer; font-family: inherit; background: var(--surface); color: var(--muted); }
+  .badge-group:hover { color: var(--text); border-color: var(--border-strong); }
+  .badge-group:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .badge-group.group-c1, .badge-group.group-c2, .badge-group.group-c3,
+  .badge-group.group-c4, .badge-group.group-c5, .badge-group.group-c6 {
+    color: rgb(var(--gc)); border-color: rgba(var(--gc), .7); background: rgba(var(--gc), .12);
+  }
+  .badge-group.group-c1:hover, .badge-group.group-c2:hover, .badge-group.group-c3:hover,
+  .badge-group.group-c4:hover, .badge-group.group-c5:hover, .badge-group.group-c6:hover {
+    border-color: rgb(var(--gc)); background: rgba(var(--gc), .2);
+  }
+  .badge-group-empty { border-style: dashed; opacity: .75; }
+  .badge-group-empty:hover { opacity: 1; }
+
+  /* In-place editor: replaces the chip, same row. No log console involved. */
+  .group-edit { display: inline-flex; align-items: center; gap: 8px; }
+  .group-edit input { width: 150px; padding: 3px 8px; font-size: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; }
+  .group-edit input:focus { outline: none; }
+  .group-swatches { display: inline-flex; align-items: center; gap: 4px; }
+  .group-swatches-hint { color: var(--muted); font-size: 11px; }
+  .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid rgba(255,255,255,.25); border-radius: 50%; cursor: pointer; background: rgb(var(--gc)); }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--text); }
+  .swatch-none { background: transparent; border-style: dashed; }
+  .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
   /* Grouping: sites bucketed by their label, each bucket collapsible. */
   .sites-groupby { padding: 6px 10px; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
   .group-section { margin-bottom: 18px; }
@@ -62,6 +114,14 @@
   .group-head:hover .collapse-toggle { color: var(--accent); }
   .group-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .group-name { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+  .group-section.group-c1 .group-name, .group-section.group-c2 .group-name,
+  .group-section.group-c3 .group-name, .group-section.group-c4 .group-name,
+  .group-section.group-c5 .group-name, .group-section.group-c6 .group-name { color: rgb(var(--gc)); }
+  .group-section.group-c1 .group-head, .group-section.group-c2 .group-head,
+  .group-section.group-c3 .group-head, .group-section.group-c4 .group-head,
+  .group-section.group-c5 .group-head, .group-section.group-c6 .group-head {
+    border-left: 3px solid rgb(var(--gc)); padding-left: 9px;
+  }
   .group-count { color: var(--muted); font-size: 12px; }
   .group-section.collapsed .card { display: none; }
 

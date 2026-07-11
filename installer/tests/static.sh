@@ -66,6 +66,17 @@ grep -q '@app.post("/api/group/{project}")' "$ROOT/runtime/app.py"
 grep -q 'GROUP_RE' "$ROOT/runtime/app.py"
 grep -q 'id="sites-groupby"' "$ROOT/runtime/manage.html"
 grep -q 'id="new-group"' "$ROOT/runtime/deploy.html"
+# 0.5.17: the group chip IS the editor. The group flow must never open the site's
+# log console again (its "output" header and copy icon are meaningless in a form).
+grep -q 'function editGroup' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'const EDITING_GROUP = new Set' "$ROOT/runtime/assets/cockpit.js"
+grep -q '/group-colors' "$ROOT/runtime/assets/cockpit.js"   # built as ${BASE}/group-colors
+grep -q '@app.post("/api/group-colors")' "$ROOT/runtime/app.py"
+grep -q 'GROUP_COLORS_FILE' "$ROOT/runtime/app.py"
+if grep -q 'function showGroup' "$ROOT/runtime/assets/cockpit.js"; then
+  echo "the group editor must not reuse the output box (showGroup was removed in 0.5.17)" >&2
+  exit 1
+fi
 grep -q '.card.collapsed .actions' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'oninput="filterProjects(this.value)"' "$ROOT/runtime/manage.html"
 if grep -RIE 'cockpit-allowed\.conf' "$ROOT/runtime" "$ROOT/install.sh" "$ROOT/installer/nginx.conf.tpl"; then

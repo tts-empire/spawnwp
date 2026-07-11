@@ -53,6 +53,8 @@ grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 # Manage dashboard: resilient refresh + collapse + filter (0.5.14).
 grep -q 'function filterProjects' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'function toggleCollapse' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'function collapseKey' "$ROOT/runtime/assets/cockpit.js"
+grep -q 'card-title" role="button"' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'const DESTROYING = new Set' "$ROOT/runtime/assets/cockpit.js"
 grep -q '.card.collapsed .actions' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'oninput="filterProjects(this.value)"' "$ROOT/runtime/manage.html"

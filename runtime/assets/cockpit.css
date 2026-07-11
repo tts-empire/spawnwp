@@ -40,9 +40,13 @@
   .card-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .card-meta a:hover { color: var(--text) !important; }
 
-  /* Collapse: chevron in the title toggles a compact one-line view. */
-  .collapse-toggle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 6px; padding: 0; vertical-align: -3px; color: var(--muted); background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; transition: transform .15s ease, color .15s ease; }
-  .collapse-toggle:hover { color: var(--text); }
+  /* Collapse: the whole site-name row is the toggle (a big, easy target); the
+     chevron is just a visual affordance. Links in .card-meta stay independent. */
+  .card-title { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; border-radius: 6px; transition: color .12s ease; }
+  .card-title:hover { color: var(--accent); }
+  .card-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .collapse-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; color: var(--muted); font-size: 18px; line-height: 1; transition: transform .15s ease, color .12s ease; }
+  .card-title:hover .collapse-toggle { color: var(--accent); }
   .card.collapsed .collapse-toggle { transform: rotate(-90deg); }
   .card.collapsed .svc-table,
   .card.collapsed .actions,

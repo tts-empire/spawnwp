@@ -31,9 +31,16 @@ function collapsedSet() {
 function saveCollapsed(set) {
   try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set])); } catch (e) { /* ignore */ }
 }
+// Reflect a card's collapsed state on its clickable title (a11y: aria-expanded).
+function setTitleExpanded(name) {
+  const title = document.querySelector(`#card-${name} .card-title`);
+  const card = document.getElementById(`card-${name}`);
+  if (title && card) title.setAttribute('aria-expanded', card.classList.contains('collapsed') ? 'false' : 'true');
+}
 function applyCollapsed(name) {
   const card = document.getElementById(`card-${name}`);
   if (card) card.classList.toggle('collapsed', collapsedSet().has(name));
+  setTitleExpanded(name);
 }
 function toggleCollapse(name) {
   const card = document.getElementById(`card-${name}`);
@@ -42,12 +49,22 @@ function toggleCollapse(name) {
   const collapsed = card.classList.toggle('collapsed');
   if (collapsed) set.add(name); else set.delete(name);
   saveCollapsed(set);
+  setTitleExpanded(name);
+}
+// The site-name row is the toggle: activate it with Enter/Space too.
+function collapseKey(event, name) {
+  if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault();
+    toggleCollapse(name);
+  }
 }
 function collapseAll() {
   const set = collapsedSet();
   document.querySelectorAll('#projects-list .card').forEach(c => {
     c.classList.add('collapsed');
-    set.add(c.id.replace('card-', ''));
+    const name = c.id.replace('card-', '');
+    set.add(name);
+    setTitleExpanded(name);
   });
   saveCollapsed(set);
 }
@@ -55,7 +72,9 @@ function expandAll() {
   const set = collapsedSet();
   document.querySelectorAll('#projects-list .card').forEach(c => {
     c.classList.remove('collapsed');
-    set.delete(c.id.replace('card-', ''));
+    const name = c.id.replace('card-', '');
+    set.delete(name);
+    setTitleExpanded(name);
   });
   saveCollapsed(set);
 }
@@ -834,7 +853,7 @@ function renderTop(p) {
 
   return `<div class="card-header">
       <div>
-        <div class="card-title"><button class="collapse-toggle" type="button" title="Collapse / expand this site" aria-label="Collapse or expand" onclick="toggleCollapse('${p.name}')">▾</button>${esc(p.name)}</div>
+        <div class="card-title" role="button" tabindex="0" aria-expanded="true" title="Collapse / expand this site" onclick="toggleCollapse('${p.name}')" onkeydown="collapseKey(event, '${p.name}')"><span class="collapse-toggle" aria-hidden="true">▾</span>${esc(p.name)}</div>
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
       </div>

@@ -4,6 +4,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.15
+
+- **Easier to collapse a site.** The collapse control on the Manage dashboard is now the whole
+  site-name row, not just a tiny chevron: click anywhere on the name to collapse or expand. The
+  chevron is larger and clearer, and the row is keyboard-focusable (Enter/Space). The site's
+  links below the name are unaffected.
+
 ## 0.5.14
 
 - **The Manage dashboard no longer blanks out.** Bringing a site Down or Destroying it could

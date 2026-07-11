@@ -7,20 +7,51 @@ FROM wordpress:php${PHP_VERSION}-fpm
 ARG PHP_VERSION
 ARG WORDPRESS_VERSION=latest
 
+# FTP/FTPS: WordPress reported "ftp and ftps are not available" because ext/ftp was
+# never installed. FTPS additionally needs OpenSSL *headers* (libssl-dev — the base
+# image only ships the runtime) AND an explicit opt-in: the implicit "FTPS comes with
+# openssl" path only applies when PHP itself is configured --with-openssl, which is
+# not the case here because docker-php-ext-install builds each extension standalone
+# via phpize.
+#
+# The opt-in flag was RENAMED in PHP 8.4, and passing the wrong one aborts configure
+# with "unrecognized options" (verified on every version we build):
+#   PHP <= 8.3  ->  --with-openssl-dir
+#   PHP >= 8.4  ->  --with-ftp-ssl
+#
+# Pre-configuring ftp here leaves a Makefile behind, and docker-php-ext-install skips
+# re-configuring when one exists ([ -e Makefile ] || docker-php-ext-configure "$ext"),
+# so the batch install below honours the SSL-enabled config — the same trick already
+# used for gd. Note: imap cannot be added this way on 8.4 (dropped from core).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev \
         libmagickwand-dev \
         libwebp-dev \
         libzip-dev \
         libexif-dev \
+        libssl-dev \
+        libxml2-dev \
+        libgmp-dev \
         unzip \
         less \
         mariadb-client \
+    && if [ "$(printf '%s\n8.4\n' "$PHP_VERSION" | sort -V | head -1)" = "8.4" ]; then \
+           docker-php-ext-configure ftp --with-ftp-ssl; \
+       else \
+           docker-php-ext-configure ftp --with-openssl-dir; \
+       fi \
     && docker-php-ext-install \
         intl \
         zip \
         exif \
         bcmath \
+        ftp \
+        soap \
+        sockets \
+        pcntl \
+        gmp \
+        pdo_mysql \
+        calendar \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install gd \
     && pecl install imagick redis \

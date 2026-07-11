@@ -4,6 +4,21 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.18
+
+- **FTP and FTPS now work.** Sites reported *"ftp and ftps are not available"*: the PHP image never
+  installed the `ftp` extension. It now does, with **FTPS enabled on every PHP version we build**
+  (7.4, 8.2, 8.3, 8.4) — which also required the OpenSSL headers (`libssl-dev`, the base image ships
+  only the runtime) and the explicit FTPS opt-in, whose flag was renamed in PHP 8.4
+  (`--with-openssl-dir` up to 8.3, `--with-ftp-ssl` from 8.4). Reported by
+  [@wpeasy](https://github.com/wpeasy).
+- **Missing extensions added**: `pdo_mysql`, `soap`, `sockets`, `pcntl`, `gmp`, `calendar`. The image
+  previously had only `pdo_sqlite` — WordPress was fine (it uses `mysqli`), which hid the gap, but
+  any plugin using PDO with MySQL failed.
+- Existing sites keep their current container and do not pick this up automatically: rebuild the PHP
+  image (System → refresh PHP images) and recreate the site. New sites get it out of the box. The
+  first deploy per PHP version after updating pays a one-off ~5-minute image rebuild.
+
 ## 0.5.17
 
 - **The group is now a click-to-edit chip.** In 0.5.16 the 🏷 Group button opened the site's *log

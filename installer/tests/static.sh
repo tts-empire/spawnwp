@@ -48,6 +48,13 @@ grep -q 'input:focus-visible,button:focus-visible' "$ROOT/runtime/auth.py"
 grep -q 'System → Blueprint capture' "$ROOT/runtime/assets/cockpit.js"
 grep -q 'UPDATE sessions SET recent_auth' "$ROOT/runtime/auth.py"
 grep -q 'php-switch-progress.py' "$ROOT/updater/managed-files.json"
+# PHP image (0.5.18): FTP/FTPS and the extensions sites depend on. FTPS needs the
+# OpenSSL headers plus an explicit opt-in whose flag was renamed in PHP 8.4 —
+# a refactor that drops any of these silently breaks FTPS again.
+grep -q 'libssl-dev' "$ROOT/runtime/docker/php/Dockerfile"
+grep -q -- '--with-ftp-ssl' "$ROOT/runtime/docker/php/Dockerfile"
+grep -q -- '--with-openssl-dir' "$ROOT/runtime/docker/php/Dockerfile"
+grep -q 'pdo_mysql' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
 grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 # Manage dashboard: resilient refresh + collapse + filter (0.5.14).

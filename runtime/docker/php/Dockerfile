@@ -56,6 +56,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-install gd \
     && pecl install imagick redis \
     && docker-php-ext-enable imagick redis \
+    # Xdebug: xdebug.ini (copied below) ships it commented out and `make xdebug-on`
+    # uncomments `zend_extension=xdebug` — but the module was never actually installed,
+    # so the toggle only produced "Failed loading Zend extension 'xdebug'". Install it
+    # here, and leave it DISABLED (no docker-php-ext-enable): xdebug.ini is the switch.
+    # Current Xdebug requires PHP >= 8.0, so 7.4 must pin the last version that supports it.
+    && if [ "$(printf '%s\n8.0\n' "$PHP_VERSION" | sort -V | head -1)" = "8.0" ]; then \
+           pecl install xdebug; \
+       else \
+           pecl install xdebug-3.1.6; \
+       fi \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # WP-CLI

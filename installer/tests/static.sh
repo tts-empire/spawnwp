@@ -55,6 +55,41 @@ grep -q 'libssl-dev' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-ftp-ssl' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-openssl-dir' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q 'pdo_mysql' "$ROOT/runtime/docker/php/Dockerfile"
+
+# Every extension the image installs must be documented. A hand-kept list rots the
+# first time someone adds an extension and forgets the page — and a docs page that
+# lies is worse than no page. Adding an extension without documenting it fails CI.
+# Sources: the docker-php-ext-install list, the standalone `docker-php-ext-install gd`,
+# and the PECL line (imagick, redis).
+DOCKERFILE="$ROOT/runtime/docker/php/Dockerfile"
+EXT_DOC="$ROOT/docs/wordpress-development.md"
+# Strip comments first (they mention 'docker-php-ext-install' in prose), then join
+# backslash-continued lines so a multi-line install list reads as one command.
+DOCKERFILE_FLAT=$(sed 's/#.*$//' "$DOCKERFILE" | sed -e :a -e '/\\$/N; s/\\\n/ /; ta')
+IMAGE_EXTS=$(
+  {
+    grep -oE 'docker-php-ext-install [a-z_0-9 ]+' <<<"$DOCKERFILE_FLAT" | sed 's/docker-php-ext-install //'
+    grep -oE 'pecl install [a-z_0-9 ]+'           <<<"$DOCKERFILE_FLAT" | sed 's/pecl install //'
+  } | tr ' ' '\n' | sort -u | grep -vE '^$'
+)
+if [ -z "$IMAGE_EXTS" ]; then
+  echo "static.sh could not parse any extension out of the php Dockerfile — fix the parser" >&2
+  exit 1
+fi
+# Search only the extensions table, not the whole page: a name mentioned in the
+# "Not available" section (e.g. imap) must not count as documenting an extension we
+# actually ship — that would let the page claim the opposite of the truth.
+EXT_TABLE=$(sed -n '/^## PHP extensions/,/^### Not available/p' "$EXT_DOC")
+if [ -z "$EXT_TABLE" ]; then
+  echo "docs/wordpress-development.md is missing the '## PHP extensions' section" >&2
+  exit 1
+fi
+for ext in $IMAGE_EXTS; do
+  if ! grep -qw "$ext" <<<"$EXT_TABLE"; then
+    echo "PHP extension '$ext' is installed in the image but not documented in the extensions table of docs/wordpress-development.md" >&2
+    exit 1
+  fi
+done
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
 grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 # Manage dashboard: resilient refresh + collapse + filter (0.5.14).

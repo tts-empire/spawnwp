@@ -4,6 +4,23 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.19
+
+- **Xdebug now actually works.** `make xdebug-on` was documented and offered, but **Xdebug had never
+  been installed in the PHP image** — since the first release. Enabling it only uncommented a
+  `zend_extension=xdebug` line pointing at a module that didn't exist, so PHP replied *"Failed
+  loading Zend extension 'xdebug'"* and no debugging happened. It is now installed on every PHP
+  version (7.4 pins Xdebug 3.1.6, the last release supporting it; 8.2+ get 3.5.x) and still
+  **disabled by default**. Found while writing the documentation below.
+- **The PHP extensions available to sites are now documented** on the
+  [WordPress development](wordpress-development.md) page: every extension, grouped by purpose, the
+  same on every PHP version. It also states plainly that **`ftp` is outbound only** (site code can
+  reach out to a remote FTP/FTPS server; nothing can FTP *into* a site) and that **`imap` is not
+  available** (removed from PHP core in 8.4). A CI check reads the extensions straight from the
+  image's Dockerfile, so the list can't silently go stale.
+- Xdebug arrives with a rebuilt PHP image: new sites get it automatically; existing sites need an
+  image rebuild (System → refresh PHP images) and a Down/Up.
+
 ## 0.5.18
 
 - **FTP and FTPS now work.** Sites reported *"ftp and ftps are not available"*: the PHP image never

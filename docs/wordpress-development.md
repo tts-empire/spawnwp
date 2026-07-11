@@ -86,6 +86,46 @@ cockpit's **✉️ Mailpit ▸** button to inspect content, headers and HTML ren
 - PHP 7.4 is an explicitly legacy, end-of-life option for compatibility work only.
   Keep PHP 8.3 or newer for new projects and public production sites.
 - Toggle Xdebug with `make xdebug-on` / `make xdebug-off` (listens on port 9003; point
-  your IDE at it over an SSH tunnel).
+  your IDE at it over an SSH tunnel). It is off by default, so it costs you nothing until
+  you ask for it.
+
+## PHP extensions
+
+Every site gets the same set on **every** PHP version (7.4, 8.2, 8.3, 8.4), so switching
+version never changes what your code can call.
+
+| Area | Extensions |
+|------|------------|
+| Database | `mysqli`, `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `mysqlnd` |
+| Images | `gd` (JPEG + WebP), `imagick`, `exif` |
+| Web & data | `curl`, `openssl`, `sodium`, `json`, `dom`, `simplexml`, `xml`, `xmlreader`, `xmlwriter`, `libxml`, `soap` |
+| Text & i18n | `mbstring`, `iconv`, `intl`, `ctype`, `pcre` |
+| Files & archives | `zip`, `zlib`, `fileinfo`, `phar` |
+| Maths | `bcmath`, `gmp` |
+| Networking | `ftp` (with FTPS), `sockets` |
+| Process & time | `pcntl`, `posix`, `calendar` |
+| Caching & perf | `opcache`, `redis` |
+| Debugging | `xdebug` (installed, disabled by default — see above) |
+
+To see the exact list for a running site, open its **⌨ WP-CLI** console in the cockpit and run:
+
+```
+eval "print_r(get_loaded_extensions());"
+```
+
+### FTP is outbound only
+
+`ftp` gives your site's PHP code the **client** functions — `ftp_connect()` and
+`ftp_ssl_connect()` — so plugins can reach **out** to a remote FTP/FTPS server (backup plugins
+pushing archives off-site, migration plugins pulling files in). FTPS is enabled on every PHP
+version.
+
+It does **not** make your site reachable *over* FTP. There is no FTP or SFTP daemon in the
+stack, and every container port binds to loopback. To work on a site's files, use the cockpit's
+**📂 Files** browser or the **⌨ WP-CLI** console.
+
+### Not available
+
+`imap` — removed from PHP core in 8.4, so it is not installable across the versions we build.
 
 See the [CLI reference](cli-reference.md) for all `make` targets.

@@ -103,6 +103,7 @@ def main() -> int:
                 "migrations/install-image-gc-units.py",
                 "migrations/install-site-expiry-units.py",
                 "migrations/add-ingest-nginx-location.py",
+                "migrations/enable-http2.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -143,6 +144,7 @@ def main() -> int:
                 "installer/migrations/install-image-gc-units.py",
                 "installer/migrations/install-site-expiry-units.py",
                 "installer/migrations/add-ingest-nginx-location.py",
+                "installer/migrations/enable-http2.py",
             ],
             "files": entries,
         }

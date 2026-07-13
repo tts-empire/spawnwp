@@ -68,6 +68,22 @@ def write_atomic(path: Path, text: str) -> None:
     os.replace(temporary, path)
 
 
+def image_identity(project: Path, php_version: str, wp_version: str) -> tuple[str, str, str]:
+    """Image tag, WP tag suffix and build-context hash, from the one definition
+    in scripts/lib-image.sh — never recomputed here.
+
+    Getting this from a second, hand-rolled copy is precisely what broke: this
+    script used to build with SPAWNWP_CONTEXT_HASH unset, so compose stamped the
+    image label "dev" and every subsequent deploy on that PHP version saw a hash
+    mismatch and rebuilt from scratch (~5 minutes)."""
+    def ask(*args: str) -> str:
+        return subprocess.run(
+            ["bash", "scripts/lib-image.sh", *args], cwd=project,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    return ask("tag", php_version, wp_version), ask("suffix", wp_version), ask("hash", wp_version)
+
+
 def command(args: list[str], project: Path, *, structured: bool = False) -> int:
     process = subprocess.Popen(
         args, cwd=project, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -163,13 +179,22 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
 
         original = env_path.read_text()
         previous = env_value(original, "PHP_VERSION", "8.3")
-        image = f"wp-dev-php:{version}"
+        # The site keeps its WordPress version across a PHP switch, but the image
+        # tag encodes it, so the target tag has to be derived from both.
+        wp_version = env_value(original, "WP_VERSION", "latest") or "latest"
+        image, wp_suffix, context_hash = image_identity(project, version, wp_version)
         cached = subprocess.run(
             ["docker", "image", "inspect", image], capture_output=True,
         ).returncode == 0
         emit("start", previous=previous, target=version, first_download=not cached)
         updated = replace_env(original, "PHP_VERSION", version)
+        # Also (re)write WP_IMAGE_SUFFIX: sites created before 0.5.20 don't have
+        # it, and compose needs it to resolve the same tag we just computed.
+        updated = replace_env(updated, "WP_IMAGE_SUFFIX", wp_suffix)
         write_atomic(env_path, updated)
+        # Without this the build stamps the label "dev" and poisons the cache for
+        # every later deploy on this PHP version.
+        os.environ["SPAWNWP_CONTEXT_HASH"] = context_hash
 
         started = False
         try:

@@ -4,6 +4,34 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.20
+
+- **Deploys stopped reusing the PHP image, and rebuilt it (~5 min) every single time.** The image
+  tag was keyed on the PHP version alone, but the image *contents* also depend on the WordPress
+  version baked into it — so a site on `latest` and a blueprint pinning a WP version fought over one
+  mutable tag, re-tagging it from under each other and rebuilding forever. The tag now carries the
+  WordPress version (`wp-dev-php:8.4`, `wp-dev-php:8.4-wp7.0.1`). This also fixes an unreported
+  hazard: a site brought Down and Up again could return on *another site's* WordPress core.
+- **Switching a site's PHP version poisoned the image cache**, labelling the image `dev` so that
+  every later deploy on that version rebuilt. The cache key now lives in exactly one place, and CI
+  fails if a second copy appears.
+- **A deploy could fail with *"This does not seem to be a WordPress installation"*** and roll the
+  site back. Bootstrap waited for the database but not for WordPress: the PHP health check is a
+  config syntax test that passes long before the first-run extraction finishes. It now waits for the
+  core files, and nginx gets the same start-up grace as PHP (the *"container was not healthy"* half
+  of the report).
+- **System → Refresh failed with `Exited with code 2`** on installs whose primary project has no
+  `.env` — a `grep` exiting non-zero under `set -euo pipefail` killed the script before its own
+  fallback. The same trap was lurking in the image garbage collector; both fixed.
+- **A stray file (an editor backup, `.DS_Store`) in the image build directory forced a needless
+  rebuild** and propagated into every site created afterwards. The cache key is now computed over
+  the files the Dockerfile actually uses, and CI fails if a new build input goes unregistered.
+- **HTTP/2 is enabled** for sites and the cockpit — nginx was already built for it and terminating
+  TLS with ALPN; it was just never switched on. Existing installations are migrated on update.
+
+All of the above was reported by [@wpeasy](https://github.com/wpeasy) in
+[discussion #8](https://github.com/tts-empire/spawnwp/discussions/8).
+
 ## 0.5.19
 
 - **Xdebug now actually works.** `make xdebug-on` was documented and offered, but **Xdebug had never

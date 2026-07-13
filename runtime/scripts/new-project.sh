@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 RUNTIME_ROOT="$(pwd)"   # absolute runtime dir, before any later cd into the site
 source /etc/spawnwp/config.env
+source "${RUNTIME_ROOT}/scripts/lib-image.sh"
 
 export DOCKER_CONFIG=${DOCKER_CONFIG:-/var/lib/spawnwp/docker}
 install -d -m 0700 "$DOCKER_CONFIG"
@@ -117,6 +118,11 @@ cp -r docker "${PROJ_DIR}/"
 # Pre-0.3.13 stacks mounted a docker/mariadb/custom.cnf that never existed, so
 # Docker auto-created an empty DIRECTORY with that name; don't propagate it.
 rm -rf "${PROJ_DIR}/docker/mariadb/custom.cnf"
+# Same idea for the php build context: anything that is not a build input (an
+# editor backup, .DS_Store) would otherwise ride along, shift this site's context
+# hash, and cost it a needless 5-minute rebuild — plus break cache sharing with
+# every other site. write_php_ini below re-creates zz-site.ini.
+spawnwp_prune_image_context "${PROJ_DIR}"
 cp Makefile "${PROJ_DIR}/"
 cp -r scripts "${PROJ_DIR}/"
 write_php_ini "${PROJ_DIR}"
@@ -132,6 +138,7 @@ cat > "${PROJ_DIR}/.env" <<EOF
 COMPOSE_PROJECT_NAME=${NAME}
 PHP_VERSION=${PHP_VERSION}
 WP_VERSION=${WP_VERSION}
+WP_IMAGE_SUFFIX=$(spawnwp_wp_suffix "${WP_VERSION}")
 WP_DEBUG=${WP_DEBUG_VALUE}
 SPAWNWP_BLUEPRINT=${BLUEPRINT_ID}
 SPAWNWP_BLUEPRINT_VERSION=${BLUEPRINT_VERSION}
@@ -260,11 +267,8 @@ cd "${PROJ_DIR}"
 # call: images past SPAWNWP_IMAGE_MAX_AGE_DAYS (default 7) are only FLAGGED as
 # stale — the cockpit's System info tab offers a manual Refresh; nothing rebuilds
 # automatically. Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
-IMAGE="wp-dev-php:${PHP_VERSION}"
-# zz-site.ini is a runtime mount (per-site values), not part of the image:
-# keep it out of the hash or every custom PHP setting would force a rebuild.
-CONTEXT_HASH=$( { cd docker/php && find . -type f ! -name 'zz-site.ini' -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
-                  echo "wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
+IMAGE=$(spawnwp_image_tag "${PHP_VERSION}" "${WP_VERSION}")
+CONTEXT_HASH=$(spawnwp_context_hash "${WP_VERSION}")
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
 NEED_BUILD=0

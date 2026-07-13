@@ -29,7 +29,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      # 60s, matching php: on a first start nginx cannot serve anything until the
+      # php entrypoint has finished extracting WordPress into the empty volume.
+      # With the old 10s grace this probe could burn its retries first and the
+      # container came up "unhealthy", failing the deploy.
+      start_period: 60s
 
   php:
     build:
@@ -38,7 +42,14 @@ services:
         PHP_VERSION: ${PHP_VERSION:-8.3}
         WORDPRESS_VERSION: ${WP_VERSION:-latest}
         SPAWNWP_CONTEXT_HASH: ${SPAWNWP_CONTEXT_HASH:-dev}
-    image: wp-dev-php:${PHP_VERSION:-8.3}
+    # The tag carries the WordPress version because the image CONTENT does: the
+    # Dockerfile bakes WORDPRESS_VERSION into /usr/src/wordpress. Keyed on PHP
+    # alone, a `latest` site and one pinning WP 7.0.1 shared this single mutable
+    # tag and re-tagged it from under each other — rebuilding forever, and
+    # occasionally bringing a recreated site back up on another site's core.
+    # WP_IMAGE_SUFFIX lives in .env (written by new-project.sh) so that every
+    # entry point — make up, php-switch, the cockpit — resolves the same tag.
+    image: wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}
     restart: unless-stopped
     extra_hosts:
       - "${DOMAIN:-dev.example.com}:host-gateway"

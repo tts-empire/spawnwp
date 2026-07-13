@@ -1448,6 +1448,11 @@ def _metric_incr(key: str, n: int = 1) -> None:
 PHP_IMAGE_REPO = "wp-dev-php"
 REFRESH_IMAGE_TOOL = PRIMARY_PROJECT / "scripts" / "refresh-image.sh"
 PHP_VER_RE = re.compile(r"^[0-9]+\.[0-9]+$")
+# Image tags carry the WordPress version when a site pins one: "8.4", "8.4-wp7.0.1".
+# The image content depends on it (the Dockerfile bakes WORDPRESS_VERSION in), so
+# the tag must too — otherwise pinned and latest sites re-tag one shared name from
+# under each other and rebuild forever. See runtime/scripts/lib-image.sh.
+IMAGE_TAG_RE = re.compile(r"^([0-9]+\.[0-9]+)(?:-wp([0-9.]+))?$")
 
 
 def _config_env_get(key: str, default: str) -> str:
@@ -1482,19 +1487,29 @@ def _image_age_days(created: str) -> int:
     return max(0, int((datetime.now(timezone.utc) - then).total_seconds() // 86400))
 
 
-def _php_versions_in_use() -> dict[str, list[str]]:
+def _image_tags_in_use() -> dict[str, list[str]]:
+    """Map image tag ("8.4", "8.4-wp7.0.1") -> the sites running it.
+
+    Resolved exactly the way compose resolves it — PHP_VERSION + WP_IMAGE_SUFFIX
+    straight from the site's .env — and deliberately NOT re-derived from
+    WP_VERSION: sites created before 0.5.20 have no WP_IMAGE_SUFFIX and really do
+    run the unsuffixed tag, whatever WordPress they pinned. This map is what stops
+    the image GC and the delete button removing an image out from under a running
+    site, so it has to describe reality rather than intent.
+    """
     used: dict[str, list[str]] = {}
     for proj in get_projects():
-        ver = _read_env(proj).get("PHP_VERSION", "")
+        env = _read_env(proj)
+        ver = env.get("PHP_VERSION", "")
         if ver:
-            used.setdefault(ver, []).append(proj.name)
+            used.setdefault(ver + env.get("WP_IMAGE_SUFFIX", ""), []).append(proj.name)
     return used
 
 
 @app.get("/api/images")
 def list_images():
     stale_days = int(_config_env_get("SPAWNWP_IMAGE_MAX_AGE_DAYS", "7") or 7)
-    used = _php_versions_in_use()
+    used = _image_tags_in_use()
     images = []
     raw = run(["docker", "image", "ls", PHP_IMAGE_REPO, "--format", "json"], PRIMARY_PROJECT)
     for line in raw.splitlines():
@@ -1503,40 +1518,43 @@ def list_images():
         except json.JSONDecodeError:
             continue
         tag = entry.get("Tag", "")
-        if not PHP_VER_RE.match(tag):
+        match = IMAGE_TAG_RE.match(tag)
+        if not match:
             continue
         created = run(["docker", "image", "inspect", "-f", "{{.Created}}",
                        f"{PHP_IMAGE_REPO}:{tag}"], PRIMARY_PROJECT)
         age = _image_age_days(created)
         images.append({
             "tag": f"{PHP_IMAGE_REPO}:{tag}",
-            "php_version": tag,
+            "image_tag": tag,                     # what delete/refresh key on
+            "php_version": match.group(1),
+            "wp_version": match.group(2) or "latest",
             "size_gb": round(_parse_size(entry.get("Size", "0B")), 2),
             "age_days": age,
             "stale": age >= stale_days,
             "used_by": sorted(used.get(tag, [])),
         })
-    images.sort(key=lambda i: i["php_version"])
+    images.sort(key=lambda i: (i["php_version"], i["wp_version"]))
     return {"images": images, "stale_days": stale_days}
 
 
 class ImageDelete(BaseModel):
-    php_version: str
-    confirm: str   # must match php_version (guards against accidental click)
+    image_tag: str
+    confirm: str   # must match image_tag (guards against accidental click)
 
 
 @app.post("/api/images/delete")
 def delete_image(body: ImageDelete):
-    if not PHP_VER_RE.match(body.php_version):
-        raise HTTPException(400, "Invalid PHP version")
-    if body.confirm != body.php_version:
+    if not IMAGE_TAG_RE.match(body.image_tag):
+        raise HTTPException(400, "Invalid image tag")
+    if body.confirm != body.image_tag:
         raise HTTPException(400, "Confirmation does not match")
     guard_not_busy()
-    users = _php_versions_in_use().get(body.php_version, [])
+    users = _image_tags_in_use().get(body.image_tag, [])
     if users:
         raise HTTPException(409, f"Image in use by: {', '.join(sorted(users))}. "
                                  "Destroy or switch those sites first.")
-    tag = f"{PHP_IMAGE_REPO}:{body.php_version}"
+    tag = f"{PHP_IMAGE_REPO}:{body.image_tag}"
     out = run(["docker", "rmi", tag], PRIMARY_PROJECT)
     if "Error" in out or "unable" in out.lower():
         raise HTTPException(409, out.splitlines()[-1] if out else "Unable to delete the image")

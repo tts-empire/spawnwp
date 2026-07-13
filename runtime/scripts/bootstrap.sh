@@ -6,6 +6,11 @@ WP=(docker compose exec -T -u www-data php wp)
 
 echo "==> Waiting for MariaDB..."
 until docker compose exec -T db mariadb -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1" &>/dev/null; do sleep 2; done
+# ...and for WordPress itself. Waiting only for the database used to let this
+# script race the php entrypoint's first-run extraction of the core files and
+# fail with "This does not seem to be a WordPress installation" (discussion #8).
+echo "==> Waiting for the WordPress core files..."
+bash scripts/wait-for-wordpress.sh
 docker compose exec -T -u www-data php chmod -R a+rX /var/www/html 2>/dev/null || true
 if "${WP[@]}" core is-installed 2>/dev/null; then
   echo "WordPress already installed - skipping bootstrap."

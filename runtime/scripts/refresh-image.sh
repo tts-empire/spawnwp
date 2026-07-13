@@ -6,6 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source /etc/spawnwp/config.env
+source "$(pwd)/scripts/lib-image.sh"
 
 export DOCKER_CONFIG=${DOCKER_CONFIG:-/var/lib/spawnwp/docker}
 
@@ -18,14 +19,20 @@ fi
 # WP build args: same values new-project.sh uses (blueprints share them), read
 # from the primary .env with the compose defaults as fallback, so the context
 # hash stamped here matches the one the create gate computes.
-WP_VERSION=$(grep -E '^WP_VERSION=' .env 2>/dev/null | cut -d= -f2)
+#
+# `|| true` is load-bearing. When the primary project has no .env (it is often a
+# scaffold used only to build images) grep exits 2, not 1 — under `pipefail` the
+# pipeline inherits that, and under `set -e` the assignment aborts the script
+# before the ${WP_VERSION:-latest} fallback below can run. 2>/dev/null hides
+# grep's message, not its exit status. That is what made System → Refresh fail
+# with a bare "Exited with code 2" (reported by @wpeasy, discussion #8).
+WP_VERSION=$(grep -E '^WP_VERSION=' .env 2>/dev/null | cut -d= -f2 || true)
 export WP_VERSION="${WP_VERSION:-latest}"
 export PHP_VERSION="$VER"
+export WP_IMAGE_SUFFIX=$(spawnwp_wp_suffix "$WP_VERSION")
 
-IMAGE="wp-dev-php:${VER}"
-# zz-site.ini is a runtime mount, excluded from the hash exactly as in new-project.sh.
-CONTEXT_HASH=$( { cd docker/php && find . -type f ! -name 'zz-site.ini' -print0 | LC_ALL=C sort -z | xargs -0 sha256sum; \
-                  echo "wp=${WP_VERSION}"; } | sha256sum | cut -c1-12 )
+IMAGE=$(spawnwp_image_tag "$VER" "$WP_VERSION")
+CONTEXT_HASH=$(spawnwp_context_hash "$WP_VERSION")
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 
 echo "==> Refreshing ${IMAGE}: pulling the latest base and rebuilding..."

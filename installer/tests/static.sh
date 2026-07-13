@@ -90,6 +90,67 @@ for ext in $IMAGE_EXTS; do
     exit 1
   fi
 done
+# ── PHP image identity (0.5.20) ───────────────────────────────────────────────
+# The image tag must carry the WordPress version, because the image CONTENT does
+# (the Dockerfile bakes WORDPRESS_VERSION in). Keyed on PHP alone, a `latest` site
+# and one pinning a WP version re-tagged a single shared name from under each
+# other and rebuilt forever — and a recreated site could come back up on another
+# site's WordPress core.
+LIB_IMAGE="$ROOT/runtime/scripts/lib-image.sh"
+grep -q 'spawnwp_image_tag'    "$LIB_IMAGE"
+grep -q 'spawnwp_context_hash' "$LIB_IMAGE"
+grep -q 'WP_IMAGE_SUFFIX' "$ROOT/runtime/compose.yaml"
+grep -q 'image: wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}' "$ROOT/runtime/compose.yaml"
+grep -q 'WP_IMAGE_SUFFIX' "$ROOT/runtime/scripts/new-project.sh"
+grep -q 'IMAGE_TAG_RE' "$ROOT/runtime/app.py"
+grep -q '_image_tags_in_use'  "$ROOT/runtime/app.py"
+
+# The context hash must exist in exactly ONE place. It used to be copy-pasted into
+# two scripts and MISSING from a third (php-switch), which built with
+# SPAWNWP_CONTEXT_HASH unset — compose then stamped the label "dev" and every later
+# deploy on that PHP version rebuilt from scratch. Re-introducing a second copy is
+# the bug, so fail on it.
+if grep -RIn -- 'find \. -type f' "$ROOT/runtime/scripts/" | grep -qv 'lib-image.sh'; then
+  echo "the php build-context hash must only be computed in runtime/scripts/lib-image.sh" >&2
+  grep -RIn -- 'find \. -type f' "$ROOT/runtime/scripts/" | grep -v 'lib-image.sh' >&2
+  exit 1
+fi
+grep -q 'SPAWNWP_CONTEXT_HASH' "$ROOT/runtime/scripts/php-switch-progress.py" || {
+  echo "php-switch must stamp SPAWNWP_CONTEXT_HASH, or its build poisons the image label with 'dev'" >&2
+  exit 1
+}
+
+# Every build input the Dockerfile COPYs must be in lib-image.sh's manifest.
+# Miss one and a change to it silently stops busting the cache: sites would keep
+# running a stale image with no way to tell. (zz-site.ini is excluded on purpose:
+# it is a per-site runtime mount, not a build input.)
+IMAGE_INPUTS=$(sed -n 's/^SPAWNWP_IMAGE_INPUTS=(\(.*\))$/\1/p' "$LIB_IMAGE")
+if [ -z "$IMAGE_INPUTS" ]; then
+  echo "static.sh could not parse SPAWNWP_IMAGE_INPUTS out of lib-image.sh — fix the parser" >&2
+  exit 1
+fi
+while read -r copied; do
+  [ -n "$copied" ] || continue
+  [ "$copied" = "zz-site.ini" ] && continue
+  if ! grep -qw -- "$copied" <<<"$IMAGE_INPUTS"; then
+    echo "the php Dockerfile COPYs '$copied' but it is not in SPAWNWP_IMAGE_INPUTS (runtime/scripts/lib-image.sh):" >&2
+    echo "  a change to it would not rebuild the image, and sites would silently keep a stale one" >&2
+    exit 1
+  fi
+done < <(grep -E '^COPY ' "$DOCKERFILE" | awk '{print $2}')
+
+# Deploys must not race the first-run WordPress extraction: the php healthcheck is
+# `php-fpm -t` (a config test) and passes long before the volume is populated, so
+# bootstrap died with "This does not seem to be a WordPress installation".
+grep -q 'wait-for-wordpress.sh' "$ROOT/runtime/scripts/bootstrap.sh"
+grep -q 'wp core version' "$ROOT/runtime/scripts/wait-for-wordpress.sh"
+
+# HTTP/2 on the TLS vhosts (nginx is already built --with-http_v2_module).
+if [ "$(grep -c 'listen \(\[::\]:\)\?443 ssl http2;' "$ROOT/installer/nginx.conf.tpl")" != "4" ]; then
+  echo "installer/nginx.conf.tpl must enable http2 on all four TLS listen lines (site + cockpit, v4 + v6)" >&2
+  exit 1
+fi
+
 grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
 grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 # Manage dashboard: resilient refresh + collapse + filter (0.5.14).

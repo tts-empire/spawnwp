@@ -523,7 +523,9 @@ async function loadBlueprints() {
   if (!select || !catalog) return;
   // Built images are only needed for the expected-time estimate: never block on them.
   fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json())
-    .then(data => { PHP_IMAGES = (data.images || []).map(img => img.php_version); updateExpectedTime(); })
+    // De-duplicated: one PHP version can now have several images (one per pinned
+    // WordPress version), and this list is only asked "is PHP x.y built at all?".
+    .then(data => { PHP_IMAGES = [...new Set((data.images || []).map(img => img.php_version))]; updateExpectedTime(); })
     .catch(() => {});
   try {
     const response = await fetch(`${BASE}/blueprints`, { cache: 'no-store' });
@@ -2099,8 +2101,13 @@ function renderImages(data) {
       : '<span class="badge badge-gray">no sites</span>';
     const delBtn = img.used_by.length
       ? `<button class="btn-neutral btn-sm" disabled title="In use by ${esc(img.used_by.join(', '))} — cannot be deleted">Delete</button>`
-      : `<button class="btn-neutral btn-sm" onclick="deleteImage('${esc(img.php_version)}')">Delete</button>`;
-    return `<tr><td><b>PHP ${esc(img.php_version)}</b></td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
+      : `<button class="btn-neutral btn-sm" onclick="deleteImage('${esc(img.image_tag)}')">Delete</button>`;
+    // A site that pins a WordPress version gets its own image: show which, so two
+    // rows reading "PHP 8.4" are not a mystery.
+    const wp = img.wp_version === 'latest'
+      ? ''
+      : ` <span class="badge badge-gray" title="This image bakes in WordPress ${esc(img.wp_version)}, pinned by a blueprint">WP ${esc(img.wp_version)}</span>`;
+    return `<tr><td><b>PHP ${esc(img.php_version)}</b>${wp}</td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
       <td class="table-actions"><button class="btn-neutral btn-sm sensitive" onclick="refreshImage('${esc(img.php_version)}')" title="Rebuild now with the latest WordPress (~5 min)">Refresh</button>${delBtn}</td></tr>`;
   }).join('');
 }
@@ -2124,22 +2131,24 @@ function refreshImage(version) {
   });
 }
 
-async function deleteImage(version) {
+// tag is the image tag, e.g. "8.4" or "8.4-wp7.0.1" — not just the PHP version,
+// because a pinned-WordPress blueprint has an image of its own.
+async function deleteImage(tag) {
   if (blockedIfBusy()) return;
-  const warn = `Delete the PHP ${version} image?\n\n`
-    + `It frees its disk space, but the NEXT deploy on PHP ${version} will rebuild it from scratch (about 5 minutes instead of ~35 seconds).\n\n`
-    + `Type the version “${version}” to confirm.`;
+  const warn = `Delete the PHP image ${tag}?\n\n`
+    + `It frees its disk space, but the NEXT deploy on ${tag} will rebuild it from scratch (about 5 minutes instead of ~35 seconds).\n\n`
+    + `Type “${tag}” to confirm.`;
   const typed = prompt(warn);
   if (typed === null) return;
-  if (typed.trim() !== version) { showToast('Version mismatch: deletion cancelled', true); return; }
+  if (typed.trim() !== tag) { showToast('Tag mismatch: deletion cancelled', true); return; }
   try {
     const res = await sensitiveFetch(`${BASE}/images/delete`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ php_version: version, confirm: typed.trim() }),
+      body: JSON.stringify({ image_tag: tag, confirm: typed.trim() }),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload.detail || res.statusText);
-    showToast(`Image PHP ${version} deleted`);
+    showToast(`Image ${tag} deleted`);
   } catch (e) {
     showToast(e.message, true);
   }

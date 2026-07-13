@@ -50,7 +50,8 @@ class PhpSwitchProgressTests(unittest.TestCase):
             root = Path(tmp)
             project = self.project(root)
             output = StringIO()
-            with mock.patch.object(progress.subprocess, "run", return_value=SimpleNamespace(returncode=1)), \
+            with mock.patch.object(progress.subprocess, "run",
+                                   return_value=SimpleNamespace(returncode=1, stdout="")), \
                  mock.patch.object(progress, "command", return_value=1), redirect_stdout(output):
                 result = progress.switch(project, "8.4", root / "locks")
             self.assertEqual(1, result)
@@ -61,13 +62,43 @@ class PhpSwitchProgressTests(unittest.TestCase):
             root = Path(tmp)
             project = self.project(root)
             output = StringIO()
-            with mock.patch.object(progress.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+            with mock.patch.object(progress.subprocess, "run",
+                                   return_value=SimpleNamespace(returncode=0, stdout="")), \
                  mock.patch.object(progress, "run_simple", return_value=0), \
                  mock.patch.object(progress, "healthy", return_value=True), redirect_stdout(output):
                 result = progress.switch(project, "8.4", root / "locks")
             self.assertEqual(0, result)
             self.assertIn("PHP_VERSION=8.4", (project / ".env").read_text())
             self.assertIn('"type":"complete"', output.getvalue())
+
+    def test_switch_stamps_the_context_hash_and_the_image_suffix(self):
+        """A switch must build with SPAWNWP_CONTEXT_HASH set.
+
+        It used to build without it, so compose stamped the image label "dev" and
+        every later deploy on that PHP version saw a cache miss and rebuilt from
+        scratch (~5 min). It must also record WP_IMAGE_SUFFIX, which is how compose
+        resolves the image tag — sites created before 0.5.20 have no such line.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = self.project(root)
+            (project / ".env").write_text("PHP_VERSION=8.3\nWP_VERSION=7.0.1\n")
+            answers = {"tag": "wp-dev-php:8.4-wp7.0.1", "suffix": "-wp7.0.1", "hash": "abc123def456"}
+
+            def fake_run(args, **kwargs):
+                if args[:2] == ["bash", "scripts/lib-image.sh"]:
+                    return SimpleNamespace(returncode=0, stdout=answers[args[2]] + "\n")
+                return SimpleNamespace(returncode=0, stdout="")
+
+            output = StringIO()
+            with mock.patch.object(progress.subprocess, "run", side_effect=fake_run), \
+                 mock.patch.object(progress, "run_simple", return_value=0), \
+                 mock.patch.object(progress, "healthy", return_value=True), \
+                 mock.patch.dict(progress.os.environ, {}, clear=False), redirect_stdout(output):
+                result = progress.switch(project, "8.4", root / "locks")
+                self.assertEqual("abc123def456", progress.os.environ["SPAWNWP_CONTEXT_HASH"])
+            self.assertEqual(0, result)
+            self.assertIn("WP_IMAGE_SUFFIX=-wp7.0.1", (project / ".env").read_text())
 
 
 if __name__ == "__main__":

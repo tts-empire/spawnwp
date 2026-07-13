@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SpawnWP — Self-hosted WordPress development labs</title>
-  <meta name="description" content="SpawnWP is a free, self-hosted WordPress development lab. Create isolated, disposable sites on your Debian or Ubuntu server from a focused web cockpit.">
+  <title>Self-Hosted WordPress Sandbox and Development Lab | SpawnWP</title>
+  <meta name="description" content="Spawn disposable, isolated WordPress test sites on your own Debian or Ubuntu server. Free, open source, remotely accessible and built for developers.">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <link rel="canonical" href="https://spawnwp.com/">
-  <meta property="og:title" content="SpawnWP — Self-hosted WordPress development labs">
+  <meta property="og:title" content="SpawnWP — Self-hosted WordPress sandbox and development lab">
   <meta property="og:description" content="Create isolated, disposable WordPress sites on your own Debian or Ubuntu server. Free, open source and built for development, testing and demos.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://spawnwp.com/">
@@ -20,7 +20,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="SpawnWP: create isolated WordPress sites on your own server">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="SpawnWP — Self-hosted WordPress development labs">
+  <meta name="twitter:title" content="SpawnWP — Self-hosted WordPress sandbox and development lab">
   <meta name="twitter:description" content="Create isolated, disposable WordPress sites on your own Debian or Ubuntu server.">
   <meta name="twitter:image" content="https://spawnwp.com/assets/og-spawnwp-wordpress-lab.png">
   <meta name="twitter:image:alt" content="SpawnWP: create isolated WordPress sites on your own server">
@@ -44,10 +44,9 @@
       <span>Spawn<strong>WP</strong></span>
     </a>
     <nav id="primary-nav" aria-label="Primary navigation">
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="/plugin/">Optional WP plugin</a>
-      <a href="/roadmap/">Roadmap</a>
+      <a href="/use-cases/">Use Cases</a>
+      <a href="/alternatives/">Alternatives</a>
+      <a href="/guides/">Guides</a>
       <a href="/docs/">Docs</a>
       <a href="https://github.com/tts-empire/spawnwp">GitHub</a>
     </nav>
@@ -57,9 +56,9 @@
     <section class="hero">
       <div class="spawn-grid" aria-hidden="true"><i></i><i></i><i></i><i class="ghost"></i><i></i><i></i></div>
       <div class="hero-copy">
-        <div class="eyebrow">Free, self-hosted WordPress lab</div>
+        <div class="eyebrow">Free, self-hosted WordPress sandbox and lab</div>
         <h1>Your WordPress dev lab.<br>Your server.<br><em>Your rules.</em></h1>
-        <p class="lede">Turn a fresh Debian or Ubuntu server into your own disposable WordPress lab — whether it is a cloud VM, VPS, dedicated server or bare metal. Create isolated environments without sandbox limits, subscriptions or lock-in.</p>
+        <p class="lede">Turn a fresh Debian or Ubuntu server into your own remotely accessible WordPress sandbox and development lab. Create disposable, isolated environments without a hosted control plane, per-site subscription or lock-in.</p>
         <div class="actions">
           <a class="button primary" href="#install">Install SpawnWP</a>
           <a class="button secondary" href="/docs/">Read the docs</a>
@@ -98,8 +97,18 @@
 
     <section class="manifesto section-narrow">
       <div class="eyebrow">A lab without the sandbox tax</div>
-      <p>Cloud WordPress sandboxes are useful — until the limits, expirations and recurring costs start getting in the way. SpawnWP gives you the same freedom to experiment, but on infrastructure you control.</p>
+      <p>Cloud WordPress sandboxes are useful — until the limits, expirations and recurring costs start getting in the way. <a class="inline-link" href="/wordpress-sandbox/">SpawnWP runs the sandbox on infrastructure you control.</a></p>
       <strong>No monthly sandbox tax. No artificial limits. No lock-in.</strong>
+    </section>
+
+    <section class="section">
+      <div class="eyebrow">Explore by intent</div>
+      <h2>Start with the problem, not the product vocabulary.</h2>
+      <div class="hub-grid">
+        <a class="hub-card" href="/wordpress-sandbox/"><span class="mini-mark">Category</span><h3>Self-hosted WordPress sandbox</h3><p>Understand isolation, lifetimes, remote access, requirements and boundaries.</p><span class="card-link">Explore the sandbox →</span></a>
+        <a class="hub-card" href="/alternatives/"><span class="mini-mark">Comparisons</span><h3>Cloud, desktop or self-hosted</h3><p>Compare InstaWP, Local and TasteWP with clear trade-offs and dated sources.</p><span class="card-link">See alternatives →</span></a>
+        <a class="hub-card" href="/use-cases/plugin-development/"><span class="mini-mark">Workflow</span><h3>Plugin development and testing</h3><p>Use WordPress.org QA tools, static analysis, runtime inspection and multiple PHP versions.</p><span class="card-link">See the workflow →</span></a>
+      </div>
     </section>
 
     <section class="principles" aria-label="Product principles">
@@ -129,7 +138,7 @@
         <article><span class="cell-mark" data-cell="5" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Built-in file browser</h3><p>Browse, edit, upload and download each site's files from the cockpit — scoped to that site's container, with a Passkey confirmation before any change.</p></article>
         <article><span class="cell-mark" data-cell="6" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>WordPress QA</h3><p>The development blueprint includes Plugin Check, Theme Check, PHPCS, PHPStan and Query Monitor.</p></article>
         <article><span class="cell-mark" data-cell="8" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Secure defaults</h3><p>HTTPS, mandatory cockpit authentication, random secrets and loopback-only service ports.</p></article>
-        <article><span class="cell-mark" data-cell="3" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit.</p></article>
+        <article><span class="cell-mark" data-cell="3" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>Multiple PHP versions</h3><p>Select a supported PHP runtime when creating an environment and keep project requirements explicit. <a href="/guides/test-wordpress-multiple-php-versions/">Follow the compatibility workflow →</a></p></article>
         <article><span class="cell-mark" data-cell="7" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><h3>No SaaS lock-in</h3><p>The runtime lives on your server and the project is distributed under the MIT License.</p></article>
         <article class="feature-wide"><div class="mini-mark">Cockpit or terminal</div><h3>Everything is scriptable.</h3><p>The cockpit covers day-to-day work, but nothing hides behind it. The <code>spawnwp</code> CLI handles the platform (updates, rollback, auth reset, telemetry), and every site ships a Makefile with targets for WP-CLI, Composer, npm, snapshots and restore, Xdebug and PHP switching.</p><a href="/docs/cli-reference/">View the CLI reference →</a></article>
         <article class="feature-wide"><div class="mini-mark">Optional WordPress plugin</div><h3>Need to move a finished site out of your lab?</h3><p>Use any backup, migration or publishing workflow you prefer. If the destination is a separate, fresh WordPress installation, the optional SpawnWP Deploy plugin can transfer the site once for you. The plugin is not required to use SpawnWP.</p><a href="/plugin/">See the optional WordPress plugin →</a></article>
@@ -154,7 +163,7 @@
   <footer>
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>Spawn<strong>WP</strong></span></a>
     <p>Self-hosted tooling for disposable WordPress development environments.</p>
-    <div><a href="/roadmap/">Roadmap</a><a href="/docs/">Documentation</a><a href="https://github.com/tts-empire/spawnwp/blob/main/LICENSE">MIT License</a></div>
+    <div><a href="/use-cases/">Use Cases</a><a href="/alternatives/">Alternatives</a><a href="/guides/">Guides</a><a href="/plugin/">Plugin</a><a href="/roadmap/">Roadmap</a><a href="/docs/">Docs</a><a href="https://github.com/tts-empire/spawnwp/blob/main/LICENSE">MIT License</a></div>
     <div class="social"><a href="https://github.com/tts-empire/spawnwp" rel="noopener" aria-label="SpawnWP on GitHub" title="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a><a href="https://www.facebook.com/profile.php?id=61591870231670" rel="noopener" aria-label="SpawnWP on Facebook" title="Facebook"><svg viewBox="0 0 320 512" aria-hidden="true" focusable="false"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/></svg></a></div>
   </footer>
   <a class="support-fab" href="https://buymeacoffee.com/spawnwp.com" target="_blank" rel="noopener noreferrer" aria-label="Support SpawnWP — buy me a coffee"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 3.5v2M10.5 3.5v2M14 3.5v2"/></svg><span>Buy me a coffee</span></a>

@@ -21,6 +21,7 @@
         if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(command);
         else fallbackCopy(command);
         button.classList.add('is-copied');
+        document.dispatchEvent(new CustomEvent('spawnwp:command-copied'));
         button.setAttribute('aria-label', 'Installation command copied');
         button.setAttribute('title', 'Copied');
         button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>';

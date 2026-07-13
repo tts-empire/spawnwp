@@ -2,7 +2,7 @@
 <h1 align="center">SpawnWP</h1>
 
 <p align="center">
-  <strong>A self-hosted WordPress lab for disposable dev environments.</strong><br>
+  <strong>A free, open-source, self-hosted WordPress sandbox and remote development lab.</strong><br>
   Bring your server. Spawn temporary WordPress projects without server babysitting.
 </p>
 
@@ -20,6 +20,11 @@ metal — into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an
 nginx TLS edge, and a web **cockpit** from which you spawn, reset, snapshot and
 destroy WordPress environments — each in its own container stack.
+
+→ [Self-hosted WordPress sandbox](https://spawnwp.com/wordpress-sandbox/) ·
+[Use cases](https://spawnwp.com/use-cases/) ·
+[Guides](https://spawnwp.com/guides/) ·
+[Alternatives](https://spawnwp.com/alternatives/)
 
 The goal is brutally simple:
 

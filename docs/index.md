@@ -1,5 +1,6 @@
 ---
-description: SpawnWP is a free, self-hosted WordPress development lab for creating isolated, disposable sites on your own Debian or Ubuntu server.
+title: SpawnWP Documentation — Install and Run a Self-Hosted WordPress Lab
+description: Install, configure and use SpawnWP to create isolated WordPress development and testing environments on your own Debian or Ubuntu server.
 ---
 
 # SpawnWP
@@ -80,3 +81,12 @@ empty cockpit and prints its one-time activation procedure.
 
 [MIT](https://github.com/tts-empire/spawnwp/blob/main/LICENSE). Free to use, modify and
 share.
+
+## Explore workflows
+
+The documentation explains setup and operation. For a problem-oriented overview, see:
+
+- [Self-hosted WordPress sandbox](https://spawnwp.com/wordpress-sandbox/)
+- [WordPress plugin development environment](https://spawnwp.com/use-cases/plugin-development/)
+- [Testing a plugin across multiple PHP versions](https://spawnwp.com/guides/test-wordpress-multiple-php-versions/)
+- [WordPress sandbox vs staging](https://spawnwp.com/guides/wordpress-sandbox-vs-staging/)

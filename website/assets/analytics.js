@@ -12,3 +12,24 @@ _paq.push(['enableLinkTracking']);
   var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
   g.async = true; g.src = u + 'matomo.js'; s.parentNode.insertBefore(g, s);
 })();
+
+// Qualified SEO funnel events. The current path is the event name so Matomo can
+// compare which landing pages move readers towards setup and source code.
+(function () {
+  function track(action) {
+    _paq.push(['trackEvent', 'SEO Funnel', action, window.location.pathname]);
+  }
+
+  document.addEventListener('click', function (event) {
+    var link = event.target.closest && event.target.closest('a[href]');
+    if (!link) return;
+    var href = link.getAttribute('href') || '';
+    if (href.indexOf('/docs/requirements/') === 0) track('visit_requirements');
+    else if (href.indexOf('/docs/installation/') === 0) track('visit_installation');
+    else if (href.indexOf('https://github.com/tts-empire/spawnwp') === 0) track('visit_github');
+  });
+
+  document.addEventListener('spawnwp:command-copied', function () {
+    track('copy_install_command');
+  });
+})();

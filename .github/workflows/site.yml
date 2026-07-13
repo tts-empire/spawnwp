@@ -1,0 +1,49 @@
+name: site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - website/**
+      - docs/**
+      - mkdocs.yml
+      - install.sh
+      - ops/website/**
+      - .github/workflows/site.yml
+  pull_request:
+    paths:
+      - website/**
+      - docs/**
+      - mkdocs.yml
+      - install.sh
+      - ops/website/**
+      - .github/workflows/site.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r website/requirements.txt
+      - run: |
+          mkdir -p /tmp/spawnwp-public
+          rsync -a --exclude=docs --exclude=sitemap-pages.xml website/ /tmp/spawnwp-public/
+          install -m 0644 install.sh /tmp/spawnwp-public/install.sh
+          python ops/website/generate-sitemap.py --root website --repo . --output /tmp/spawnwp-public/sitemap-pages.xml
+          mkdocs build --strict -f website/mkdocs-public.yml -d /tmp/spawnwp-public/docs
+          python ops/website/check-site.py --root /tmp/spawnwp-public --sitemap /tmp/spawnwp-public/sitemap-pages.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-site-preview
+          path: /tmp/spawnwp-public
+          if-no-files-found: error
+          retention-days: 7

@@ -4,6 +4,9 @@ description: Develop and test WordPress plugins and themes with SpawnWP, its QA 
 
 # WordPress development
 
+For a workflow overview before the command-level reference, see the
+[WordPress plugin development and testing environment](https://spawnwp.com/use-cases/plugin-development/).
+
 When a project is finished, use any backup, export, migration or publishing workflow
 you prefer. The [optional SpawnWP Deploy WordPress plugin](deploying-a-site.md) is one
 way to copy a site once to a separate, fresh WordPress installation; it is not required
@@ -80,6 +83,9 @@ notifications, your plugin's mails) is captured instead of delivered. Open it fr
 cockpit's **✉️ Mailpit ▸** button to inspect content, headers and HTML rendering.
 
 ## PHP versions & Xdebug
+
+For a repeatable compatibility matrix, follow
+[How to test a WordPress plugin across multiple PHP versions](https://spawnwp.com/guides/test-wordpress-multiple-php-versions/).
 
 - Switch a site's PHP version from the cockpit (**PHP ▾**) or the CLI
   (`make php-switch VER=8.4`). Cached versions switch instantly.

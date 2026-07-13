@@ -56,6 +56,28 @@ empty target and must be tested with rollback enabled.
 
 ## Changelog
 
+### 0.3.4-dev
+
+- **The blueprint capture form remembers what you last captured.** Re-pushing an update to
+  an existing blueprint no longer means retyping the id, name, description and capture
+  options: they are pre-filled from your previous capture on that server, with the patch
+  version bumped (`1.4.9` → `1.4.10`). This matters beyond convenience — the documented
+  workflow is to re-capture with the *same id* to **replace** a blueprint, and a mistyped
+  id silently forks a new one instead.
+  The fields are remembered per SpawnWP server connection, and are saved even when a
+  capture then fails (an oversized payload, an unreachable server), which is exactly when
+  retyping hurts most. A first-ever capture is unchanged. A *Start a new blueprint* button
+  clears the form when you want a different blueprint rather than a new version of the
+  same one. Requested by [@wpeasy](https://github.com/wpeasy) in
+  [discussion #9](https://github.com/tts-empire/spawnwp/discussions/9).
+
+### 0.3.3-dev
+
+- **Kind-aware package exclusions.** Directories named `Upgrade/`, `Cache/` or `Backup/`
+  inside plugin *source* trees are legitimate code and are now kept, while the same names
+  are still stripped from user uploads. Fixes a fatal on sites deployed with MetaBox AIO,
+  whose `MBB\Upgrade\Manager` class was being dropped from the package.
+
 ### 0.3.2-dev
 
 - **Capture the source WordPress version.** A captured blueprint now records the origin

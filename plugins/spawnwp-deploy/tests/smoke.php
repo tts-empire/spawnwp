@@ -57,6 +57,67 @@ SpawnWP_Deploy_Blueprint::render_panel();
 $panel = ob_get_clean();
 $assert( str_contains( $panel, 'Create a SpawnWP blueprint from this site' ), 'Blueprint hero is the primary panel' );
 
+// Blueprint form memory (0.3.4): the capture form pre-fills from the last capture, so
+// re-pushing an update to an existing blueprint doesn't mean retyping every field —
+// and, crucially, doesn't invite a typo'd id that silently forks a new blueprint.
+$blueprint_call = static function ( string $method, ...$args ) {
+	$reflected = new ReflectionMethod( 'SpawnWP_Deploy_Blueprint', $method );
+	$reflected->setAccessible( true );
+	return $reflected->invoke( null, ...$args );
+};
+$next_version = static fn( string $v ) => $blueprint_call( 'next_version', $v );
+$last_fields  = static fn( string $pin ) => $blueprint_call( 'last_fields', $pin );
+$remember     = static fn( string $conn, array $f ) => $blueprint_call( 'remember_fields', $conn, $f );
+
+$assert( '1.0.1' === $next_version( '1.0.0' ), 'next_version bumps the patch level' );
+$assert( '1.2.10' === $next_version( '1.2.9' ), 'next_version carries past 9 without touching minor' );
+$assert( '1.0.0' === $next_version( 'not-a-version' ), 'next_version falls back to 1.0.0 when unparseable' );
+
+$saved_conn = get_option( 'spawnwp_deploy_last_blueprint_conn' );
+delete_option( 'spawnwp_deploy_last_blueprint_conn' );
+$assert( array() === $last_fields( '8.3' ), 'No memory yet: the form keeps its first-capture defaults' );
+
+// A stale option must never brick the form. capture_fields() rejects an empty PHP set
+// and an empty capture set, so if PHP_CHOICES ever drops a version, a blueprint captured
+// against it would otherwise render a form that cannot be submitted.
+$remember(
+	'smoke-conn',
+	array(
+		'id'          => 'smoke-bp',
+		'name'        => 'Smoke',
+		'description' => 'Smoke test blueprint',
+		'version'     => '2.4.7',
+		'php_default' => '5.6',
+		'php_allowed' => array( '5.6' ),
+		'capture'     => array( 'plugins' => false, 'themes' => false, 'uploads' => false, 'database' => false ),
+	)
+);
+$stale = $last_fields( '8.3' );
+$assert( 'smoke-bp' === $stale['id'], 'Memory round trip: the blueprint id comes back' );
+$assert( '2.4.8' === $stale['version'], 'Pre-filled version is the bumped patch of the last capture' );
+$assert( array( '8.3' ) === $stale['php_allowed'], 'A stale PHP version falls back to this site\'s PHP' );
+$assert( '8.3' === $stale['php_default'], 'The PHP default always sits inside the allowed set' );
+$assert( ! in_array( false, $stale['capture'], true ), 'An all-empty capture set falls back to capturing everything' );
+
+// The capture form only renders when a server is connected; without one the panel shows
+// the pairing box instead, and there is no form to pre-fill.
+$active_servers = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE role='server' AND status='active'" );
+if ( $active_servers ) {
+	ob_start();
+	SpawnWP_Deploy_Blueprint::render_panel();
+	$prefilled = ob_get_clean();
+	$assert( str_contains( $prefilled, 'value="smoke-bp"' ), 'The panel pre-fills the blueprint id from the last capture' );
+	$assert( str_contains( $prefilled, 'id="spawnwp-bp-reset"' ), 'A pre-filled form offers "Start a new blueprint"' );
+} else {
+	echo "SKIP: panel pre-fill assertions need an active server connection\n";
+}
+
+delete_option( 'spawnwp_deploy_last_blueprint_smoke-conn' );
+delete_option( 'spawnwp_deploy_last_blueprint_conn' );
+if ( $saved_conn ) {
+	update_option( 'spawnwp_deploy_last_blueprint_conn', $saved_conn, false );
+}
+
 $secret_plaintext = SpawnWP_Deploy_Crypto::random_token( 32 );
 $encrypted        = SpawnWP_Deploy_Crypto::encrypt( $secret_plaintext );
 $assert( $encrypted !== $secret_plaintext && SpawnWP_Deploy_Crypto::decrypt( $encrypted ) === $secret_plaintext, 'Key storage encrypt/decrypt round trip' );

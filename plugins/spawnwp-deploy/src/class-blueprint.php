@@ -167,7 +167,12 @@ final class SpawnWP_Deploy_Blueprint {
 	}
 
 	private static function step_prepare( array $connection ): array {
-		$fields    = self::capture_fields();
+		$fields = self::capture_fields();
+		// Remember the fields here — after validation, but BEFORE the package build,
+		// which can legitimately fail (the 2 GiB payload limit is a real case). A
+		// failed capture is exactly when the operator must not have to retype
+		// everything, so the memory is written even when the capture then throws.
+		self::remember_fields( (string) $connection['id'], $fields );
 		$blueprint = self::build_manifest( $fields );
 		$local     = SpawnWP_Deploy_Database::uuid();
 		try {
@@ -250,6 +255,73 @@ final class SpawnWP_Deploy_Blueprint {
 			throw new RuntimeException( 'Select at least one component to capture.' );
 		}
 		return compact( 'id', 'name', 'description', 'version', 'php_default', 'php_allowed', 'capture' );
+	}
+
+	private static function remember_fields( string $connection_id, array $fields ): void {
+		// Keyed by connection, like the existing spawnwp_deploy_last_job_<connection_id>:
+		// two SpawnWP servers hold different blueprint sets, and pre-filling one from the
+		// other's ids invites an accidental fork. The pointer records which connection was
+		// captured last, because the panel renders a single shared form.
+		// $fields is capture_fields()' validated output (id, name, description, version,
+		// php_default, php_allowed, capture) — no secrets, so autoload stays off.
+		update_option( 'spawnwp_deploy_last_blueprint_' . $connection_id, $fields, false );
+		update_option( 'spawnwp_deploy_last_blueprint_conn', $connection_id, false );
+	}
+
+	private static function last_fields( string $php_pin ): array {
+		// The previous capture, sanitised into something the form can always render.
+		// Every field is re-checked rather than trusted, because the option can go STALE:
+		// if a future release drops a version from PHP_CHOICES, a blueprint captured
+		// against it would render the PHP row with nothing ticked, and capture_fields()
+		// would then reject the form ("Select at least one PHP version") for a user who
+		// never touched it. Same for an empty capture set. Returns array() when nothing is
+		// remembered, so a first-ever capture keeps the original static defaults.
+		$connection = (string) get_option( 'spawnwp_deploy_last_blueprint_conn', '' );
+		if ( '' === $connection ) {
+			return array();
+		}
+		$last = get_option( 'spawnwp_deploy_last_blueprint_' . $connection );
+		if ( ! is_array( $last ) || empty( $last['id'] ) ) {
+			return array();
+		}
+
+		$allowed = array_values( array_intersect( self::PHP_CHOICES, (array) ( $last['php_allowed'] ?? array() ) ) );
+		if ( ! $allowed ) {
+			$allowed = array( $php_pin );
+		}
+		$default = (string) ( $last['php_default'] ?? '' );
+		if ( ! in_array( $default, $allowed, true ) ) {
+			$default = in_array( $php_pin, $allowed, true ) ? $php_pin : $allowed[0];
+		}
+		$capture = array(
+			'plugins'  => ! empty( $last['capture']['plugins'] ),
+			'themes'   => ! empty( $last['capture']['themes'] ),
+			'uploads'  => ! empty( $last['capture']['uploads'] ),
+			'database' => ! empty( $last['capture']['database'] ),
+		);
+		if ( ! in_array( true, $capture, true ) ) {
+			$capture = array_fill_keys( array_keys( $capture ), true );
+		}
+
+		return array(
+			'id'          => (string) $last['id'],
+			'name'        => (string) ( $last['name'] ?? '' ),
+			'description' => (string) ( $last['description'] ?? '' ),
+			'version'     => self::next_version( (string) ( $last['version'] ?? '' ) ),
+			'php_default' => $default,
+			'php_allowed' => $allowed,
+			'capture'     => $capture,
+		);
+	}
+
+	private static function next_version( string $version ): string {
+		// Bump the patch level: the documented workflow is to update the source site and
+		// re-push to REPLACE the same blueprint, so the next capture is almost always a
+		// new version of the same thing. Anything unparseable resets to 1.0.0.
+		if ( ! preg_match( '/^(\d+)\.(\d+)\.(\d+)$/', $version, $matches ) ) {
+			return '1.0.0';
+		}
+		return $matches[1] . '.' . $matches[2] . '.' . ( (int) $matches[3] + 1 );
 	}
 
 	private static function build_manifest( array $fields ): array {
@@ -341,6 +413,18 @@ final class SpawnWP_Deploy_Blueprint {
 		$inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 		$php       = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
 		$php_pin   = in_array( $php, self::PHP_CHOICES, true ) ? $php : '8.2';
+		// Pre-fill from the previous capture; empty on a first-ever capture, where the
+		// static defaults below apply unchanged.
+		$last         = self::last_fields( $php_pin );
+		$last_capture = $last['capture'] ?? array(
+			'plugins'  => true,
+			'themes'   => true,
+			'uploads'  => true,
+			'database' => true,
+		);
+		$last_allowed = $last['php_allowed'] ?? array( $php_pin );
+		$last_default = $last['php_default'] ?? $php_pin;
+		$last_version = $last['version'] ?? '1.0.0';
 		?>
 		<section class="spawnwp-panel spawnwp-blueprint">
 			<h2>Create a SpawnWP blueprint from this site</h2>
@@ -375,31 +459,38 @@ final class SpawnWP_Deploy_Blueprint {
 						</ul>
 					</div>
 				<?php endif; ?>
+				<?php if ( $last ) : ?>
+					<p class="description" id="spawnwp-bp-prefilled">
+						Pre-filled from your last capture (<code><?php echo esc_html( $last['id'] ); ?></code>, now version
+						<code><?php echo esc_html( $last_version ); ?></code>). Re-capturing with the same id <strong>replaces</strong>
+						that blueprint. To create a different one, use <em>Start a new blueprint</em>.
+					</p>
+				<?php endif; ?>
 				<form id="spawnwp-blueprint-form" onsubmit="return false">
 					<table class="form-table" role="presentation">
 						<tr><th><label for="spawnwp-bp-id">Blueprint id</label></th>
-							<td><input type="text" id="spawnwp-bp-id" pattern="[a-z0-9][a-z0-9-]{0,30}" maxlength="31" class="regular-text" placeholder="my-agency-base" required>
+							<td><input type="text" id="spawnwp-bp-id" pattern="[a-z0-9][a-z0-9-]{0,30}" maxlength="31" class="regular-text" placeholder="my-agency-base" value="<?php echo esc_attr( $last['id'] ?? '' ); ?>" required>
 							<p class="description">Lowercase letters, digits and hyphens. Reusing an id lets you replace the existing blueprint.</p></td></tr>
 						<tr><th><label for="spawnwp-bp-name">Name</label></th>
-							<td><input type="text" id="spawnwp-bp-name" maxlength="60" class="regular-text" placeholder="Agency base setup" required></td></tr>
+							<td><input type="text" id="spawnwp-bp-name" maxlength="60" class="regular-text" placeholder="Agency base setup" value="<?php echo esc_attr( $last['name'] ?? '' ); ?>" required></td></tr>
 						<tr><th><label for="spawnwp-bp-description">Description</label></th>
-							<td><input type="text" id="spawnwp-bp-description" maxlength="240" class="large-text" placeholder="Usual plugins, theme and starting content" required></td></tr>
+							<td><input type="text" id="spawnwp-bp-description" maxlength="240" class="large-text" placeholder="Usual plugins, theme and starting content" value="<?php echo esc_attr( $last['description'] ?? '' ); ?>" required></td></tr>
 						<tr><th><label for="spawnwp-bp-version">Version</label></th>
-							<td><input type="text" id="spawnwp-bp-version" pattern="\d+\.\d+\.\d+" class="small-text" value="1.0.0" required></td></tr>
+							<td><input type="text" id="spawnwp-bp-version" pattern="\d+\.\d+\.\d+" class="small-text" value="<?php echo esc_attr( $last_version ); ?>" required></td></tr>
 						<tr><th>Contents</th><td>
-							<label><input type="checkbox" id="spawnwp-bp-plugins" checked> Plugin files (including premium/custom)</label><br>
-							<label><input type="checkbox" id="spawnwp-bp-themes" checked> Theme files</label><br>
-							<label><input type="checkbox" id="spawnwp-bp-uploads" checked> Media uploads</label><br>
-							<label><input type="checkbox" id="spawnwp-bp-database" checked> Database (posts, pages, settings &mdash; never users or passwords)</label>
+							<label><input type="checkbox" id="spawnwp-bp-plugins" <?php checked( ! empty( $last_capture['plugins'] ) ); ?>> Plugin files (including premium/custom)</label><br>
+							<label><input type="checkbox" id="spawnwp-bp-themes" <?php checked( ! empty( $last_capture['themes'] ) ); ?>> Theme files</label><br>
+							<label><input type="checkbox" id="spawnwp-bp-uploads" <?php checked( ! empty( $last_capture['uploads'] ) ); ?>> Media uploads</label><br>
+							<label><input type="checkbox" id="spawnwp-bp-database" <?php checked( ! empty( $last_capture['database'] ) ); ?>> Database (posts, pages, settings &mdash; never users or passwords)</label>
 						</td></tr>
 						<tr><th>PHP versions</th><td>
 							<?php foreach ( self::PHP_CHOICES as $choice ) : ?>
-								<label style="margin-right:12px"><input type="checkbox" class="spawnwp-bp-php" value="<?php echo esc_attr( $choice ); ?>" <?php checked( $choice === $php_pin ); ?>> <?php echo esc_html( $choice ); ?></label>
+								<label style="margin-right:12px"><input type="checkbox" class="spawnwp-bp-php" value="<?php echo esc_attr( $choice ); ?>" <?php checked( in_array( $choice, $last_allowed, true ) ); ?>> <?php echo esc_html( $choice ); ?></label>
 							<?php endforeach; ?>
 							<p class="description">Default for new sites:
 								<select id="spawnwp-bp-php-default">
 									<?php foreach ( self::PHP_CHOICES as $choice ) : ?>
-										<option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $choice === $php_pin ); ?>><?php echo esc_html( $choice ); ?></option>
+										<option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $choice === $last_default ); ?>><?php echo esc_html( $choice ); ?></option>
 									<?php endforeach; ?>
 								</select>
 								This site runs PHP <?php echo esc_html( $php ); ?>.</p>
@@ -408,6 +499,9 @@ final class SpawnWP_Deploy_Blueprint {
 					<?php foreach ( $servers as $server ) : ?>
 						<button class="button button-primary spawnwp-bp-start" data-connection="<?php echo esc_attr( $server['id'] ); ?>">Create blueprint on <?php echo esc_html( $server['label'] ?: $server['remote_url'] ); ?></button>
 					<?php endforeach; ?>
+					<?php if ( $last ) : ?>
+						<button type="button" class="button" id="spawnwp-bp-reset">Start a new blueprint</button>
+					<?php endif; ?>
 				</form>
 				<pre id="spawnwp-bp-log" hidden></pre>
 			<?php endif; ?>
@@ -418,6 +512,7 @@ final class SpawnWP_Deploy_Blueprint {
 			const ajaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 			const nonce=<?php echo wp_json_encode( wp_create_nonce( 'spawnwp_blueprint_ajax' ) ); ?>;
 			const premium=<?php echo wp_json_encode( count( $inventory['premium'] ) ); ?>;
+			const phpPin=<?php echo wp_json_encode( $php_pin ); ?>;
 			const log=document.getElementById('spawnwp-bp-log');
 			function line(text){log.hidden=false;log.textContent+=text+'\n';log.scrollTop=log.scrollHeight;}
 			function fields(){
@@ -470,6 +565,21 @@ final class SpawnWP_Deploy_Blueprint {
 				}catch(error){line('ERROR: '+error.message);button.disabled=false;}
 			}
 			document.querySelectorAll('.spawnwp-bp-start').forEach(button=>button.addEventListener('click',()=>capture(button)));
+			// Pre-filling biases the form towards REPLACING the last blueprint, which is
+			// the common case but makes starting a genuinely new one harder. Hand it back:
+			// restore the first-capture defaults, client-side, without touching the stored
+			// memory (a reload brings the pre-fill back).
+			const reset=document.getElementById('spawnwp-bp-reset');
+			if(reset)reset.addEventListener('click',()=>{
+				['spawnwp-bp-id','spawnwp-bp-name','spawnwp-bp-description'].forEach(id=>{document.getElementById(id).value='';});
+				document.getElementById('spawnwp-bp-version').value='1.0.0';
+				['spawnwp-bp-plugins','spawnwp-bp-themes','spawnwp-bp-uploads','spawnwp-bp-database'].forEach(id=>{document.getElementById(id).checked=true;});
+				document.querySelectorAll('.spawnwp-bp-php').forEach(box=>{box.checked=box.value===phpPin;});
+				document.getElementById('spawnwp-bp-php-default').value=phpPin;
+				const notice=document.getElementById('spawnwp-bp-prefilled');
+				if(notice)notice.hidden=true;
+				document.getElementById('spawnwp-bp-id').focus();
+			});
 		})();
 		</script>
 		<?php endif; ?>

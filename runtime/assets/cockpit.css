@@ -15,7 +15,7 @@
   .brand-name strong { color: var(--accent); font-weight: 650; }
   .brand-context { color: var(--muted); font-size: 12px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border-strong); }
   .brand-mark { width: 30px; height: 30px; display: grid; grid-template-columns: repeat(3, 8px); grid-template-rows: repeat(3, 8px); gap: 3px; flex: 0 0 30px; }
-  .brand-mark span { width: 8px; height: 8px; border-radius: 2px; background: #3b3b40; }
+  .brand-mark span { width: 8px; height: 8px; border-radius: 2px; background: #4a4a52; }
   .brand-mark .lit { background: var(--accent); }
   .brand-mark .outline { background: transparent; border: 2px solid var(--accent); }
   #header-clock { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 56px; }

@@ -164,7 +164,7 @@ final class SpawnWP_Deploy_Admin {
 		.spawnwp-brandbar{display:flex;align-items:center;gap:12px;margin:6px 0 22px}
 		.spawnwp-logo{width:38px;height:38px;border-radius:9px;background:#0d0d10;display:grid;place-content:center;flex:none}
 		.spawnwp-logo .grid{display:grid;grid-template-columns:repeat(3,6px);gap:3px}
-		.spawnwp-logo i{width:6px;height:6px;border-radius:2px;background:#3a3a3f}
+		.spawnwp-logo i{width:6px;height:6px;border-radius:2px;background:#4a4a52}
 		.spawnwp-logo i.on{background:#f6b269}
 		.spawnwp-logo i.ring{background:transparent;box-shadow:inset 0 0 0 1px #f6b269}
 		.spawnwp-word{font-size:22px;font-weight:600;letter-spacing:-.02em;color:#1d2327;line-height:1}

@@ -80,3 +80,15 @@ footer>p{flex:1 1 240px}@media(max-width:1050px){footer{flex-wrap:wrap}}
 @media(max-width:800px){.roadmap-hero{grid-template-columns:1fr;padding-top:64px}.roadmap-visual{margin:-12px auto 0;max-width:620px}.roadmap-intro{grid-template-columns:1fr;gap:28px}.roadmap-grid{grid-template-columns:1fr;gap:28px;padding-left:24px}.roadmap-grid::before{left:5px}.roadmap-card,.roadmap-card:nth-child(even),.roadmap-card:nth-child(even):hover{transform:none}.roadmap-card:hover{transform:none}.roadmap-card.wide,.roadmap-card:only-child{grid-column:auto;width:auto}.roadmap-card:nth-child(odd)::after,.roadmap-card:nth-child(even)::after,.roadmap-card:only-child::after{left:-26px;right:auto;top:50%}.roadmap-card h3{max-width:68%}.roadmap-section{padding-bottom:78px}}
 @media(max-width:520px){.roadmap-visual{margin-left:-24px;margin-right:-24px}.roadmap-node text{display:none}.roadmap-card{padding:28px;min-height:280px}.roadmap-card::before{right:24px;top:88px;width:58px;height:58px}.roadmap-card h3{font-size:24px}.roadmap-intro .lede{font-size:20px}}
 @media(prefers-reduced-motion:reduce){.roadmap-card,.roadmap-card:hover,.roadmap-card:nth-child(even),.roadmap-card:nth-child(even):hover{transition:none}}
+
+/* Social — the hover is the mark's own idea: a cell coming alive. The tile fills with apricot
+   from the bottom, exactly like the lit cell in the logo, rather than a generic glow. */
+.social{display:flex;gap:10px}
+.social a{position:relative;display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--line);border-radius:6px;background:var(--charcoal);color:var(--slate);overflow:hidden;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
+.social a::before{content:"";position:absolute;inset:0;background:var(--apricot);transform:scaleY(0);transform-origin:bottom;transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+.social a svg{position:relative;height:18px;width:auto;fill:currentColor;transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+.social a:hover,.social a:focus-visible{color:#111;border-color:var(--apricot);transform:translateY(-2px);box-shadow:0 8px 22px rgba(246,178,105,.22)}
+.social a:hover::before,.social a:focus-visible::before{transform:scaleY(1)}
+.social a:hover svg,.social a:focus-visible svg{transform:scale(1.08)}
+.social a:focus-visible{outline:2px solid var(--apricot);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.social a,.social a::before,.social a svg{transition:none}.social a:hover,.social a:focus-visible{transform:none}.social a:hover svg{transform:none}}

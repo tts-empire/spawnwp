@@ -122,6 +122,12 @@ def main() -> int:
         build_deploy_plugin_zip(deploy_zip)
         add_entry(entries, package, deploy_zip, "payload/runtime/assets/spawnwp-deploy.zip",
                   "runtime", "assets/spawnwp-deploy.zip", "0644")
+        # The plugin release public key, so new-project.sh can verify plugin
+        # zips fetched from spawnwp.com at spawn time. Distinct from the core
+        # key in payload/lib/release-public.pem — hence the explicit filename.
+        add_entry(entries, package, ROOT / "plugins" / "spawnwp-deploy" / "release-public.pem",
+                  "payload/runtime/assets/spawnwp-deploy-release-public.pem",
+                  "runtime", "assets/spawnwp-deploy-release-public.pem", "0644")
 
         archive = args.output / f"{prefix}.tar.gz"
         with archive.open("wb") as raw:

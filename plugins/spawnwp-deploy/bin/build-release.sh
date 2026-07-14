@@ -27,5 +27,12 @@ rm -f "$ZIP" "$ZIP.sha256" "$ZIP.sig"
 openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$ZIP.sha256" | base64 -w0 > "$ZIP.sig"
 printf '\n' >> "$ZIP.sig"
 
+# Unsigned pointer to the newest release, published alongside the artifacts so
+# spawn-time installs can discover it. Tampering is bounded: consumers only act
+# on versions newer than their bundled copy, and the artifact itself is signed.
+printf '{"version":"%s","zip":"%s","sha256":"%s"}\n' \
+  "$VERSION" "$(basename "$ZIP")" "$(cut -d' ' -f1 "$ZIP.sha256")" > "$DIST/latest.json"
+
 echo "Built: $ZIP"
 echo "SHA-256: $(cut -d' ' -f1 "$ZIP.sha256")"
+echo "Manifest: $DIST/latest.json (publish it with the artifacts)"

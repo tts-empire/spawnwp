@@ -59,8 +59,9 @@ these constraints do not fit your project.
 
 On a site created inside SpawnWP, the quickest way is to tick **Install the SpawnWP
 Deploy plugin** on the cockpit's Deploy page when you create the site — it arrives
-installed and activated from the signed copy bundled with SpawnWP. Otherwise install
-it by hand:
+installed and activated from the latest signed release (SpawnWP verifies its Ed25519
+signature; if the server is offline it falls back to the signed copy bundled with
+SpawnWP). Otherwise install it by hand:
 
 1. [Download the optional plugin](https://spawnwp.com/deploy/).
 2. In the source site inside SpawnWP, open **Plugins → Add New → Upload Plugin**,

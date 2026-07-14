@@ -344,12 +344,84 @@ echo "==> Fixing wp-content bind mount ownership (uid 33)..."
 chown -R 33:33 "${PROJ_DIR}/projects/primary/wp-content"
 
 # Optional: install the SpawnWP Deploy plugin when the cockpit checkbox asked
-# for it. The signed plugin zip ships with the cockpit at a stable path; if it
-# is missing the site is still created, just without the plugin (non-fatal).
+# for it. The plugin releases on its own cadence, so the copy bundled with the
+# core release can lag the published one: prefer the latest signed artifact
+# from spawnwp.com when it is strictly newer, and fall back to the bundle when
+# offline or when anything about the download fails verification (non-fatal —
+# the site is still created, at worst without the plugin).
+
+deploy_plugin_zip_version() {  # $1 = plugin zip -> prints the header Version, or nothing
+  python3 - "$1" <<'PY' 2>/dev/null || true
+import re, sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as z:
+    text = z.read("spawnwp-deploy/spawnwp-deploy.php").decode("utf-8", "replace")
+m = re.search(r"^\s*\*\s*Version:\s*(\S+)", text, re.M)
+print(m.group(1) if m else "")
+PY
+}
+
+# Exit 0 iff $1 is strictly newer than $2. A '-suffix' marks a pre-release of
+# its base version (sort -V would order 0.3.4-dev AFTER 0.3.4, backwards).
+deploy_plugin_version_newer() {
+  python3 - "$1" "$2" <<'PY' 2>/dev/null
+import re, sys
+def key(v):
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", v.strip())
+    if not m:
+        sys.exit(1)  # unparseable -> treat as not newer
+    a, b, c, pre = m.groups()
+    return (int(a), int(b), int(c), pre is None, pre or "")
+sys.exit(0 if key(sys.argv[1]) > key(sys.argv[2]) else 1)
+PY
+}
+
+# Downloads the newest published plugin into $1 when it is strictly newer than
+# the bundled version ($2), verifying sha256 + Ed25519 signature against the
+# pubkey shipped in assets. Sets DEPLOY_PLUGIN_ZIP on success. Only ever called
+# inside an if-condition, and every step carries '|| return 1', so any failure
+# is contained and lands in the caller's fallback branch despite errexit.
+try_fetch_latest_deploy_plugin() {  # $1 = workdir, $2 = bundled version
+  local base="${SPAWNWP_DEPLOY_PLUGIN_BASE_URL:-https://spawnwp.com/downloads/spawnwp-deploy}"
+  local pubkey="$RUNTIME_ROOT/assets/spawnwp-deploy-release-public.pem"
+  local ver zip
+  [ -f "$pubkey" ] || return 1
+  curl -fsSL --max-time 10 -o "$1/latest.json" "$base/latest.json" 2>/dev/null || return 1
+  ver=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$1/latest.json" 2>/dev/null) || return 1
+  zip=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["zip"])' "$1/latest.json" 2>/dev/null) || return 1
+  # The manifest is unsigned: constrain the filename it can point at.
+  [[ "$zip" =~ ^spawnwp-deploy-[A-Za-z0-9._-]+\.zip$ ]] || return 1
+  deploy_plugin_version_newer "$ver" "$2" || return 1
+  echo "  -> plugin release ${ver} is published (bundled: ${2}); downloading..."
+  curl -fsSL --max-time 60 -o "$1/$zip"        "$base/$zip"        2>/dev/null || return 1
+  curl -fsSL --max-time 10 -o "$1/$zip.sha256" "$base/$zip.sha256" 2>/dev/null || return 1
+  curl -fsSL --max-time 10 -o "$1/$zip.sig"    "$base/$zip.sig"    2>/dev/null || return 1
+  (cd "$1" && sha256sum -c "$zip.sha256" >/dev/null 2>&1) || return 1
+  base64 -d "$1/$zip.sig" > "$1/sig.bin" 2>/dev/null || return 1
+  openssl pkeyutl -verify -rawin -pubin -inkey "$pubkey" \
+    -in "$1/$zip.sha256" -sigfile "$1/sig.bin" >/dev/null 2>&1 || return 1
+  [ "$(deploy_plugin_zip_version "$1/$zip")" = "$ver" ] || return 1
+  DEPLOY_PLUGIN_ZIP="$1/$zip"
+}
+
 if [ "${SPAWNWP_INSTALL_DEPLOY_PLUGIN:-0}" = "1" ]; then
-  DEPLOY_PLUGIN_ZIP="${SPAWNWP_DEPLOY_PLUGIN_ZIP:-$RUNTIME_ROOT/assets/spawnwp-deploy.zip}"
+  DEPLOY_PLUGIN_SOURCE="bundled"
+  DEPLOY_FETCH_DIR=""
+  if [ -n "${SPAWNWP_DEPLOY_PLUGIN_ZIP:-}" ]; then
+    DEPLOY_PLUGIN_ZIP="$SPAWNWP_DEPLOY_PLUGIN_ZIP"   # explicit override: no fetch
+    DEPLOY_PLUGIN_SOURCE="override"
+  else
+    DEPLOY_PLUGIN_ZIP="$RUNTIME_ROOT/assets/spawnwp-deploy.zip"
+    BUNDLED_DEPLOY_VERSION=""
+    [ -f "$DEPLOY_PLUGIN_ZIP" ] && BUNDLED_DEPLOY_VERSION=$(deploy_plugin_zip_version "$DEPLOY_PLUGIN_ZIP")
+    DEPLOY_FETCH_DIR=$(mktemp -d)
+    if try_fetch_latest_deploy_plugin "$DEPLOY_FETCH_DIR" "${BUNDLED_DEPLOY_VERSION:-0.0.0}"; then
+      DEPLOY_PLUGIN_SOURCE="spawnwp.com (verified)"
+    else
+      echo "  -> no newer verified plugin release available; using the bundled copy${BUNDLED_DEPLOY_VERSION:+ (${BUNDLED_DEPLOY_VERSION})}."
+    fi
+  fi
   if [ -f "$DEPLOY_PLUGIN_ZIP" ]; then
-    echo "==> Installing the SpawnWP Deploy plugin..."
+    echo "==> Installing the SpawnWP Deploy plugin $(deploy_plugin_zip_version "$DEPLOY_PLUGIN_ZIP") [${DEPLOY_PLUGIN_SOURCE}]..."
     STAGED="${PROJ_DIR}/projects/primary/wp-content/.spawnwp-deploy.zip"
     install -m 0644 -o 33 -g 33 "$DEPLOY_PLUGIN_ZIP" "$STAGED"
     if docker compose exec -T -u www-data php wp plugin install /var/www/html/wp-content/.spawnwp-deploy.zip --activate --force; then
@@ -361,6 +433,7 @@ if [ "${SPAWNWP_INSTALL_DEPLOY_PLUGIN:-0}" = "1" ]; then
   else
     echo "  !! SpawnWP Deploy plugin bundle not found at ${DEPLOY_PLUGIN_ZIP}; skipping its installation." >&2
   fi
+  if [ -n "$DEPLOY_FETCH_DIR" ]; then rm -rf "$DEPLOY_FETCH_DIR"; fi
 fi
 
 # Aggregate local metrics (counters only — see lib-metrics.sh).

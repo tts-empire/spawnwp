@@ -50,7 +50,8 @@ The importer is the optional **SpawnWP Deploy** WordPress plugin.
 
 - **If the source site was created inside SpawnWP**, the quickest way is to tick
   *Install the SpawnWP Deploy plugin* when you create it — it arrives installed and
-  activated from the signed copy bundled with SpawnWP.
+  activated from the latest signed release (Ed25519-verified; offline it falls back
+  to the signed copy bundled with SpawnWP).
 - **On your own external WordPress**, install it by hand: download the signed package and
   verify its checksum and Ed25519 signature first. Follow
   [Install the WordPress plugin](deploying-a-site.md#install-the-wordpress-plugin).

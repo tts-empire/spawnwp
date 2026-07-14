@@ -4,6 +4,17 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.21
+
+- **Sites created with the "Install the SpawnWP Deploy plugin" checkbox now get the latest
+  published plugin release, not the copy frozen into the core release.** The plugin ships on its
+  own cadence, so the zip bundled at core-release time could lag behind the published one. At spawn
+  time SpawnWP now fetches the newest signed artifact from spawnwp.com, verifies its SHA-256 and
+  Ed25519 signature against the plugin release key (which now ships with the runtime), and installs
+  it only when it is strictly newer than the bundled copy. Offline — or on any verification
+  failure — it falls back to the bundled zip exactly as before, and the deploy log says which
+  version was installed and where it came from.
+
 ## 0.5.20
 
 - **Deploys stopped reusing the PHP image, and rebuilt it (~5 min) every single time.** The image

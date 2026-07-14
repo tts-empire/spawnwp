@@ -64,7 +64,8 @@ def local_target(root: Path, value: str) -> Path | None:
         return None
     parsed = urlparse(value)
     path = parsed.path
-    if not path or path.startswith(("/docs/", "/downloads/", "/api/")):
+    # /downloads/ and /media/ are nginx aliases outside the release tree.
+    if not path or path.startswith(("/docs/", "/downloads/", "/api/", "/media/")):
         return None
     if path == "/install.sh":
         return root / "install.sh"

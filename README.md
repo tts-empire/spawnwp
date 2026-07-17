@@ -14,7 +14,11 @@
 </p>
 
 <p align="center">
-  <img src="website/assets/promo-poster.jpg" alt="SpawnWP cockpit showing the blueprint catalog and isolated WordPress site deployment" width="100%">
+  <a href="https://spawnwp.com/#see-it-in-action"><img src=".github/promo-demo.webp" alt="SpawnWP cockpit spawning an isolated WordPress site: filling the deploy form, streaming the deployment output, and the running site on the Manage dashboard" width="100%"></a>
+</p>
+
+<p align="center">
+  <em>From an empty form to a running WordPress site, in the cockpit. <a href="https://spawnwp.com/#see-it-in-action">Watch the full 77-second tour →</a></em>
 </p>
 
 ---

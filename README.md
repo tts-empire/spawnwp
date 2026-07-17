@@ -13,6 +13,10 @@
   <img alt="Arch: amd64/arm64" src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-444">
 </p>
 
+<p align="center">
+  <img src="website/assets/promo-poster.jpg" alt="SpawnWP cockpit showing the blueprint catalog and isolated WordPress site deployment" width="100%">
+</p>
+
 ---
 
 SpawnWP turns a fresh Debian or Ubuntu server — cloud VM/VPS, dedicated or bare

@@ -11,6 +11,7 @@
   <img alt="Docs: MkDocs Material" src="https://img.shields.io/badge/docs-MkDocs%20Material-526CFE">
   <img alt="Platform: Ubuntu/Debian" src="https://img.shields.io/badge/platform-Ubuntu%20%7C%20Debian-E95420">
   <img alt="Arch: amd64/arm64" src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-444">
+  <a href="https://wordpress.org/plugins/spawnwp-deploy/"><img alt="SpawnWP Deploy on WordPress.org" src="https://img.shields.io/badge/WordPress.org-SpawnWP%20Deploy-3858E9?logo=wordpress&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -49,6 +50,24 @@ PHPStan, Query Monitor, Mailpit and more, preinstalled.
 The cockpit lives on its own subdomain and is protected by HTTPS plus mandatory
 application authentication: passkey preferred, or password with TOTP and recovery codes.
 
+## SpawnWP Deploy is on WordPress.org
+
+[SpawnWP Deploy](https://wordpress.org/plugins/spawnwp-deploy/) is the official,
+optional WordPress companion plugin for SpawnWP. It captures an already configured
+WordPress site — content, settings, uploads, plugins and themes — as a reusable blueprint
+on your own SpawnWP server. From a cockpit-created environment it can also perform a
+guarded, one-time transfer to a separate, fresh WordPress installation.
+
+New cockpit sites can install and activate the latest stable plugin release with one
+checkbox. Existing users of a directly downloaded preview build should update from the
+WordPress dashboard or replace it with the
+[official latest-stable ZIP](https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip)
+to receive future releases through WordPress.org. The plugin is optional; the core
+SpawnWP workflow does not depend on it.
+
+→ [Plugin page and changelog](https://wordpress.org/plugins/spawnwp-deploy/) ·
+[Installation and migration guide](https://spawnwp.com/docs/deploying-a-site/)
+
 ## Highlights
 
 - **One-command install** — `curl … | bash`, no manual setup.
@@ -58,6 +77,8 @@ application authentication: passkey preferred, or password with TOTP and recover
   lives on a separate, application-authenticated cockpit subdomain.
 - **WordPress.org QA built in** — the exact checks the .org review runs, in-browser
   and on the CLI.
+- **Reusable content blueprints** — capture a configured WordPress site with the
+  official SpawnWP Deploy plugin and reproduce it as isolated environments.
 - **Secure by default** — random per-install secrets, dropped Linux capabilities,
   no Docker socket exposure, loopback-only service ports, automatic TLS.
 - **Portable** — Ubuntu 22.04/24.04/26.04 and Debian 12/13, amd64 and arm64; web traffic uses
@@ -121,8 +142,6 @@ include:
   permissions.
 - **Disposable-site lifecycle** — configurable expiry, advance warnings, and a safe
   grace period before automatic cleanup.
-- **Reusable environments** — fast local cloning and versioned full-site templates
-  containing the database, uploads, plugins, and themes.
 - **Developer automation** — API tokens, CLI workflows, and Git integration for
   repeatable plugin and theme development.
 - **Safer sharing and compatibility testing** — temporary demo access, one-click

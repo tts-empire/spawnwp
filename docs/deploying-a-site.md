@@ -24,12 +24,12 @@ SpawnWP Deploy applies only to the third action. It offers one guarded transfer 
 source WordPress site inside SpawnWP to a **separate, fresh and empty WordPress
 installation**.
 
-!!! warning "Optional public-preview plugin"
-    The plugin is currently `0.3.1-dev`. Test it with disposable sites and keep an
-    independent backup. Do not use it for a destination that already contains content
-    or live user data.
+!!! warning "Use a fresh destination"
+    SpawnWP Deploy is available from the official WordPress.org Plugin Directory, but a
+    transfer must still target a fresh, empty WordPress installation. Keep an independent
+    backup and do not use a destination that already contains content or live user data.
 
-Since `0.3.0-dev` the plugin leads with **blueprints** — capturing a configured site as
+The plugin leads with **blueprints** — capturing a configured site as
 a reusable template (see [Content blueprints](blueprints.md#content-blueprints-captured-from-a-site)).
 Publishing a finished site out, described below, is its secondary role: it is offered
 only on sites running inside a SpawnWP cockpit, and on an external destination the
@@ -59,13 +59,15 @@ these constraints do not fit your project.
 
 On a site created inside SpawnWP, the quickest way is to tick **Install the SpawnWP
 Deploy plugin** on the cockpit's Deploy page when you create the site — it arrives
-installed and activated from the latest signed release (SpawnWP verifies its Ed25519
-signature; if the server is offline it falls back to the signed copy bundled with
-SpawnWP). Otherwise install it by hand:
+installed and activated from the latest stable WordPress.org release. The cockpit obtains
+that release through SpawnWP's Ed25519-verified mirror; if the server is offline it falls
+back to the stable copy bundled with SpawnWP. Otherwise install it by hand:
 
-1. [Download the optional plugin](https://spawnwp.com/deploy/).
-2. In the source site inside SpawnWP, open **Plugins → Add New → Upload Plugin**,
-   upload the ZIP and activate it.
+1. Open [SpawnWP Deploy on WordPress.org](https://wordpress.org/plugins/spawnwp-deploy/)
+   and install it from the WordPress dashboard, or download the
+   [latest stable ZIP](https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip).
+2. If you downloaded the ZIP, open **Plugins → Add New → Upload Plugin** on the
+   source site, upload it and activate it.
 3. Repeat the same WordPress plugin installation on the separate, fresh target site.
 4. Open **Tools → SpawnWP Deploy** in both WordPress dashboards.
 
@@ -88,7 +90,7 @@ The pre-transfer rollback is retained for seven days.
 
 ## Capture a site as a blueprint
 
-The plugin's main job, since `0.3.0-dev`, is to capture the configured site as a
+The plugin's main job is to capture the configured site as a
 reusable **content blueprint** on your own SpawnWP server: pair with a single-use code
 from the cockpit's **System → Blueprint capture**, choose what to capture, and press
 *Create blueprint*. See

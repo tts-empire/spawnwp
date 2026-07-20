@@ -50,10 +50,13 @@ The importer is the optional **SpawnWP Deploy** WordPress plugin.
 
 - **If the source site was created inside SpawnWP**, the quickest way is to tick
   *Install the SpawnWP Deploy plugin* when you create it — it arrives installed and
-  activated from the latest signed release (Ed25519-verified; offline it falls back
-  to the signed copy bundled with SpawnWP).
-- **On your own external WordPress**, install it by hand: download the signed package and
-  verify its checksum and Ed25519 signature first. Follow
+  activated from the latest stable WordPress.org release through SpawnWP's
+  Ed25519-verified mirror; offline it falls back to the stable copy bundled with
+  SpawnWP.
+- **On your own external WordPress**, install it from the
+  [official WordPress.org Plugin Directory](https://wordpress.org/plugins/spawnwp-deploy/),
+  or upload the
+  [latest stable ZIP](https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip). Follow
   [Install the WordPress plugin](deploying-a-site.md#install-the-wordpress-plugin).
 
 ## Step 2 — Generate a pairing code in the cockpit

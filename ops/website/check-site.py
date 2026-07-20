@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -122,18 +123,39 @@ def main() -> None:
             extra = sorted(sitemap_urls - set(canonicals))
             errors.append(f"sitemap mismatch; missing={missing}, extra={extra}")
 
+    required = {
+        "https://wordpress.org/plugins/spawnwp-deploy/",
+        "https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip",
+    }
     plugin_page = args.root / "plugin/index.html"
     if plugin_page.is_file():
         plugin_html = plugin_page.read_text(encoding="utf-8")
-        required = {
-            "https://wordpress.org/plugins/spawnwp-deploy/",
-            "https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip",
-        }
         for value in sorted(required):
             if value not in plugin_html:
                 errors.append(f"{plugin_page}: missing official plugin link {value}")
         if "spawnwp-deploy-0." in plugin_html or "-dev" in plugin_html:
             errors.append(f"{plugin_page}: plugin distribution must not hardcode a version or -dev build")
+
+    plugin_docs = {
+        args.root / "docs/deploying-a-site/index.html": True,
+        args.root / "docs/importing-a-site/index.html": True,
+        args.root / "docs/blueprints/index.html": False,
+    }
+    for docs_page, needs_download_links in plugin_docs.items():
+        if not docs_page.is_file():
+            errors.append(f"{docs_page}: missing rendered plugin documentation")
+            continue
+        docs_html = docs_page.read_text(encoding="utf-8")
+        if needs_download_links:
+            for value in sorted(required):
+                if value not in docs_html:
+                    errors.append(f"{docs_page}: missing official plugin link {value}")
+        stale_markers = ("spawnwp.com/deploy/", "public-preview")
+        for marker in stale_markers:
+            if marker in docs_html:
+                errors.append(f"{docs_page}: stale plugin distribution marker {marker}")
+        if re.search(r"\b\d+\.\d+\.\d+-dev\b", docs_html):
+            errors.append(f"{docs_page}: stale development plugin version")
 
     if errors:
         raise SystemExit("\n".join(errors))

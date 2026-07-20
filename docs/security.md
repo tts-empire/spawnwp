@@ -27,6 +27,37 @@ and the manifest is written last so a failed upload cannot leave a partial bluep
 Captured databases never include the `users` or `usermeta` tables, and the source
 site URL is replaced with a placeholder before upload.
 
+## Magic login
+
+Sites are created with a must-use plugin (`wp-content/mu-plugins/spawnwp-autologin.php`)
+that signs an administrator into `wp-admin` from a link minted by the cockpit, skipping the
+WordPress login form. It replaces copying a password out of the cockpit and pasting it into
+a login page, which is worse practice than it looks: passwords travel through clipboards,
+chat windows and screen recordings, and they do not expire.
+
+It is an authentication bypass, so it is bounded on every side:
+
+- **Only the cockpit can mint a link.** There is no public endpoint that issues one; the
+  request comes from an authenticated cockpit session.
+- **Single use.** The plugin invalidates a link *before* it creates the session, so two
+  requests arriving at the same moment cannot both succeed.
+- **Two-minute expiry**, independent of use.
+- **The secret is never stored.** The cockpit saves only the link's SHA-256, so nothing on
+  the server — database dump, backup, or transient store — can be replayed to get in.
+  The token itself exists only in the link.
+- **256 bits of entropy**, generated with a cryptographic RNG: not guessable by brute force.
+- **Removable.** Turning the feature off in the cockpit deletes the plugin from the site,
+  which removes the capability rather than merely disabling it.
+- **It never leaves the site.** Deploy packages exclude `mu-plugins`, so publishing a site
+  elsewhere does not carry magic login to the destination.
+
+The plugin is deliberately **not** part of [SpawnWP Deploy](deploying-a-site.md): that
+plugin is distributed through WordPress.org, and a login bypass has no business travelling
+through a public plugin directory and its release cadence.
+
+Set `SPAWNWP_ENABLE_AUTOLOGIN=0` in `/etc/spawnwp/config.env` to spawn sites without it.
+Existing sites are unaffected by that setting — turn them off individually in the cockpit.
+
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
 application authentication.

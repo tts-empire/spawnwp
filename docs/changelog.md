@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.23
+
+- **New sites now come with magic login enabled.** In 0.5.22 it had to be switched on per
+  site, which defeated the purpose. Existing sites are unchanged — enable it once on any of
+  them, no recreation needed — and `SPAWNWP_ENABLE_AUTOLOGIN=0` in `/etc/spawnwp/config.env`
+  spawns sites without it. The security properties are unchanged: single-use links, two-minute
+  expiry, mintable only from an authenticated cockpit session, and only their SHA-256 is
+  stored.
+- **Documented 0.5.22.** The cockpit guide now covers naming and deleting snapshots, folder
+  uploads, zip extraction and why an archive can be refused, plus magic login; the security
+  reference gains a section on exactly what a magic link is and what bounds it.
+
 ## 0.5.22
 
 - **Snapshots can be named and deleted.** A snapshot was a bare timestamp with no way to remove

@@ -436,6 +436,22 @@ if [ "${SPAWNWP_INSTALL_DEPLOY_PLUGIN:-0}" = "1" ]; then
   if [ -n "$DEPLOY_FETCH_DIR" ]; then rm -rf "$DEPLOY_FETCH_DIR"; fi
 fi
 
+# Magic login: on by default, because a one-click way into wp-admin that has to
+# be switched on per site is a one-click way into nothing. The mu-plugin is
+# inert without a token, and only the authenticated cockpit can mint one.
+# Set SPAWNWP_ENABLE_AUTOLOGIN=0 (per spawn, or in /etc/spawnwp/config.env) to
+# spawn sites without it; removing the file later disables it just as well.
+if [ "${SPAWNWP_ENABLE_AUTOLOGIN:-1}" = "1" ]; then
+  AUTOLOGIN_SRC="$RUNTIME_ROOT/mu-plugins/spawnwp-autologin.php"
+  if [ -f "$AUTOLOGIN_SRC" ]; then
+    install -D -o 33 -g 33 -m 0644 "$AUTOLOGIN_SRC" \
+      "${PROJ_DIR}/projects/primary/wp-content/mu-plugins/spawnwp-autologin.php"
+    echo "==> Magic login enabled (one-click sign-in from the cockpit)."
+  else
+    echo "  !! Magic login bundle not found at ${AUTOLOGIN_SRC}; skipping it." >&2
+  fi
+fi
+
 # Aggregate local metrics (counters only — see lib-metrics.sh).
 metric_incr creates_total
 if [ "${NEED_BUILD:-0}" = "1" ]; then

@@ -164,6 +164,18 @@ mu-plugins, drop-ins, a plugin's `.env`, or a debug log — without opening an S
 - **Download.** The **⬇** action streams any file out as-is, at any size.
 - **Upload, New folder, Rename, Delete.** Drop a file into the current folder, create
   subfolders, move/rename, or remove files and folders.
+- **Upload folder.** **⬆ Upload folder** takes a whole directory tree — a theme, a plugin,
+  a build output — and recreates its structure on the site. Files go up one at a time, with
+  a running count, so a large tree takes a while but never floods the server.
+- **Extract a zip.** Any `.zip` in the listing gains a **📦** button that unpacks it into the
+  folder it sits in, overwriting files of the same name.
+
+!!! warning "Archives are checked before they are unpacked"
+    A zip can contain entries like `../../wp-config.php` that, extracted naively, write
+    outside the folder you chose — a "zip slip". SpawnWP reads the archive's index first and
+    refuses the **whole** archive if any entry is an absolute path or contains `..`, naming
+    the offending entry. Archives that would expand past 2 GiB, or hold more than 20,000
+    entries, are refused as well, so a bad upload cannot fill the disk.
 
 Everything runs **inside that one site's PHP container**, as the web user (`www-data`), so
 uploaded and edited files get the ownership WordPress needs and nothing can reach the host
@@ -203,11 +215,52 @@ the real fixed cost on disk (~1.8&nbsp;GB per PHP version in use):
 marker when uploads are included) and, after a confirmation, overwrites the site with the
 chosen snapshot.
 
+Snapshots can be **named**: double-click one in the list, or use the ✏️ button, and give it
+something you will recognise in a week — "before the theme swap", "clean install". Clear
+the name by saving an empty one. The **🗑** button deletes a snapshot, removing its database
+dump, its uploads tarball and its name; because that destroys a restore point, it asks for
+the same Passkey confirmation as a restore.
+
+The files on disk keep their timestamp names (`20260714-093712.sql.gz`) and the labels live
+in a small `backups/labels.json` beside them. That is deliberate: the timestamp is what the
+restore path validates to make sure it only ever reads a real snapshot, and renaming files
+to whatever was typed into a text box would have put that check at the mercy of the name.
+Snapshots taken before 0.5.22 simply show up unnamed until you name them.
+
 ### Destroy
 
 Destroy is intentionally guarded: it's only enabled when the site is **Down**, and it
 asks for a typed confirmation of the site name. It removes the containers and volumes,
 the `/srv/<name>` directory, and the site's nginx blocks on both domains.
+
+### WordPress credentials & magic login
+
+**🔑 WP Admin** shows the site's WordPress administrator credentials, read from its `.env`,
+with a button to copy the password on its own.
+
+Underneath sits **🔑 Magic login**: one click opens that site's `/wp-admin/` already signed
+in, with no username or password to copy. New sites get it automatically. On a site created
+before 0.5.23 — or one where you turned it off — press **Enable magic login** once and the
+button lights up; it works on any existing site, nothing needs recreating.
+
+**Disable magic login** removes it again. That is not a flag in a database: it deletes the
+must-use plugin from the site, so the feature stops existing there even for someone holding
+a link.
+
+!!! note "What a magic link actually is"
+    Enabling the feature installs a small must-use plugin
+    (`wp-content/mu-plugins/spawnwp-autologin.php`). Pressing the button asks the cockpit
+    for a fresh link that is **single-use** and **expires after two minutes** — whichever
+    comes first. The link is a genuine way into WordPress that skips the login form, so
+    treat it like a password: don't paste it into a chat or a ticket, and if you think one
+    leaked, just press the button again — minting a new link is free, and an old link is
+    dead the moment it is used or two minutes pass.
+
+    SpawnWP never stores the link's secret, only its SHA-256, so nothing on the server can
+    be replayed to get in. Magic login is also **excluded from Deploy packages**: if you
+    publish a site elsewhere, the destination does not inherit it.
+
+    To spawn sites without it, set `SPAWNWP_ENABLE_AUTOLOGIN=0` in `/etc/spawnwp/config.env`.
 
 ### Database & email
 

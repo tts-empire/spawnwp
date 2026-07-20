@@ -197,6 +197,19 @@ for page in manage deploy updates system; do
   fi
 done
 
+# Magic login (0.5.23) ships enabled on new sites: the default lives in a ":-1"
+# parameter expansion, which is exactly the sort of thing a refactor flips to 0
+# without anyone noticing until users report the button does nothing.
+grep -q 'SPAWNWP_ENABLE_AUTOLOGIN:-1' "$ROOT/runtime/scripts/new-project.sh" || {
+  echo "ERROR: magic login is no longer enabled by default for new sites" >&2
+  exit 1
+}
+# ...and the mu-plugin it copies must actually ship in the release.
+grep -q 'mu-plugins/spawnwp-autologin.php' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the auto-login mu-plugin is missing from managed-files.json" >&2
+  exit 1
+}
+
 # New sites must prefer the WordPress.org stable mirror over an embedded build
 # carrying the same base version with a -dev suffix, while never treating the
 # prerelease as newer than stable.

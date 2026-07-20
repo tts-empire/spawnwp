@@ -1,0 +1,265 @@
+.spawnwp-deploy-wrap {
+	max-width: 940px;
+}
+
+.spawnwp-deploy-wrap .notice {
+	margin: 16px 0;
+}
+
+.spawnwp-brandbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 6px 0 22px;
+}
+
+.spawnwp-logo {
+	display: grid;
+	width: 38px;
+	height: 38px;
+	flex: none;
+	place-content: center;
+	border-radius: 9px;
+	background: #0d0d10;
+}
+
+.spawnwp-logo .grid {
+	display: grid;
+	grid-template-columns: repeat(3, 6px);
+	gap: 3px;
+}
+
+.spawnwp-logo i {
+	width: 6px;
+	height: 6px;
+	border-radius: 2px;
+	background: #4a4a52;
+}
+
+.spawnwp-logo i.on {
+	background: #f6b269;
+}
+
+.spawnwp-logo i.ring {
+	background: transparent;
+	box-shadow: inset 0 0 0 1px #f6b269;
+}
+
+.spawnwp-word {
+	color: #1d2327;
+	font-size: 22px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	line-height: 1;
+}
+
+.spawnwp-word strong {
+	color: #f6b269;
+	font-weight: 600;
+}
+
+.spawnwp-role {
+	margin-left: auto;
+	padding: 4px 11px;
+	border: 1px solid #dcdcde;
+	border-radius: 999px;
+	background: #fff;
+	color: #646970;
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.spawnwp-blueprint {
+	position: relative;
+	overflow: hidden;
+	margin: 0 0 20px;
+	padding: 22px 24px 24px;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.spawnwp-blueprint::before {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	height: 3px;
+	background: linear-gradient(90deg, #f6b269, rgba(246, 178, 105, 0));
+	content: "";
+}
+
+.spawnwp-blueprint h2 {
+	margin: 0 0 4px;
+	font-size: 18px;
+}
+
+.spawnwp-blueprint > .description {
+	max-width: 66ch;
+	margin: 0 0 16px;
+	color: #50575e;
+}
+
+.spawnwp-deploy-adv {
+	margin: 0 0 20px;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #f6f7f7;
+}
+
+.spawnwp-deploy-adv > summary {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 15px 20px;
+	color: #1d2327;
+	font-size: 14px;
+	font-weight: 600;
+	list-style: none;
+	cursor: pointer;
+}
+
+.spawnwp-deploy-adv > summary::-webkit-details-marker {
+	display: none;
+}
+
+.spawnwp-deploy-adv > summary::before {
+	color: #646970;
+	font-size: 17px;
+	line-height: 1;
+	content: "\203a";
+	transition: transform 0.15s;
+}
+
+.spawnwp-deploy-adv[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.spawnwp-adv-title {
+	margin-right: auto;
+}
+
+.spawnwp-badge {
+	padding: 2px 9px;
+	border: 1px solid #f0d9ae;
+	border-radius: 999px;
+	background: #fcf3e3;
+	color: #8a6d3b;
+	font-size: 10px;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+}
+
+.spawnwp-deploy-adv > p {
+	margin: 0 20px 8px;
+	font-size: 13px;
+}
+
+.spawnwp-subpanel {
+	margin: 12px 20px;
+	padding: 15px 17px;
+	border: 1px solid #e5e5e7;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.spawnwp-subpanel h3 {
+	margin: 0 0 8px;
+	color: #1d2327;
+	font-size: 13px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.spawnwp-muted {
+	color: #646970;
+}
+
+.spawnwp-ok {
+	color: #18743b;
+	font-weight: 600;
+}
+
+.spawnwp-bad {
+	color: #b32d2e;
+	font-weight: 600;
+}
+
+.spawnwp-connection,
+.spawnwp-receiver {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 0;
+	border-top: 1px solid #f0f0f1;
+}
+
+.spawnwp-connection:first-of-type,
+.spawnwp-receiver:first-of-type {
+	border-top: 0;
+}
+
+.spawnwp-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.spawnwp-actions form,
+.spawnwp-receiver form {
+	margin: 0;
+}
+
+.spawnwp-warning {
+	margin: 0 0 16px;
+	padding: 11px 14px;
+	border: 1px solid #dba617;
+	border-left-width: 3px;
+	border-radius: 4px;
+	background: #fcf9e8;
+}
+
+.spawnwp-warning ul {
+	margin: 6px 0 0 18px;
+	list-style: disc;
+}
+
+.spawnwp-bp-php-choice {
+	margin-right: 12px;
+}
+
+#spawnwp-log,
+#spawnwp-bp-log {
+	display: block;
+	overflow: auto;
+	max-height: 360px;
+	margin-top: 12px;
+	padding: 14px;
+	border-left: 3px solid #f6b269;
+	border-radius: 6px;
+	background: #0d0d10;
+	color: #f8f8f8;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 782px) {
+	.spawnwp-connection,
+	.spawnwp-receiver {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.spawnwp-subpanel {
+		margin: 12px;
+	}
+
+	.spawnwp-deploy-adv > p {
+		margin: 0 12px 8px;
+	}
+}

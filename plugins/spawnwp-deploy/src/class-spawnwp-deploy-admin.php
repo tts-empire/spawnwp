@@ -8,11 +8,29 @@ final class SpawnWP_Deploy_Admin {
 	public static function init(): void {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'actions' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_spawnwp_deploy_step', array( __CLASS__, 'ajax_step' ) );
 	}
 
 	public static function menu(): void {
 		add_management_page( 'SpawnWP Deploy', 'SpawnWP Deploy', 'manage_options', 'spawnwp-deploy', array( __CLASS__, 'page' ) );
+	}
+
+	public static function enqueue_assets( string $hook_suffix ): void {
+		if ( 'tools_page_spawnwp-deploy' !== $hook_suffix ) {
+			return;
+		}
+		wp_enqueue_style( 'spawnwp-deploy-admin', SPAWNWP_DEPLOY_URL . 'assets/admin.css', array(), SPAWNWP_DEPLOY_VERSION );
+		wp_enqueue_script( 'spawnwp-deploy-admin', SPAWNWP_DEPLOY_URL . 'assets/admin.js', array(), SPAWNWP_DEPLOY_VERSION, true );
+		wp_localize_script(
+			'spawnwp-deploy-admin',
+			'spawnwpDeployAdmin',
+			array(
+				'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+				'deployNonce'    => wp_create_nonce( 'spawnwp_deploy_ajax' ),
+				'blueprintNonce' => wp_create_nonce( 'spawnwp_blueprint_ajax' ),
+			)
+		);
 	}
 
 	public static function actions(): void {
@@ -47,19 +65,20 @@ final class SpawnWP_Deploy_Admin {
 		}
 		global $wpdb;
 		SpawnWP_Deploy_Database::maintain_connections();
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only status message set by this plugin's redirect.
 		$message     = isset( $_GET['spawnwp_message'] ) ? sanitize_text_field( wp_unslash( $_GET['spawnwp_message'] ) ) : '';
-		$connections = $wpdb->get_results( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE role='source' AND status IN ('active','consumed') ORDER BY created_at DESC", ARRAY_A );
-		$pending     = $wpdb->get_row( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE role='target' AND status='pending' ORDER BY created_at DESC LIMIT 1", ARRAY_A );
-		$receivers   = $wpdb->get_results( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE role='target' AND status='active' ORDER BY created_at DESC", ARRAY_A );
-		$history     = $wpdb->get_results( 'SELECT id,label,role,remote_url,status,updated_at FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE status IN ('expired','revoked') ORDER BY updated_at DESC LIMIT 10", ARRAY_A );
+		$table       = SpawnWP_Deploy_Database::table( 'connections' );
+		$connections = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE role='source' AND status IN ('active','consumed') ORDER BY created_at DESC", $table ), ARRAY_A );
+		$pending     = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE role='target' AND status='pending' ORDER BY created_at DESC LIMIT 1", $table ), ARRAY_A );
+		$receivers   = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE role='target' AND status='active' ORDER BY created_at DESC", $table ), ARRAY_A );
+		$history     = $wpdb->get_results( $wpdb->prepare( "SELECT id,label,role,remote_url,status,updated_at FROM %i WHERE status IN ('expired','revoked') ORDER BY updated_at DESC LIMIT 10", $table ), ARRAY_A );
 		$guard       = SpawnWP_Deploy_Guard::target_report();
-		$is_cockpit  = SpawnWP_Deploy_Guard::is_cockpit();
 		?>
 		<div class="wrap spawnwp-deploy-wrap">
 			<header class="spawnwp-brandbar">
 				<span class="spawnwp-logo" aria-hidden="true"><span class="grid"><i></i><i></i><i class="ring"></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i></span></span>
 				<span class="spawnwp-word">Spawn<strong>WP</strong></span>
-				<span class="spawnwp-role" title="Where this plugin is running"><?php echo esc_html( $is_cockpit ? 'Cockpit site' : 'External site' ); ?></span>
+				<span class="spawnwp-role">Self-hosted</span>
 			</header>
 			<?php if ( $message ) : ?>
 				<div class="notice <?php echo 'success' === $message ? 'notice-success' : 'notice-error'; ?> is-dismissible"><p><?php echo esc_html( 'success' === $message ? 'Action completed.' : rawurldecode( $message ) ); ?></p></div>
@@ -67,11 +86,10 @@ final class SpawnWP_Deploy_Admin {
 
 			<?php SpawnWP_Deploy_Blueprint::render_panel(); ?>
 
-			<details class="spawnwp-deploy-adv"<?php echo ( $connections || $receivers || ( $pending && ! $is_cockpit ) ) ? ' open' : ''; ?>>
+			<details class="spawnwp-deploy-adv"<?php echo ( $connections || $receivers || $pending ) ? ' open' : ''; ?>>
 				<summary><span class="spawnwp-adv-title">Publish a finished site elsewhere</span><span class="spawnwp-badge">Advanced</span></summary>
 				<p class="spawnwp-muted">A one-time transfer of a finished site to a separate, empty WordPress install — not staging or synchronization, and separate from blueprints above.</p>
 
-				<?php if ( $is_cockpit ) : ?>
 					<div class="spawnwp-subpanel">
 						<h3>Send this site to an empty destination</h3>
 						<p class="spawnwp-muted">Paste the short-lived connection key generated by the empty destination site.</p>
@@ -85,10 +103,13 @@ final class SpawnWP_Deploy_Admin {
 
 					<div class="spawnwp-subpanel">
 						<h3>Connected destinations</h3>
-						<?php if ( ! $connections ) : ?><p class="spawnwp-muted">No destination connected yet.</p><?php endif; ?>
+						<?php
+						if ( ! $connections ) :
+							?>
+							<p class="spawnwp-muted">No destination connected yet.</p><?php endif; ?>
 						<?php foreach ( $connections as $connection ) : ?>
 							<div class="spawnwp-connection">
-								<div><strong><?php echo esc_html( $connection['label'] ?: $connection['remote_url'] ); ?></strong><br><code><?php echo esc_html( $connection['remote_url'] ); ?></code><br><small>Status: <?php echo esc_html( $connection['status'] ); ?></small></div>
+								<div><strong><?php echo esc_html( ! empty( $connection['label'] ) ? $connection['label'] : $connection['remote_url'] ); ?></strong><br><code><?php echo esc_html( $connection['remote_url'] ); ?></code><br><small>Status: <?php echo esc_html( $connection['status'] ); ?></small></div>
 								<div class="spawnwp-actions">
 									<button class="button button-primary spawnwp-start" data-connection="<?php echo esc_attr( $connection['id'] ); ?>" <?php disabled( 'active' !== $connection['status'] ); ?>>Deploy to empty site</button>
 									<?php $last_job = get_option( 'spawnwp_deploy_last_job_' . $connection['id'] ); if ( 'consumed' === $connection['status'] && $last_job ) : ?>
@@ -104,7 +125,6 @@ final class SpawnWP_Deploy_Admin {
 						<?php endforeach; ?>
 						<pre id="spawnwp-log" hidden></pre>
 					</div>
-				<?php else : ?>
 					<div class="spawnwp-subpanel">
 						<h3>Receive a published site</h3>
 						<?php if ( $guard['ok'] ) : ?>
@@ -115,7 +135,7 @@ final class SpawnWP_Deploy_Admin {
 								<?php submit_button( 'Generate connection key', 'secondary', 'submit', false ); ?>
 							</form>
 							<?php if ( $pending && strtotime( $pending['pair_expires'] . ' UTC' ) > time() ) : ?>
-								<textarea rows="4" class="large-text code" readonly onclick="this.select()"><?php echo esc_textarea( get_transient( 'spawnwp_deploy_bundle_' . $pending['id'] ) ); ?></textarea>
+								<textarea rows="4" class="large-text code spawnwp-select-on-click" readonly><?php echo esc_textarea( get_transient( 'spawnwp_deploy_bundle_' . $pending['id'] ) ); ?></textarea>
 								<p class="spawnwp-muted">Expires <?php echo esc_html( gmdate( 'Y-m-d H:i:s', strtotime( $pending['pair_expires'] . ' UTC' ) ) ); ?> UTC.</p>
 							<?php endif; ?>
 							<?php foreach ( $receivers as $receiver ) : ?>
@@ -138,19 +158,12 @@ final class SpawnWP_Deploy_Admin {
 							</ul>
 						<?php endif; ?>
 					</div>
-
-					<div class="spawnwp-subpanel spawnwp-disabled">
-						<h3>Send this site elsewhere</h3>
-						<p class="spawnwp-muted">Publishing a site out runs from sites created inside a SpawnWP cockpit. This WordPress is not managed by a cockpit, so the action is unavailable here.</p>
-					</div>
-				<?php endif; ?>
-
 				<?php if ( $history ) : ?>
 					<div class="spawnwp-subpanel spawnwp-history">
 						<h3>Connection history (<?php echo esc_html( count( $history ) ); ?>)</h3>
 						<?php foreach ( $history as $item ) : ?>
 							<div class="spawnwp-connection">
-								<div><strong><?php echo esc_html( $item['label'] ?: ( $item['remote_url'] ?: 'Unused pairing key' ) ); ?></strong><br><small><?php echo esc_html( ucfirst( $item['role'] ) . ' · ' . ucfirst( $item['status'] ) . ' · ' . gmdate( 'Y-m-d H:i:s', strtotime( $item['updated_at'] . ' UTC' ) ) . ' UTC' ); ?></small></div>
+								<div><strong><?php echo esc_html( ! empty( $item['label'] ) ? $item['label'] : ( ! empty( $item['remote_url'] ) ? $item['remote_url'] : 'Unused pairing key' ) ); ?></strong><br><small><?php echo esc_html( ucfirst( $item['role'] ) . ' · ' . ucfirst( $item['status'] ) . ' · ' . gmdate( 'Y-m-d H:i:s', strtotime( $item['updated_at'] . ' UTC' ) ) . ' UTC' ); ?></small></div>
 							</div>
 						<?php endforeach; ?>
 						<p class="spawnwp-muted">Expired and revoked entries are removed after 30 days when no deployment job references them.</p>
@@ -158,59 +171,6 @@ final class SpawnWP_Deploy_Admin {
 				<?php endif; ?>
 			</details>
 		</div>
-		<style>
-		.spawnwp-deploy-wrap{max-width:940px}
-		.spawnwp-deploy-wrap .notice{margin:16px 0}
-		.spawnwp-brandbar{display:flex;align-items:center;gap:12px;margin:6px 0 22px}
-		.spawnwp-logo{width:38px;height:38px;border-radius:9px;background:#0d0d10;display:grid;place-content:center;flex:none}
-		.spawnwp-logo .grid{display:grid;grid-template-columns:repeat(3,6px);gap:3px}
-		.spawnwp-logo i{width:6px;height:6px;border-radius:2px;background:#4a4a52}
-		.spawnwp-logo i.on{background:#f6b269}
-		.spawnwp-logo i.ring{background:transparent;box-shadow:inset 0 0 0 1px #f6b269}
-		.spawnwp-word{font-size:22px;font-weight:600;letter-spacing:-.02em;color:#1d2327;line-height:1}
-		.spawnwp-word strong{color:#f6b269;font-weight:600}
-		.spawnwp-role{margin-left:auto;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#646970;background:#fff;border:1px solid #dcdcde;border-radius:999px;padding:4px 11px}
-		.spawnwp-blueprint{position:relative;background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:22px 24px 24px;margin:0 0 20px;box-shadow:0 1px 2px rgba(0,0,0,.04);overflow:hidden}
-		.spawnwp-blueprint::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#f6b269,rgba(246,178,105,0))}
-		.spawnwp-blueprint h2{margin:0 0 4px;font-size:18px}
-		.spawnwp-blueprint>.description{margin:0 0 16px;color:#50575e;max-width:66ch}
-		.spawnwp-deploy-adv{background:#f6f7f7;border:1px solid #dcdcde;border-radius:8px;margin:0 0 20px}
-		.spawnwp-deploy-adv>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:15px 20px;font-size:14px;font-weight:600;color:#1d2327}
-		.spawnwp-deploy-adv>summary::-webkit-details-marker{display:none}
-		.spawnwp-deploy-adv>summary::before{content:"\203A";font-size:17px;line-height:1;color:#646970;transition:transform .15s}
-		.spawnwp-deploy-adv[open]>summary::before{transform:rotate(90deg)}
-		.spawnwp-adv-title{margin-right:auto}
-		.spawnwp-badge{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#8a6d3b;background:#fcf3e3;border:1px solid #f0d9ae;border-radius:999px;padding:2px 9px}
-		.spawnwp-deploy-adv>p{margin:0 20px 8px;font-size:13px}
-		.spawnwp-subpanel{background:#fff;border:1px solid #e5e5e7;border-radius:6px;padding:15px 17px;margin:12px 20px}
-		.spawnwp-subpanel h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#1d2327}
-		.spawnwp-disabled{opacity:.65}
-		.spawnwp-muted{color:#646970}
-		.spawnwp-ok{color:#18743b;font-weight:600}
-		.spawnwp-bad{color:#b32d2e;font-weight:600}
-		.spawnwp-connection,.spawnwp-receiver{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid #f0f0f1}
-		.spawnwp-connection:first-of-type,.spawnwp-receiver:first-of-type{border-top:0}
-		.spawnwp-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-		.spawnwp-actions form,.spawnwp-receiver form{margin:0}
-		.spawnwp-warning{background:#fcf9e8;border:1px solid #dba617;border-left-width:3px;border-radius:4px;padding:11px 14px;margin:0 0 16px}
-		.spawnwp-warning ul{margin:6px 0 0 18px;list-style:disc}
-		#spawnwp-log,#spawnwp-bp-log{display:block;background:#0d0d10;color:#f8f8f8;border-radius:6px;border-left:3px solid #f6b269;padding:14px;margin-top:12px;max-height:360px;overflow:auto;white-space:pre-wrap;font-size:12px;line-height:1.5}
-		@media(max-width:782px){.spawnwp-connection,.spawnwp-receiver{align-items:flex-start;flex-direction:column}.spawnwp-subpanel{margin:12px}.spawnwp-deploy-adv>p{margin:0 12px 8px}}
-		</style>
-		<?php if ( $is_cockpit ) : ?>
-		<script>
-		(function(){
-			const ajaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-			const nonce=<?php echo wp_json_encode( wp_create_nonce( 'spawnwp_deploy_ajax' ) ); ?>;
-			const log=document.getElementById('spawnwp-log');
-			function line(text){log.hidden=false;log.textContent+=text+'\n';log.scrollTop=log.scrollHeight;}
-			async function step(connection,op,state={}){const body=new URLSearchParams({action:'spawnwp_deploy_step',nonce,connection,op,...state});const response=await fetch(ajaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const data=await response.json();if(!data.success)throw new Error(data.data&&data.data.message?data.data.message:'Deployment step failed');return data.data;}
-			async function deploy(button){const connection=button.dataset.connection;button.disabled=true;try{line('Checking destination...');let data=await step(connection,'preflight');if(data.warnings&&data.warnings.length){data.warnings.forEach(warning=>line('WARNING: '+warning));if(!confirm(data.warnings.join('\n')+'\n\nContinue anyway?'))throw new Error('Deployment cancelled after compatibility warning.');}line('Destination ready. Building package...');data=await step(connection,'prepare');line('Package ready: '+data.manifest.archive_bytes+' bytes');while(data.next<data.manifest.chunk_count){data=await step(connection,'transfer',{job:data.job,next:String(data.next)});line('Transferred '+data.next+' / '+data.manifest.chunk_count+' chunks');}line('Verifying and staging...');await step(connection,'stage',{job:data.job});if(!confirm('Final confirmation: this will publish the package to the empty destination. Continue?'))throw new Error('Activation cancelled; staged package retained.');line('Activating during a short maintenance window...');const done=await step(connection,'activate',{job:data.job});line('Deployment '+done.state+'.');button.textContent='Deployed';}catch(error){line('ERROR: '+error.message);button.disabled=false;}}
-			document.querySelectorAll('.spawnwp-start').forEach(button=>button.addEventListener('click',()=>deploy(button)));
-			document.querySelectorAll('.spawnwp-rollback').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Rollback the destination to its pre-deploy state?'))return;button.disabled=true;try{line('Rolling back destination...');const done=await step(button.dataset.connection,'rollback',{job:button.dataset.job});line('Rollback '+done.state+'. Reload this page to deploy again.');}catch(error){line('ERROR: '+error.message);button.disabled=false;}}));
-		})();
-		</script>
-		<?php endif; ?>
 		<?php
 	}
 
@@ -218,7 +178,7 @@ final class SpawnWP_Deploy_Admin {
 		global $wpdb;
 		$guard = SpawnWP_Deploy_Guard::target_report();
 		if ( ! $guard['ok'] ) {
-			throw new RuntimeException( implode( ' ', $guard['issues'] ) );
+			throw new RuntimeException( implode( ' ', array_map( 'esc_html', $guard['issues'] ) ) );
 		}
 		$id      = SpawnWP_Deploy_Database::uuid();
 		$token   = SpawnWP_Deploy_Crypto::random_token();
@@ -410,19 +370,20 @@ final class SpawnWP_Deploy_Admin {
 
 	private static function decode_response( $response ): array {
 		if ( is_wp_error( $response ) ) {
-			throw new RuntimeException( $response->get_error_message() );
+			throw new RuntimeException( esc_html( $response->get_error_message() ) );
 		}
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {
-			throw new RuntimeException( $data['message'] ?? 'Remote request failed with HTTP ' . $status );
+			$message = isset( $data['message'] ) ? esc_html( (string) $data['message'] ) : 'Remote request failed with HTTP ' . absint( $status );
+			throw new RuntimeException( esc_html( $message ) );
 		}
 		return is_array( $data ) ? $data : array();
 	}
 
 	private static function source_connection( string $id ): array {
 		global $wpdb;
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE id=%s AND role='source' AND status IN ('active','consumed')", $id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='source' AND status IN ('active','consumed')", SpawnWP_Deploy_Database::table( 'connections' ), $id ), ARRAY_A );
 		if ( ! $row ) {
 			throw new RuntimeException( 'Active destination connection not found.' );
 		}
@@ -431,7 +392,7 @@ final class SpawnWP_Deploy_Admin {
 
 	private static function revoke_local( string $id ): void {
 		global $wpdb;
-		$connection = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE id=%s AND role='source'", $id ), ARRAY_A );
+		$connection = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='source'", SpawnWP_Deploy_Database::table( 'connections' ), $id ), ARRAY_A );
 		if ( ! $connection ) {
 			throw new RuntimeException( 'Source connection not found.' );
 		}
@@ -444,7 +405,11 @@ final class SpawnWP_Deploy_Admin {
 		}
 		$wpdb->update(
 			SpawnWP_Deploy_Database::table( 'connections' ),
-			array( 'status' => 'revoked', 'private_key' => '', 'updated_at' => current_time( 'mysql', true ) ),
+			array(
+				'status'      => 'revoked',
+				'private_key' => '',
+				'updated_at'  => current_time( 'mysql', true ),
+			),
 			array( 'id' => $id )
 		);
 	}
@@ -453,8 +418,15 @@ final class SpawnWP_Deploy_Admin {
 		global $wpdb;
 		$wpdb->update(
 			SpawnWP_Deploy_Database::table( 'connections' ),
-			array( 'status' => 'revoked', 'private_key' => '', 'updated_at' => current_time( 'mysql', true ) ),
-			array( 'id' => $id, 'role' => 'target' )
+			array(
+				'status'      => 'revoked',
+				'private_key' => '',
+				'updated_at'  => current_time( 'mysql', true ),
+			),
+			array(
+				'id'   => $id,
+				'role' => 'target',
+			)
 		);
 		SpawnWP_Deploy_Database::audit( 'connection_revoked_locally', array(), $id );
 	}

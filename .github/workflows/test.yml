@@ -21,8 +21,12 @@ jobs:
       - run: PYTHONPATH=runtime python -m unittest discover -s runtime/tests -v
       - run: python -m unittest discover -s installer/tests -p 'test_*.py' -v
       - run: python -m unittest discover -s ops/telemetry-receiver -p 'test_*.py' -v
-      - run: python -m py_compile updater/spawnwp updater/build-release.py runtime/app.py runtime/scripts/blueprint.py
-      - run: bash -n updater/publish-release.sh runtime/scripts/*.sh clients/knock.sh
+      - run: python -m unittest discover -s ops/website -p 'test_*.py' -v
+      - run: python -m py_compile updater/spawnwp updater/build-release.py runtime/app.py runtime/scripts/blueprint.py ops/website/sync_wporg_plugin.py
+      - run: bash -n updater/publish-release.sh runtime/scripts/*.sh clients/knock.sh ops/website/install-plugin-sync.sh plugins/spawnwp-deploy/bin/build-release.sh
       - run: bash installer/tests/static.sh
+      - name: Verify main matches the WordPress.org stable plugin
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python ops/website/sync_wporg_plugin.py --check-source plugins/spawnwp-deploy --lock-file /tmp/spawnwp-plugin-source-check.lock
       - run: pip install -r website/requirements.txt
       - run: mkdocs build --strict

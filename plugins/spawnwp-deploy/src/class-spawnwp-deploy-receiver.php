@@ -4,13 +4,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Receiver payloads can reach 2 GiB and require bounded streaming plus atomic directory
+// swaps for rollback safety. WP_Filesystem has no streaming API and its move abstraction
+// cannot guarantee the same local-filesystem atomicity required by this deployment flow.
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+// phpcs:disable WordPress.WP.AlternativeFunctions.rename_rename
+// phpcs:disable WordPress.WP.AlternativeFunctions.unlink_unlink
+// phpcs:disable PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite
+
 final class SpawnWP_Deploy_Receiver {
 	public static function root( string $job_id ): string {
-		return WP_CONTENT_DIR . '/.spawnwp-deploy/receiver/' . sanitize_file_name( $job_id );
+		return SpawnWP_Deploy_Package::storage_root() . '/receiver/' . sanitize_file_name( $job_id );
 	}
 
 	public static function create_job( string $connection_id, array $manifest ): string {
 		global $wpdb;
+		SpawnWP_Deploy_Package::ensure_storage_root();
 		$job_id = SpawnWP_Deploy_Database::uuid();
 		$root   = self::root( $job_id );
 		if ( ! wp_mkdir_p( $root . '/chunks' ) ) {
@@ -96,7 +108,7 @@ final class SpawnWP_Deploy_Receiver {
 		if ( ! hash_equals( $manifest['archive_sha256'], hash_file( 'sha256', $archive ) ) ) {
 			throw new RuntimeException( 'Payload checksum mismatch.' );
 		}
-		if ( disk_free_space( WP_CONTENT_DIR ) < (int) $manifest['archive_bytes'] * 2 ) {
+		if ( disk_free_space( SpawnWP_Deploy_Package::storage_root() ) < (int) $manifest['archive_bytes'] * 2 ) {
 			throw new RuntimeException( 'Insufficient free space to stage and activate payload.' );
 		}
 
@@ -131,9 +143,9 @@ final class SpawnWP_Deploy_Receiver {
 		}
 		$guard = SpawnWP_Deploy_Guard::target_report();
 		if ( ! $guard['ok'] ) {
-			throw new RuntimeException( 'Target is no longer empty: ' . implode( ' ', $guard['issues'] ) );
+			throw new RuntimeException( 'Target is no longer empty: ' . implode( ' ', array_map( 'esc_html', $guard['issues'] ) ) );
 		}
-		$manifest = json_decode( $job['manifest'], true );
+		$manifest               = json_decode( $job['manifest'], true );
 		$compatibility_warnings = SpawnWP_Deploy_Guard::compatibility_warnings( $manifest, $guard['environment'] );
 		if ( $compatibility_warnings ) {
 			SpawnWP_Deploy_Database::audit( 'compatibility_warning_accepted', array( 'warnings' => $compatibility_warnings ), $job['connection_id'], $job['id'] );
@@ -145,7 +157,6 @@ final class SpawnWP_Deploy_Receiver {
 			'started_at' => gmdate( 'c' ),
 		);
 		try {
-			self::maintenance( true );
 			$activation['tables']   = self::import_and_swap_database( $job, $manifest, $owner_user_id );
 			$manifest['activation'] = $activation;
 			self::persist_manifest( $job['id'], $manifest, 'activating' );
@@ -161,7 +172,6 @@ final class SpawnWP_Deploy_Receiver {
 				array( 'id' => $job['id'] )
 			);
 			wp_cache_flush();
-			self::maintenance( false );
 			$healthcheck_url = defined( 'SPAWNWP_DEPLOY_HEALTHCHECK_URL' ) ? SPAWNWP_DEPLOY_HEALTHCHECK_URL : home_url( '/' );
 			$check           = wp_remote_get(
 				$healthcheck_url,
@@ -171,7 +181,7 @@ final class SpawnWP_Deploy_Receiver {
 					'sslverify'   => true,
 				)
 			);
-			$status_code = wp_remote_retrieve_response_code( $check );
+			$status_code     = wp_remote_retrieve_response_code( $check );
 			if ( is_wp_error( $check ) || $status_code < 200 || $status_code >= 400 ) {
 				throw new RuntimeException( 'Post-activation health check failed.' );
 			}
@@ -192,8 +202,7 @@ final class SpawnWP_Deploy_Receiver {
 				'rollback_expires' => get_option( 'spawnwp_deploy_rollback_expires' ),
 			);
 		} catch ( Throwable $error ) {
-			self::maintenance( false );
-			$latest_manifest = $wpdb->get_var( $wpdb->prepare( 'SELECT manifest FROM ' . SpawnWP_Deploy_Database::table( 'jobs' ) . ' WHERE id=%s', $job['id'] ) );
+			$latest_manifest = $wpdb->get_var( $wpdb->prepare( 'SELECT manifest FROM %i WHERE id=%s', SpawnWP_Deploy_Database::table( 'jobs' ), $job['id'] ) );
 			$latest_manifest = $latest_manifest ? json_decode( $latest_manifest, true ) : array();
 			if ( ! empty( $latest_manifest['activation'] ) ) {
 				$activation = $latest_manifest['activation'];
@@ -223,11 +232,9 @@ final class SpawnWP_Deploy_Receiver {
 		if ( empty( $manifest['activation'] ) || time() > (int) get_option( 'spawnwp_deploy_rollback_expires', 0 ) ) {
 			throw new RuntimeException( 'Rollback is not available.' );
 		}
-		self::maintenance( true );
 		self::rollback_maps( $manifest['activation'] );
 		delete_option( 'spawnwp_deploy_completed_at' );
 		delete_option( 'spawnwp_deploy_rollback_expires' );
-		self::maintenance( false );
 		SpawnWP_Deploy_Database::audit( 'rollback_complete', array(), $job['connection_id'], $job['id'] );
 		return array( 'state' => 'rollback' );
 	}
@@ -239,11 +246,11 @@ final class SpawnWP_Deploy_Receiver {
 		if ( ! $expires || time() <= $expires ) {
 			return;
 		}
-		$jobs = $wpdb->get_results( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'jobs' ) . " WHERE state='complete'", ARRAY_A );
+		$jobs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE state='complete'", SpawnWP_Deploy_Database::table( 'jobs' ) ), ARRAY_A );
 		foreach ( $jobs as $job ) {
 			$manifest = json_decode( $job['manifest'], true );
 			foreach ( $manifest['activation']['tables'] ?? array() as $entry ) {
-				$wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $entry['backup'] ) . '`' );
+				$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $entry['backup'] ) );
 			}
 			self::remove_tree( self::root( $job['id'] ) . '/backup-content' );
 		}
@@ -266,9 +273,10 @@ final class SpawnWP_Deploy_Receiver {
 				$temp   = substr( $wpdb->prefix . 'sd' . $short . '_' . $suffix, 0, 64 );
 				$backup = substr( $wpdb->prefix . 'sb' . $short . '_' . $suffix, 0, 64 );
 				$ddl    = preg_replace( '/^CREATE TABLE\s+`[^`]+`/i', 'CREATE TABLE `' . esc_sql( $temp ) . '`', $record['create'] );
-				$wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $temp ) . '`' );
+				$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $temp ) );
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Authenticated package DDL has its table identifier replaced above; placeholders cannot represent a full CREATE TABLE statement.
 				if ( false === $wpdb->query( $ddl ) ) {
-					throw new RuntimeException( 'Unable to create temporary table for ' . $live );
+					throw new RuntimeException( 'Unable to create a temporary deployment table.' );
 				}
 				$map[ $record['name'] ] = array(
 					'live'   => $live,
@@ -283,7 +291,7 @@ final class SpawnWP_Deploy_Receiver {
 					$data[ $column ] = null === $value ? null : base64_decode( $value, true );
 				}
 				if ( false === $wpdb->insert( $map[ $current_table ]['temp'], $data ) ) {
-					throw new RuntimeException( 'Unable to import a row into ' . $map[ $current_table ]['live'] );
+					throw new RuntimeException( 'Unable to import a deployment database row.' );
 				}
 			}
 		}
@@ -294,27 +302,28 @@ final class SpawnWP_Deploy_Receiver {
 		if ( isset( $map[ $options_source ] ) ) {
 			$temp_options = $map[ $options_source ]['temp'];
 			foreach ( array( 'home', 'siteurl', 'admin_email' ) as $name ) {
-				$value = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$options_live} WHERE option_name=%s", $name ) );
-				$wpdb->query( $wpdb->prepare( "UPDATE `{$temp_options}` SET option_value=%s WHERE option_name=%s", $value, $name ) );
+				$value = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name=%s', $options_live, $name ) );
+				$wpdb->query( $wpdb->prepare( 'UPDATE %i SET option_value=%s WHERE option_name=%s', $temp_options, $value, $name ) );
 			}
 		}
 		$posts_source = $manifest['source_prefix'] . 'posts';
 		if ( isset( $map[ $posts_source ] ) ) {
-			$wpdb->query( $wpdb->prepare( 'UPDATE `' . esc_sql( $map[ $posts_source ]['temp'] ) . '` SET post_author=%d', $owner_user_id ) );
+			$wpdb->query( $wpdb->prepare( 'UPDATE %i SET post_author=%d', $map[ $posts_source ]['temp'], $owner_user_id ) );
 		}
 		$comments_source = $manifest['source_prefix'] . 'comments';
 		if ( isset( $map[ $comments_source ] ) ) {
-			$wpdb->query( 'UPDATE `' . esc_sql( $map[ $comments_source ]['temp'] ) . '` SET user_id=0' );
+			$wpdb->query( $wpdb->prepare( 'UPDATE %i SET user_id=0', $map[ $comments_source ]['temp'] ) );
 		}
 
 		$renames = array();
 		foreach ( $map as $entry ) {
-			$wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $entry['backup'] ) . '`' );
+			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $entry['backup'] ) );
 			if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $entry['live'] ) ) ) {
-				$renames[] = '`' . esc_sql( $entry['live'] ) . '` TO `' . esc_sql( $entry['backup'] ) . '`';
+				$renames[] = $wpdb->prepare( '%i TO %i', $entry['live'], $entry['backup'] );
 			}
-			$renames[] = '`' . esc_sql( $entry['temp'] ) . '` TO `' . esc_sql( $entry['live'] ) . '`';
+			$renames[] = $wpdb->prepare( '%i TO %i', $entry['temp'], $entry['live'] );
 		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Each RENAME fragment is prepared above with identifier placeholders.
 		if ( false === $wpdb->query( 'RENAME TABLE ' . implode( ', ', $renames ) ) ) {
 			throw new RuntimeException( 'Atomic database table swap failed.' );
 		}
@@ -324,21 +333,24 @@ final class SpawnWP_Deploy_Receiver {
 	private static function swap_files( array $job, array &$manifest ): void {
 		$stage_content = self::root( $job['id'] ) . '/stage/content';
 		$backup_root   = self::root( $job['id'] ) . '/backup-content';
+		$plugin_dir    = dirname( plugin_basename( SPAWNWP_DEPLOY_FILE ) );
+		$preserve      = '.' === $plugin_dir ? array() : array( $plugin_dir );
 		wp_mkdir_p( $backup_root );
 		foreach ( array( 'plugins', 'themes', 'uploads' ) as $kind ) {
 			$staged = $stage_content . '/' . $kind;
 			$live   = 'plugins' === $kind ? WP_PLUGIN_DIR : ( 'themes' === $kind ? get_theme_root() : wp_get_upload_dir()['basedir'] );
 			$backup = $backup_root . '/' . $kind;
-			if ( 'plugins' === $kind ) {
+			if ( in_array( $kind, array( 'plugins', 'uploads' ), true ) ) {
+				$kind_preserve                     = 'plugins' === $kind ? $preserve : array( 'spawnwp-deploy' );
 				$manifest['activation']['files'][] = array(
 					'mode'     => 'children',
 					'staged'   => $staged,
 					'live'     => $live,
 					'backup'   => $backup,
-					'preserve' => array( 'spawnwp-deploy' ),
+					'preserve' => $kind_preserve,
 				);
 				self::persist_manifest( $job['id'], $manifest, 'activating' );
-				self::swap_directory_children( $staged, $live, $backup, array( 'spawnwp-deploy' ) );
+				self::swap_directory_children( $staged, $live, $backup, $kind_preserve );
 			} else {
 				$manifest['activation']['files'][] = array(
 					'mode'   => 'directory',
@@ -347,10 +359,10 @@ final class SpawnWP_Deploy_Receiver {
 				);
 				self::persist_manifest( $job['id'], $manifest, 'activating' );
 				if ( is_dir( $live ) && ! rename( $live, $backup ) ) {
-					throw new RuntimeException( 'Unable to back up ' . $kind );
+					throw new RuntimeException( 'Unable to back up the ' . sanitize_key( $kind ) . ' directory.' );
 				}
 				if ( is_dir( $staged ) && ! rename( $staged, $live ) ) {
-					throw new RuntimeException( 'Unable to activate ' . $kind );
+					throw new RuntimeException( 'Unable to activate the ' . sanitize_key( $kind ) . ' directory.' );
 				}
 			}
 		}
@@ -371,13 +383,17 @@ final class SpawnWP_Deploy_Receiver {
 
 	private static function swap_directory_children( string $staged, string $live, string $backup, array $preserve ): void {
 		wp_mkdir_p( $backup );
-		foreach ( glob( $live . '/*' ) ?: array() as $path ) {
+		$live_children = glob( $live . '/*' );
+		$live_children = false !== $live_children ? $live_children : array();
+		foreach ( $live_children as $path ) {
 			if ( in_array( basename( $path ), $preserve, true ) ) {
 				continue;
 			}
 			rename( $path, $backup . '/' . basename( $path ) );
 		}
-		foreach ( glob( $staged . '/*' ) ?: array() as $path ) {
+		$staged_children = glob( $staged . '/*' );
+		$staged_children = false !== $staged_children ? $staged_children : array();
+		foreach ( $staged_children as $path ) {
 			if ( in_array( basename( $path ), $preserve, true ) ) {
 				continue;
 			}
@@ -392,12 +408,13 @@ final class SpawnWP_Deploy_Receiver {
 			foreach ( $activation['tables'] as $entry ) {
 				if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $entry['backup'] ) ) ) {
 					$failed = substr( $entry['temp'] . '_failed', 0, 64 );
-					$wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $failed ) . '`' );
-					$renames[] = '`' . esc_sql( $entry['live'] ) . '` TO `' . esc_sql( $failed ) . '`';
-					$renames[] = '`' . esc_sql( $entry['backup'] ) . '` TO `' . esc_sql( $entry['live'] ) . '`';
+					$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $failed ) );
+					$renames[] = $wpdb->prepare( '%i TO %i', $entry['live'], $failed );
+					$renames[] = $wpdb->prepare( '%i TO %i', $entry['backup'], $entry['live'] );
 				}
 			}
 			if ( $renames ) {
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Each RENAME fragment is prepared above with identifier placeholders.
 				$wpdb->query( 'RENAME TABLE ' . implode( ', ', $renames ) );
 			}
 		}
@@ -411,7 +428,7 @@ final class SpawnWP_Deploy_Receiver {
 					rename( $entry['backup'], $entry['live'] );
 				}
 			} else {
-				self::swap_directory_children( $entry['backup'], $entry['live'], dirname( $entry['backup'] ) . '/failed-plugins', $entry['preserve'] );
+				self::swap_directory_children( $entry['backup'], $entry['live'], dirname( $entry['backup'] ) . '/failed-children', $entry['preserve'] );
 			}
 		}
 		wp_cache_flush();
@@ -419,9 +436,10 @@ final class SpawnWP_Deploy_Receiver {
 
 	private static function validate_archive( ZipArchive $zip, int $max_uncompressed ): void {
 		$total = 0;
+		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- ZipArchive exposes the native numFiles property.
 		for ( $i = 0; $i < $zip->numFiles; ++$i ) {
-			$stat = $zip->statIndex( $i );
-			$name = str_replace( '\\', '/', $stat['name'] );
+			$stat  = $zip->statIndex( $i );
+			$name  = str_replace( '\\', '/', $stat['name'] );
 			$parts = explode( '/', $name );
 			if ( str_starts_with( $name, '/' ) || preg_match( '/^[A-Za-z]:/', $name ) || in_array( '..', $parts, true ) || str_contains( $name, "\0" ) ) {
 				throw new RuntimeException( 'Unsafe archive path.' );
@@ -435,15 +453,6 @@ final class SpawnWP_Deploy_Receiver {
 			if ( $total > $max_uncompressed ) {
 				throw new RuntimeException( 'Archive expansion exceeds safety limit.' );
 			}
-		}
-	}
-
-	private static function maintenance( bool $enable ): void {
-		$file = ABSPATH . '.maintenance';
-		if ( $enable ) {
-			file_put_contents( $file, '<?php $upgrading = ' . time() . ';' );
-		} else {
-			@unlink( $file );
 		}
 	}
 

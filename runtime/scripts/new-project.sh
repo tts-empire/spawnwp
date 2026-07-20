@@ -345,8 +345,8 @@ chown -R 33:33 "${PROJ_DIR}/projects/primary/wp-content"
 
 # Optional: install the SpawnWP Deploy plugin when the cockpit checkbox asked
 # for it. The plugin releases on its own cadence, so the copy bundled with the
-# core release can lag the published one: prefer the latest signed artifact
-# from spawnwp.com when it is strictly newer, and fall back to the bundle when
+# core release can lag the published one: prefer the signed mirror of the latest
+# WordPress.org stable when it is strictly newer, and fall back to the bundle when
 # offline or when anything about the download fails verification (non-fatal —
 # the site is still created, at worst without the plugin).
 
@@ -415,7 +415,7 @@ if [ "${SPAWNWP_INSTALL_DEPLOY_PLUGIN:-0}" = "1" ]; then
     [ -f "$DEPLOY_PLUGIN_ZIP" ] && BUNDLED_DEPLOY_VERSION=$(deploy_plugin_zip_version "$DEPLOY_PLUGIN_ZIP")
     DEPLOY_FETCH_DIR=$(mktemp -d)
     if try_fetch_latest_deploy_plugin "$DEPLOY_FETCH_DIR" "${BUNDLED_DEPLOY_VERSION:-0.0.0}"; then
-      DEPLOY_PLUGIN_SOURCE="spawnwp.com (verified)"
+      DEPLOY_PLUGIN_SOURCE="WordPress.org mirror (verified)"
     else
       echo "  -> no newer verified plugin release available; using the bundled copy${BUNDLED_DEPLOY_VERSION:+ (${BUNDLED_DEPLOY_VERSION})}."
     fi

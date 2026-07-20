@@ -119,6 +119,7 @@ live_hash=$(curl --resolve "$HOST:443:127.0.0.1" -fsS "$base/install.sh" | sha25
 repo_hash=$(sha256sum install.sh | awk '{print $1}')
 [[ "$live_hash" == "$repo_hash" ]] || { echo "live install.sh checksum mismatch" >&2; exit 1; }
 bash ops/website/check-live-install.sh
+python3 ops/website/sync_wporg_plugin.py --check
 
 flipped=0
 echo "published $release (previous: ${previous:-none})"

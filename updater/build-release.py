@@ -48,15 +48,17 @@ def normalize_tar(info: tarfile.TarInfo) -> tarfile.TarInfo:
 
 
 def build_deploy_plugin_zip(destination: Path) -> None:
-    """Build a deterministic zip of the SpawnWP Deploy plugin so the cockpit can
-    install it on opt-in sites. Same file set as plugins/spawnwp-deploy/bin/
-    build-release.sh; fixed timestamps keep the release reproducible. The zip is
-    covered by the core release signature, so no separate plugin signature ships."""
+    """Build the WordPress.org-stable plugin tree for the offline fallback.
+
+    Development documentation, tests, build tools and signing keys deliberately stay
+    outside the archive. Fixed timestamps keep the SpawnWP release reproducible; the
+    generated zip is covered by the core release signature.
+    """
     import zipfile
 
     plugin = ROOT / "plugins" / "spawnwp-deploy"
-    members: list[Path] = [plugin / "spawnwp-deploy.php", plugin / "README.md"]
-    for sub in ("src", "recovery"):
+    members: list[Path] = [plugin / "spawnwp-deploy.php", plugin / "readme.txt"]
+    for sub in ("assets", "src", "recovery"):
         members += sorted(p for p in (plugin / sub).rglob("*") if p.is_file())
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:

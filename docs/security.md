@@ -12,7 +12,8 @@ creation and is never installed automatically. When explicitly installed, it use
 per-connection Ed25519 keys, signed requests,
 timestamps, nonces, body hashes and checksummed chunks. Connection keys expire after
 15 minutes. The target stages and verifies the package before activation and retains a
-seven-day rollback. The plugin is a public preview and is not installed by default.
+seven-day rollback. The plugin is distributed through WordPress.org and is installed only
+when an administrator explicitly selects it for a new site.
 
 Since 0.4.0 the same machine-authentication model also protects **content blueprint
 captures** pushed from the plugin to the SpawnWP server (`/api/ingest/*`): every

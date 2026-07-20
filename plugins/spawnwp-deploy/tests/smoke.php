@@ -122,7 +122,7 @@ $secret_plaintext = SpawnWP_Deploy_Crypto::random_token( 32 );
 $encrypted        = SpawnWP_Deploy_Crypto::encrypt( $secret_plaintext );
 $assert( $encrypted !== $secret_plaintext && SpawnWP_Deploy_Crypto::decrypt( $encrypted ) === $secret_plaintext, 'Key storage encrypt/decrypt round trip' );
 
-foreach ( array( 'class-blueprint.php', 'class-admin.php' ) as $source_file ) {
+foreach ( array( 'class-spawnwp-deploy-blueprint.php', 'class-spawnwp-deploy-admin.php' ) as $source_file ) {
 	$src = (string) file_get_contents( SPAWNWP_DEPLOY_DIR . 'src/' . $source_file );
 	$assert( ! str_contains( $src, 'wp_remote_post(' ) && ! str_contains( $src, 'wp_remote_request(' ), "Outbound requests use the SSRF-guarded API in {$source_file}" );
 }

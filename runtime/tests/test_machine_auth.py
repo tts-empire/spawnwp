@@ -1,5 +1,5 @@
 """Cross-implementation vectors: signatures produced by PHP sodium
-(plugins/spawnwp-deploy/src/class-crypto.php canonical format, fixture generated
+(plugins/spawnwp-deploy/src/class-spawnwp-deploy-crypto.php canonical format, fixture generated
 with sodium_crypto_sign_detached) must verify with the Python machine_auth
 module, so the two sides cannot drift apart silently."""
 

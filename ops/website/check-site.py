@@ -122,6 +122,19 @@ def main() -> None:
             extra = sorted(sitemap_urls - set(canonicals))
             errors.append(f"sitemap mismatch; missing={missing}, extra={extra}")
 
+    plugin_page = args.root / "plugin/index.html"
+    if plugin_page.is_file():
+        plugin_html = plugin_page.read_text(encoding="utf-8")
+        required = {
+            "https://wordpress.org/plugins/spawnwp-deploy/",
+            "https://downloads.wordpress.org/plugin/spawnwp-deploy.latest-stable.zip",
+        }
+        for value in sorted(required):
+            if value not in plugin_html:
+                errors.append(f"{plugin_page}: missing official plugin link {value}")
+        if "spawnwp-deploy-0." in plugin_html or "-dev" in plugin_html:
+            errors.append(f"{plugin_page}: plugin distribution must not hardcode a version or -dev build")
+
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"validated {len(canonicals)} canonical HTML pages")

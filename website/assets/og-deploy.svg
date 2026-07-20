@@ -6,5 +6,5 @@
   <text x="70" y="335" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">Move a finished site once.</text>
   <text x="70" y="410" fill="#f8f8f8" font-family="Arial,sans-serif" font-size="58" font-weight="700">To a fresh WordPress install.</text>
   <line x1="70" y1="482" x2="1130" y2="482" stroke="#343439" stroke-width="2"/>
-  <text x="70" y="540" fill="#a1a1aa" font-family="Arial,sans-serif" font-size="25">Optional workflow  ·  Public preview  ·  Your publishing choice</text>
+  <text x="70" y="540" fill="#a1a1aa" font-family="Arial,sans-serif" font-size="25">Official WordPress.org plugin  ·  Optional workflow  ·  Your publishing choice</text>
 </svg>

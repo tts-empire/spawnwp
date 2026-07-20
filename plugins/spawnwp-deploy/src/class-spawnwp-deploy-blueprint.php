@@ -77,7 +77,7 @@ final class SpawnWP_Deploy_Blueprint {
 
 	public static function revoke( string $id ): void {
 		global $wpdb;
-		$connection = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE id=%s AND role='server'", $id ), ARRAY_A );
+		$connection = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='server'", SpawnWP_Deploy_Database::table( 'connections' ), $id ), ARRAY_A );
 		if ( ! $connection ) {
 			throw new RuntimeException( 'Server connection not found.' );
 		}
@@ -90,7 +90,11 @@ final class SpawnWP_Deploy_Blueprint {
 		}
 		$wpdb->update(
 			SpawnWP_Deploy_Database::table( 'connections' ),
-			array( 'status' => 'revoked', 'private_key' => '', 'updated_at' => current_time( 'mysql', true ) ),
+			array(
+				'status'      => 'revoked',
+				'private_key' => '',
+				'updated_at'  => current_time( 'mysql', true ),
+			),
 			array( 'id' => $id )
 		);
 		SpawnWP_Deploy_Database::audit( 'server_connection_revoked', array(), $id );
@@ -154,6 +158,7 @@ final class SpawnWP_Deploy_Blueprint {
 		if ( (int) ( $preflight['ingest_format'] ?? 0 ) > self::SUPPORTED_INGEST_FORMAT ) {
 			throw new RuntimeException( 'The SpawnWP server uses a newer blueprint format; update this plugin.' );
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- ajax_step() verifies the request nonce before calling this helper.
 		$blueprint_id = sanitize_key( wp_unslash( $_POST['blueprint_id'] ?? '' ) );
 		$existing     = $preflight['existing_blueprint_ids'] ?? array();
 		$inventory    = SpawnWP_Deploy_Guard::plugin_inventory();
@@ -208,11 +213,12 @@ final class SpawnWP_Deploy_Blueprint {
 						'chunk_size'  => $manifest['chunk_size'],
 						'chunk_count' => $manifest['chunk_count'],
 					),
+					// phpcs:ignore WordPress.Security.NonceVerification.Missing -- ajax_step() verifies the request nonce before calling this helper.
 					'replace'   => ! empty( $_POST['replace'] ),
 				)
 			)
 		);
-		$state  = array(
+		$state = array(
 			'local'       => $local,
 			'job'         => $remote['job_id'],
 			'chunk_size'  => (int) $manifest['chunk_size'],
@@ -224,6 +230,8 @@ final class SpawnWP_Deploy_Blueprint {
 	}
 
 	private static function capture_fields(): array {
+		// ajax_step() verifies the request nonce before this helper reads the capture form.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
 		$id          = sanitize_key( wp_unslash( $_POST['blueprint_id'] ?? '' ) );
 		$name        = sanitize_text_field( wp_unslash( $_POST['blueprint_name'] ?? '' ) );
 		$description = sanitize_text_field( wp_unslash( $_POST['blueprint_description'] ?? '' ) );
@@ -251,6 +259,7 @@ final class SpawnWP_Deploy_Blueprint {
 			'uploads'  => ! empty( $_POST['include_uploads'] ),
 			'database' => ! empty( $_POST['include_database'] ),
 		);
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 		if ( ! in_array( true, $capture, true ) ) {
 			throw new RuntimeException( 'Select at least one component to capture.' );
 		}
@@ -356,7 +365,7 @@ final class SpawnWP_Deploy_Blueprint {
 
 	public static function server_connection( string $id ): array {
 		global $wpdb;
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE id=%s AND role='server' AND status='active'", $id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='server' AND status='active'", SpawnWP_Deploy_Database::table( 'connections' ), $id ), ARRAY_A );
 		if ( ! $row ) {
 			throw new RuntimeException( 'Active server connection not found.' );
 		}
@@ -393,7 +402,7 @@ final class SpawnWP_Deploy_Blueprint {
 
 	private static function decode_response( $response ): array {
 		if ( is_wp_error( $response ) ) {
-			throw new RuntimeException( $response->get_error_message() );
+			throw new RuntimeException( esc_html( $response->get_error_message() ) );
 		}
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -402,14 +411,14 @@ final class SpawnWP_Deploy_Blueprint {
 			if ( ! $message && 404 === $status ) {
 				$message = 'The server does not support blueprint capture. Update your SpawnWP server to 0.4.0 or later.';
 			}
-			throw new RuntimeException( is_string( $message ) ? $message : 'Server request failed with HTTP ' . $status );
+			throw new RuntimeException( is_string( $message ) ? esc_html( $message ) : 'Server request failed with HTTP ' . absint( $status ) );
 		}
 		return is_array( $data ) ? $data : array();
 	}
 
 	public static function render_panel(): void {
 		global $wpdb;
-		$servers   = $wpdb->get_results( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'connections' ) . " WHERE role='server' AND status='active' ORDER BY created_at DESC", ARRAY_A );
+		$servers   = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE role='server' AND status='active' ORDER BY created_at DESC", SpawnWP_Deploy_Database::table( 'connections' ) ), ARRAY_A );
 		$inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 		$php       = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
 		$php_pin   = in_array( $php, self::PHP_CHOICES, true ) ? $php : '8.2';
@@ -466,7 +475,7 @@ final class SpawnWP_Deploy_Blueprint {
 						that blueprint. To create a different one, use <em>Start a new blueprint</em>.
 					</p>
 				<?php endif; ?>
-				<form id="spawnwp-blueprint-form" onsubmit="return false">
+				<form id="spawnwp-blueprint-form" data-premium-count="<?php echo esc_attr( count( $inventory['premium'] ) ); ?>" data-php-pin="<?php echo esc_attr( $php_pin ); ?>">
 					<table class="form-table" role="presentation">
 						<tr><th><label for="spawnwp-bp-id">Blueprint id</label></th>
 							<td><input type="text" id="spawnwp-bp-id" pattern="[a-z0-9][a-z0-9-]{0,30}" maxlength="31" class="regular-text" placeholder="my-agency-base" value="<?php echo esc_attr( $last['id'] ?? '' ); ?>" required>
@@ -485,7 +494,7 @@ final class SpawnWP_Deploy_Blueprint {
 						</td></tr>
 						<tr><th>PHP versions</th><td>
 							<?php foreach ( self::PHP_CHOICES as $choice ) : ?>
-								<label style="margin-right:12px"><input type="checkbox" class="spawnwp-bp-php" value="<?php echo esc_attr( $choice ); ?>" <?php checked( in_array( $choice, $last_allowed, true ) ); ?>> <?php echo esc_html( $choice ); ?></label>
+							<label class="spawnwp-bp-php-choice"><input type="checkbox" class="spawnwp-bp-php" value="<?php echo esc_attr( $choice ); ?>" <?php checked( in_array( $choice, $last_allowed, true ) ); ?>> <?php echo esc_html( $choice ); ?></label>
 							<?php endforeach; ?>
 							<p class="description">Default for new sites:
 								<select id="spawnwp-bp-php-default">
@@ -497,7 +506,7 @@ final class SpawnWP_Deploy_Blueprint {
 						</td></tr>
 					</table>
 					<?php foreach ( $servers as $server ) : ?>
-						<button class="button button-primary spawnwp-bp-start" data-connection="<?php echo esc_attr( $server['id'] ); ?>">Create blueprint on <?php echo esc_html( $server['label'] ?: $server['remote_url'] ); ?></button>
+						<button class="button button-primary spawnwp-bp-start" data-connection="<?php echo esc_attr( $server['id'] ); ?>">Create blueprint on <?php echo esc_html( ! empty( $server['label'] ) ? $server['label'] : $server['remote_url'] ); ?></button>
 					<?php endforeach; ?>
 					<?php if ( $last ) : ?>
 						<button type="button" class="button" id="spawnwp-bp-reset">Start a new blueprint</button>
@@ -506,83 +515,6 @@ final class SpawnWP_Deploy_Blueprint {
 				<pre id="spawnwp-bp-log" hidden></pre>
 			<?php endif; ?>
 		</section>
-		<?php if ( $servers ) : ?>
-		<script>
-		(function(){
-			const ajaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-			const nonce=<?php echo wp_json_encode( wp_create_nonce( 'spawnwp_blueprint_ajax' ) ); ?>;
-			const premium=<?php echo wp_json_encode( count( $inventory['premium'] ) ); ?>;
-			const phpPin=<?php echo wp_json_encode( $php_pin ); ?>;
-			const log=document.getElementById('spawnwp-bp-log');
-			function line(text){log.hidden=false;log.textContent+=text+'\n';log.scrollTop=log.scrollHeight;}
-			function fields(){
-				const allowed=[...document.querySelectorAll('.spawnwp-bp-php:checked')].map(box=>box.value);
-				return {
-					blueprint_id:document.getElementById('spawnwp-bp-id').value.trim(),
-					blueprint_name:document.getElementById('spawnwp-bp-name').value.trim(),
-					blueprint_description:document.getElementById('spawnwp-bp-description').value.trim(),
-					blueprint_version:document.getElementById('spawnwp-bp-version').value.trim(),
-					php_default:document.getElementById('spawnwp-bp-php-default').value,
-					php_allowed:allowed.join(','),
-					include_plugins:document.getElementById('spawnwp-bp-plugins').checked?'1':'',
-					include_themes:document.getElementById('spawnwp-bp-themes').checked?'1':'',
-					include_uploads:document.getElementById('spawnwp-bp-uploads').checked?'1':'',
-					include_database:document.getElementById('spawnwp-bp-database').checked?'1':''
-				};
-			}
-			async function step(connection,op,state={}){const body=new URLSearchParams({action:'spawnwp_blueprint_step',nonce,connection,op,...state});const response=await fetch(ajaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const data=await response.json();if(!data.success)throw new Error(data.data&&data.data.message?data.data.message:'Blueprint step failed');return data.data;}
-			const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-			async function capture(button){
-				const connection=button.dataset.connection;
-				const form=fields();
-				if(!document.getElementById('spawnwp-blueprint-form').reportValidity())return;
-				button.disabled=true;
-				try{
-					line('Checking SpawnWP server...');
-					const pre=await step(connection,'preflight',{blueprint_id:form.blueprint_id});
-					line('Server SpawnWP '+pre.spawnwp_version+' ready.');
-					if(pre.exists){
-						if(!pre.replaceable)throw new Error('Blueprint id "'+form.blueprint_id+'" already exists on the server and cannot be replaced. Pick another id.');
-						if(!confirm('A blueprint named "'+form.blueprint_id+'" already exists on the server.\nReplace it with this capture? The old version is kept until the new one is verified.'))throw new Error('Capture cancelled.');
-						form.replace='1';
-					}
-					if(premium>0&&!confirm('This site uses '+premium+' premium/custom plugin(s) (see the warning above).\nSites spawned from this blueprint may require new license keys or re-activation.\n\nContinue?'))throw new Error('Capture cancelled.');
-					if(form.include_database&&!confirm('The database capture includes this site\'s real posts, pages and settings: they will appear in every site spawned from this blueprint.\nUsers and passwords are never included.\n\nContinue?'))throw new Error('Capture cancelled.');
-					line('Building capture package (this can take a while)...');
-					let data=await step(connection,'prepare',form);
-					const job=data.job;
-					line('Package ready: '+data.chunk_count+' chunks.');
-					while(data.next<data.chunk_count){data=await step(connection,'transfer',{job,next:String(data.next)});line('Transferred '+data.next+' / '+data.chunk_count+' chunks');}
-					line('Upload complete. Server is verifying and installing...');
-					await step(connection,'finalize',{job});
-					for(;;){
-						await sleep(2000);
-						const status=await step(connection,'status',{job});
-						if(status.state==='complete'){line('Blueprint installed. It is now available on the Deploy page of your SpawnWP server.');button.textContent='Blueprint created';return;}
-						if(status.state==='failed')throw new Error(status.error||'Server-side installation failed.');
-						line('Server: '+status.state+'...');
-					}
-				}catch(error){line('ERROR: '+error.message);button.disabled=false;}
-			}
-			document.querySelectorAll('.spawnwp-bp-start').forEach(button=>button.addEventListener('click',()=>capture(button)));
-			// Pre-filling biases the form towards REPLACING the last blueprint, which is
-			// the common case but makes starting a genuinely new one harder. Hand it back:
-			// restore the first-capture defaults, client-side, without touching the stored
-			// memory (a reload brings the pre-fill back).
-			const reset=document.getElementById('spawnwp-bp-reset');
-			if(reset)reset.addEventListener('click',()=>{
-				['spawnwp-bp-id','spawnwp-bp-name','spawnwp-bp-description'].forEach(id=>{document.getElementById(id).value='';});
-				document.getElementById('spawnwp-bp-version').value='1.0.0';
-				['spawnwp-bp-plugins','spawnwp-bp-themes','spawnwp-bp-uploads','spawnwp-bp-database'].forEach(id=>{document.getElementById(id).checked=true;});
-				document.querySelectorAll('.spawnwp-bp-php').forEach(box=>{box.checked=box.value===phpPin;});
-				document.getElementById('spawnwp-bp-php-default').value=phpPin;
-				const notice=document.getElementById('spawnwp-bp-prefilled');
-				if(notice)notice.hidden=true;
-				document.getElementById('spawnwp-bp-id').focus();
-			});
-		})();
-		</script>
-		<?php endif; ?>
 		<?php
 	}
 }

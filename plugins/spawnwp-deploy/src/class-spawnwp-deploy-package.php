@@ -4,6 +4,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Deployment archives can reach 2 GiB and must be streamed in bounded chunks. The
+// WP_Filesystem API only exposes whole-file reads/writes, so native stream and cleanup
+// primitives are required here to avoid exhausting PHP memory.
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fread
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+// phpcs:disable WordPress.WP.AlternativeFunctions.unlink_unlink
+
 final class SpawnWP_Deploy_Package {
 	const MAX_BYTES   = 2147483648;
 	const DEV_PLUGINS = array(
@@ -15,8 +26,16 @@ final class SpawnWP_Deploy_Package {
 		'spawnwp-deploy',
 	);
 
+	public static function storage_root(): string {
+		$uploads = wp_upload_dir();
+		if ( ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) ) {
+			throw new RuntimeException( 'The WordPress uploads directory is unavailable.' );
+		}
+		return trailingslashit( $uploads['basedir'] ) . 'spawnwp-deploy';
+	}
+
 	public static function workspace( string $job_id ): string {
-		return WP_CONTENT_DIR . '/.spawnwp-deploy/jobs/' . sanitize_file_name( $job_id );
+		return self::storage_root() . '/jobs/' . sanitize_file_name( $job_id );
 	}
 
 	public static function prepare( string $job_id, string $target_url, array $target_env, array $options = array() ): array {
@@ -35,6 +54,7 @@ final class SpawnWP_Deploy_Package {
 		if ( ! wp_mkdir_p( $workspace ) ) {
 			throw new RuntimeException( 'Unable to create package workspace.' );
 		}
+		self::ensure_storage_root();
 
 		$db_file = $workspace . '/database.jsonl';
 		if ( $options['include_database'] ) {
@@ -86,7 +106,7 @@ final class SpawnWP_Deploy_Package {
 			'chunk_count'    => (int) ceil( $size / $chunk_size ),
 			'exclusions'     => array( 'core', 'wp-config.php', 'users', 'usermeta', 'mu-plugins', 'drop-ins', 'cache', 'logs', 'backups', 'spawnwp-dev-tools' ),
 		);
-		file_put_contents( $workspace . '/manifest.json', wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		file_put_contents( $workspace . '/manifest.json', wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ), LOCK_EX );
 		return $manifest;
 	}
 
@@ -131,9 +151,9 @@ final class SpawnWP_Deploy_Package {
 			);
 			if ( $foreign_keys ) {
 				fclose( $handle );
-				throw new RuntimeException( "Foreign keys are not supported in v1 ({$table})." );
+				throw new RuntimeException( 'Foreign keys are not supported in this deployment format.' );
 			}
-			$create_row = $wpdb->get_row( 'SHOW CREATE TABLE `' . esc_sql( $table ) . '`', ARRAY_N );
+			$create_row = $wpdb->get_row( $wpdb->prepare( 'SHOW CREATE TABLE %i', $table ), ARRAY_N );
 			self::write_jsonl(
 				$handle,
 				array(
@@ -145,7 +165,7 @@ final class SpawnWP_Deploy_Package {
 
 			$offset = 0;
 			do {
-				$rows = $wpdb->get_results( 'SELECT * FROM `' . esc_sql( $table ) . '` LIMIT 500 OFFSET ' . (int) $offset, ARRAY_A );
+				$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i LIMIT 500 OFFSET %d', $table, $offset ), ARRAY_A );
 				foreach ( $rows as $db_row ) {
 					if ( $table === $wpdb->options && isset( $db_row['option_name'] ) ) {
 						if ( str_starts_with( $db_row['option_name'], 'spawnwp_deploy_' ) ) {
@@ -173,8 +193,9 @@ final class SpawnWP_Deploy_Package {
 						)
 					);
 				}
-				$offset += count( $rows );
-			} while ( count( $rows ) === 500 );
+				$row_count = count( $rows );
+				$offset   += $row_count;
+			} while ( 500 === $row_count );
 		}
 		fclose( $handle );
 	}
@@ -188,13 +209,15 @@ final class SpawnWP_Deploy_Package {
 			array_filter(
 				$plugins,
 				static function ( $plugin ) {
-					$slug = explode( '/', (string) $plugin )[0];
-					return ! in_array( $slug, self::DEV_PLUGINS, true );
+					$slug       = explode( '/', (string) $plugin )[0];
+					$plugin_dir = dirname( plugin_basename( SPAWNWP_DEPLOY_FILE ) );
+					$excluded   = '.' === $plugin_dir ? self::DEV_PLUGINS : array_merge( self::DEV_PLUGINS, array( $plugin_dir ) );
+					return ! in_array( $slug, $excluded, true );
 				}
 			)
 		);
 		if ( $keep_deploy_plugin ) {
-			$plugins[] = 'spawnwp-deploy/spawnwp-deploy.php';
+			$plugins[] = plugin_basename( SPAWNWP_DEPLOY_FILE );
 		}
 		return maybe_serialize( array_values( array_unique( $plugins ) ) );
 	}
@@ -257,15 +280,18 @@ final class SpawnWP_Deploy_Package {
 		$iterator = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $iterator as $file ) {
 			if ( $file->isLink() ) {
-				throw new RuntimeException( 'Symlinks are not supported: ' . $file->getPathname() );
+				throw new RuntimeException( 'Symlinks are not supported in deployment packages.' );
 			}
 			if ( ! $file->isFile() ) {
 				continue;
 			}
 			$relative = ltrim( str_replace( '\\', '/', substr( $file->getPathname(), strlen( $root ) ) ), '/' );
 			$top      = explode( '/', $relative )[0];
-			if ( 'plugins' === $kind && in_array( $top, self::DEV_PLUGINS, true ) ) {
-				continue;
+			if ( 'plugins' === $kind ) {
+				$plugin_dir = dirname( plugin_basename( SPAWNWP_DEPLOY_FILE ) );
+				if ( in_array( $top, self::DEV_PLUGINS, true ) || ( '.' !== $plugin_dir && $top === $plugin_dir ) ) {
+					continue;
+				}
 			}
 			if ( self::excluded_path( $relative, $kind ) ) {
 				continue;
@@ -286,9 +312,9 @@ final class SpawnWP_Deploy_Package {
 	 * MetaBox AIO's `MBB\Upgrade\Manager`), breaking the deployed site.
 	 */
 	private static function excluded_path( string $path, string $kind ): bool {
-		$parts = explode( '/', strtolower( $path ) );
-		$always = array( '.git', 'node_modules' );
-		$uploads_only = array( 'cache', 'backups', 'backup', 'upgrade', 'upgrade-temp-backup' );
+		$parts        = explode( '/', strtolower( $path ) );
+		$always       = array( '.git', 'node_modules' );
+		$uploads_only = array( 'cache', 'backups', 'backup', 'upgrade', 'upgrade-temp-backup', 'spawnwp-deploy' );
 		foreach ( $parts as $part ) {
 			if ( in_array( $part, $always, true ) ) {
 				return true;
@@ -298,6 +324,18 @@ final class SpawnWP_Deploy_Package {
 			}
 		}
 		return (bool) preg_match( '/(?:debug|error)\.log$/i', $path );
+	}
+
+	public static function ensure_storage_root(): void {
+		$root = self::storage_root();
+		if ( ! wp_mkdir_p( $root ) ) {
+			throw new RuntimeException( 'Unable to secure the package storage directory.' );
+		}
+		$apache = "Options -Indexes\n<FilesMatch \".*\">\nRequire all denied\n</FilesMatch>\n";
+		$iis    = '<?xml version="1.0" encoding="UTF-8"?><configuration><system.webServer><security><requestFiltering><hiddenSegments><add segment="spawnwp-deploy" /></hiddenSegments></requestFiltering></security></system.webServer></configuration>';
+		if ( false === file_put_contents( $root . '/.htaccess', $apache, LOCK_EX ) || false === file_put_contents( $root . '/web.config', $iis, LOCK_EX ) ) {
+			throw new RuntimeException( 'Unable to protect the package storage directory.' );
+		}
 	}
 
 	private static function remove_tree( string $path ): void {

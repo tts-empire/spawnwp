@@ -196,3 +196,17 @@ for page in manage deploy updates system; do
     exit 1
   fi
 done
+
+# New sites must prefer the WordPress.org stable mirror over an embedded build
+# carrying the same base version with a -dev suffix, while never treating the
+# prerelease as newer than stable.
+eval "$(sed -n '/^deploy_plugin_version_newer()/,/^}/p' "$ROOT/runtime/scripts/new-project.sh")"
+deploy_plugin_version_newer 0.3.4 0.3.4-dev || {
+  echo "stable Deploy plugin must sort after the matching -dev build" >&2
+  exit 1
+}
+if deploy_plugin_version_newer 0.3.4-dev 0.3.4; then
+  echo "Deploy plugin -dev build must not sort after stable" >&2
+  exit 1
+fi
+grep -q 'DEPLOY_PLUGIN_SOURCE="WordPress.org mirror (verified)"' "$ROOT/runtime/scripts/new-project.sh"

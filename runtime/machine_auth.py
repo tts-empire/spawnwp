@@ -1,6 +1,6 @@
 """Signed-request verification for machine callers (SpawnWP Deploy plugin).
 
-Mirrors plugins/spawnwp-deploy/src/class-crypto.php exactly: the canonical
+Mirrors plugins/spawnwp-deploy/src/class-spawnwp-deploy-crypto.php exactly: the canonical
 string is METHOD\npath\ntimestamp\nnonce\nsha256(body) where path is the raw
 URL path (e.g. /api/ingest/preflight), the signature is a base64 Ed25519
 detached signature and timestamps are accepted within +-300 seconds.

@@ -42,9 +42,9 @@ final class SpawnWP_Deploy_Guard {
 			$issues[] = 'Deactivate/remove application plugins before pairing: ' . implode( ', ', $content['application_plugins'] );
 		}
 
-		$writable = wp_is_writable( WP_CONTENT_DIR ) && wp_is_writable( WP_PLUGIN_DIR ) && wp_is_writable( get_theme_root() );
+		$writable = wp_is_writable( wp_get_upload_dir()['basedir'] ) && wp_is_writable( WP_PLUGIN_DIR ) && wp_is_writable( get_theme_root() );
 		if ( ! $writable ) {
-			$issues[] = 'Direct write access to wp-content, plugins, and themes is required.';
+			$issues[] = 'Write access to uploads, plugins, and themes is required.';
 		}
 
 		return array(
@@ -67,8 +67,8 @@ final class SpawnWP_Deploy_Guard {
 		}
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
-		$update = get_site_transient( 'update_plugins' );
-		$known  = array_merge( (array) ( $update->response ?? array() ), (array) ( $update->no_update ?? array() ) );
+		$update  = get_site_transient( 'update_plugins' );
+		$known   = array_merge( (array) ( $update->response ?? array() ), (array) ( $update->no_update ?? array() ) );
 		$wporg   = array();
 		$premium = array();
 		foreach ( get_option( 'active_plugins', array() ) as $basename ) {
@@ -76,20 +76,28 @@ final class SpawnWP_Deploy_Guard {
 			if ( in_array( $slug, SpawnWP_Deploy_Package::DEV_PLUGINS, true ) ) {
 				continue;
 			}
-			$file = WP_PLUGIN_DIR . '/' . $basename;
-			$data = file_exists( $file ) ? get_plugin_data( $file, false, false ) : array();
+			$file     = WP_PLUGIN_DIR . '/' . $basename;
+			$data     = file_exists( $file ) ? get_plugin_data( $file, false, false ) : array();
 			$is_wporg = isset( $known[ $basename ] );
 			if ( ! $is_wporg ) {
-				$info     = plugins_api( 'plugin_information', array( 'slug' => $slug, 'fields' => array( 'sections' => false ) ) );
+				$info     = plugins_api(
+					'plugin_information',
+					array(
+						'slug'   => $slug,
+						'fields' => array( 'sections' => false ),
+					)
+				);
 				$is_wporg = ! is_wp_error( $info ) && ! empty( $info->slug ) && $info->slug === $slug;
 			}
 			if ( $is_wporg && preg_match( '/^[a-z0-9][a-z0-9-]{0,63}$/', $slug ) ) {
 				$wporg[] = $slug;
 			} else {
+				$name      = ! empty( $data['Name'] ) ? (string) $data['Name'] : $slug;
+				$version   = ! empty( $data['Version'] ) ? (string) $data['Version'] : 'unknown';
 				$premium[] = array(
-					'name'    => substr( (string) ( $data['Name'] ?? '' ) ?: $slug, 0, 100 ),
+					'name'    => substr( $name, 0, 100 ),
 					'slug'    => substr( $slug, 0, 64 ),
-					'version' => substr( (string) ( $data['Version'] ?? '' ) ?: 'unknown', 0, 32 ),
+					'version' => substr( $version, 0, 32 ),
 				);
 			}
 		}
@@ -103,6 +111,9 @@ final class SpawnWP_Deploy_Guard {
 
 	public static function environment(): array {
 		global $wpdb, $wp_version;
+		$free_bytes    = disk_free_space( wp_get_upload_dir()['basedir'] );
+		$post_max_size = ini_get( 'post_max_size' );
+		$post_max_size = false !== $post_max_size && '' !== $post_max_size ? $post_max_size : '8M';
 		return array(
 			'home_url'       => home_url( '/' ),
 			'wordpress'      => $wp_version,
@@ -111,33 +122,27 @@ final class SpawnWP_Deploy_Guard {
 			'table_prefix'   => $wpdb->prefix,
 			'content_dir'    => WP_CONTENT_DIR,
 			'uploads'        => wp_get_upload_dir()['basedir'],
-			'free_bytes'     => @disk_free_space( WP_CONTENT_DIR ) ?: 0,
+			'free_bytes'     => false !== $free_bytes ? $free_bytes : 0,
 			'sodium'         => extension_loaded( 'sodium' ),
 			'zip'            => class_exists( 'ZipArchive' ),
 			'multisite'      => is_multisite(),
-			'max_body_bytes' => wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) ?: '8M' ),
+			'max_body_bytes' => wp_convert_hr_to_bytes( $post_max_size ),
 		);
-	}
-
-	/**
-	 * Whether this WordPress runs inside a SpawnWP cockpit-managed site. Cockpit
-	 * sites define SPAWNWP_DEPLOY_HEALTHCHECK_URL through their container config,
-	 * so its presence is a reliable signal that "publish this site out" belongs
-	 * here (and, on other sites, that it does not).
-	 */
-	public static function is_cockpit(): bool {
-		return defined( 'SPAWNWP_DEPLOY_HEALTHCHECK_URL' );
 	}
 
 	private static function content_counts(): array {
 		global $wpdb;
-		$sql = "SELECT COUNT(*) FROM {$wpdb->posts}
+		$sql = $wpdb->prepare(
+			"SELECT COUNT(*) FROM %i
 			WHERE post_status NOT IN ('auto-draft','trash')
 			AND post_type NOT IN ('revision','nav_menu_item','customize_changeset','wp_global_styles','wp_navigation')
 			AND NOT (
 				(ID = 1 AND post_type = 'post')
 				OR (ID IN (2,3) AND post_type = 'page')
-			)";
+			)",
+			$wpdb->posts
+		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The query was prepared immediately above with an identifier placeholder.
 		$non_default_posts = (int) $wpdb->get_var( $sql );
 
 		$uploads_dir  = wp_get_upload_dir()['basedir'];
@@ -159,7 +164,6 @@ final class SpawnWP_Deploy_Guard {
 			}
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		$allowed             = array( plugin_basename( SPAWNWP_DEPLOY_FILE ), 'akismet/akismet.php', 'hello.php' );
 		$application_plugins = array_values( array_diff( get_option( 'active_plugins', array() ), $allowed ) );
 		$comment_count       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->comments} WHERE NOT (comment_ID = 1 AND comment_post_ID = 1)" );

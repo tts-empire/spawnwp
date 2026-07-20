@@ -104,7 +104,7 @@ final class SpawnWP_Deploy_REST {
 			}
 		}
 		$table = SpawnWP_Deploy_Database::table( 'connections' );
-		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%s AND role='target'", sanitize_text_field( $data['pairing_id'] ) ), ARRAY_A );
+		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='target'", $table, sanitize_text_field( $data['pairing_id'] ) ), ARRAY_A );
 		if ( ! $row || 'pending' !== $row['status'] || strtotime( $row['pair_expires'] . ' UTC' ) < time() ) {
 			return new WP_Error( 'spawnwp_pair_expired', 'Pairing key is invalid or expired.', array( 'status' => 403 ) );
 		}
@@ -153,16 +153,17 @@ final class SpawnWP_Deploy_REST {
 			return new WP_Error( 'spawnwp_auth_missing', 'Signed connection headers are required.', array( 'status' => 401 ) );
 		}
 		$table    = SpawnWP_Deploy_Database::table( 'connections' );
-		$row      = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%s AND role='target' AND status='active'", $id ), ARRAY_A );
+		$row      = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE id=%s AND role='target' AND status='active'", $table, $id ), ARRAY_A );
 		$raw_body = (string) $request->get_body();
 		if ( ! $row || ! SpawnWP_Deploy_Crypto::verify( $row['public_key'], $signature, $request->get_method(), $request->get_route(), $timestamp, $nonce, $raw_body ) ) {
 			return new WP_Error( 'spawnwp_auth_invalid', 'Request signature is invalid.', array( 'status' => 401 ) );
 		}
 		$nonces = SpawnWP_Deploy_Database::table( 'nonces' );
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$nonces} WHERE created_at < %s", gmdate( 'Y-m-d H:i:s', time() - 600 ) ) );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %s', $nonces, gmdate( 'Y-m-d H:i:s', time() - 600 ) ) );
 		$inserted = $wpdb->query(
 			$wpdb->prepare(
-				"INSERT IGNORE INTO {$nonces} (connection_id,nonce_hash,created_at) VALUES (%s,%s,%s)",
+				'INSERT IGNORE INTO %i (connection_id,nonce_hash,created_at) VALUES (%s,%s,%s)',
+				$nonces,
 				$id,
 				hash( 'sha256', $nonce ),
 				current_time( 'mysql', true )
@@ -175,7 +176,7 @@ final class SpawnWP_Deploy_REST {
 		return true;
 	}
 
-	public static function preflight( WP_REST_Request $request ): WP_REST_Response {
+	public static function preflight(): WP_REST_Response {
 		return rest_ensure_response( SpawnWP_Deploy_Guard::target_report() );
 	}
 
@@ -186,7 +187,7 @@ final class SpawnWP_Deploy_REST {
 			self::validate_manifest( $manifest );
 			$guard = SpawnWP_Deploy_Guard::target_report();
 			if ( ! $guard['ok'] ) {
-				throw new RuntimeException( implode( ' ', $guard['issues'] ) );
+				throw new RuntimeException( implode( ' ', array_map( 'sanitize_text_field', $guard['issues'] ) ) );
 			}
 			return rest_ensure_response( array( 'job_id' => SpawnWP_Deploy_Receiver::create_job( $connection['id'], $manifest ) ) );
 		} catch ( Throwable $error ) {
@@ -254,7 +255,7 @@ final class SpawnWP_Deploy_REST {
 		global $wpdb;
 		$connection = $request->get_param( '_spawnwp_connection' );
 		$job        = $wpdb->get_row(
-			$wpdb->prepare( 'SELECT * FROM ' . SpawnWP_Deploy_Database::table( 'jobs' ) . ' WHERE id=%s AND connection_id=%s', sanitize_text_field( $request['id'] ), $connection['id'] ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id=%s AND connection_id=%s', SpawnWP_Deploy_Database::table( 'jobs' ), sanitize_text_field( $request['id'] ), $connection['id'] ),
 			ARRAY_A
 		);
 		if ( ! $job ) {
@@ -266,7 +267,7 @@ final class SpawnWP_Deploy_REST {
 	private static function validate_manifest( array $manifest ): void {
 		foreach ( array( 'format', 'source_url', 'target_url', 'wordpress', 'php', 'archive_bytes', 'archive_sha256', 'chunk_size', 'chunk_count', 'source_prefix' ) as $field ) {
 			if ( ! isset( $manifest[ $field ] ) ) {
-				throw new RuntimeException( 'Manifest is missing ' . $field );
+				throw new RuntimeException( 'Manifest is missing ' . sanitize_key( $field ) );
 			}
 		}
 		if ( 1 !== (int) $manifest['format'] || (int) $manifest['archive_bytes'] > SpawnWP_Deploy_Package::MAX_BYTES || ! hash_equals( untrailingslashit( home_url() ), untrailingslashit( $manifest['target_url'] ) ) ) {

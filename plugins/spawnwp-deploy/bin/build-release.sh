@@ -15,7 +15,13 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
 mkdir -p "$DIST" "$STAGE/spawnwp-deploy"
-cp -a "$ROOT/spawnwp-deploy.php" "$ROOT/src" "$ROOT/recovery" "$ROOT/README.md" "$STAGE/spawnwp-deploy/"
+cp -a \
+  "$ROOT/spawnwp-deploy.php" \
+  "$ROOT/readme.txt" \
+  "$ROOT/assets" \
+  "$ROOT/src" \
+  "$ROOT/recovery" \
+  "$STAGE/spawnwp-deploy/"
 
 ZIP="$DIST/spawnwp-deploy-${VERSION}.zip"
 rm -f "$ZIP" "$ZIP.sha256" "$ZIP.sig"

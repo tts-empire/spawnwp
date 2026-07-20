@@ -1,0 +1,23 @@
+[Unit]
+Description=Synchronize SpawnWP Deploy with WordPress.org stable
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/lib/spawnwp/sync_wporg_plugin.py --publish
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectHome=read-only
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+ReadWritePaths=/var/www/spawnwp-downloads /var/backups/spawnwp-plugin-previews /var/lock
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictRealtime=yes
+LockPersonality=yes

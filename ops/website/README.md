@@ -16,6 +16,28 @@ from canonical HTML, flips the public symlink atomically and rolls back on a fai
 live check. Signed plugin downloads stay outside the release tree. Historical releases
 are not deleted automatically.
 
+## WordPress.org plugin mirror
+
+WordPress.org is the stable release authority for SpawnWP Deploy. The public plugin page
+links to the official directory and latest-stable ZIP. A signed compatibility mirror at
+`/downloads/spawnwp-deploy/` remains available for existing cockpit installations.
+
+Install or refresh the root-only synchronizer on the production server with:
+
+    sudo bash ops/website/install-plugin-sync.sh
+
+The persistent systemd timer checks WordPress.org every ten minutes. It validates the
+official ZIP, signs the exact bytes with `/root/.spawnwp/deploy-release-ed25519.pem`,
+promotes the release atomically and updates `latest.json` last. A failed check leaves the
+currently published mirror untouched. Inspect it with:
+
+    sudo systemctl status spawnwp-plugin-sync.timer
+    sudo journalctl -u spawnwp-plugin-sync.service
+    sudo python3 /usr/local/lib/spawnwp/sync_wporg_plugin.py --check
+
+Old `-dev` packages are retained for audit under
+`/var/backups/spawnwp-plugin-previews/`, outside the Nginx download alias.
+
 ## SEO content map
 
 | URL | Primary intent | Status |

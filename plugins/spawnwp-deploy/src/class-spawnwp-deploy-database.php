@@ -94,6 +94,7 @@ final class SpawnWP_Deploy_Database {
 		);
 
 		update_option( 'spawnwp_deploy_schema_version', self::SCHEMA_VERSION, false );
+		update_option( 'spawnwp_deploy_plugin_basename', plugin_basename( SPAWNWP_DEPLOY_FILE ), false );
 		self::install_mu_loader();
 		if ( ! wp_next_scheduled( 'spawnwp_deploy_cleanup' ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'spawnwp_deploy_cleanup' );
@@ -106,13 +107,18 @@ final class SpawnWP_Deploy_Database {
 	}
 
 	public static function install_mu_loader(): bool {
+		global $wp_filesystem;
 		$dir = defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
 		if ( ! wp_mkdir_p( $dir ) ) {
 			return false;
 		}
 		$source = SPAWNWP_DEPLOY_DIR . 'recovery/spawnwp-deploy-loader.php';
 		$target = trailingslashit( $dir ) . 'spawnwp-deploy-loader.php';
-		return copy( $source, $target );
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		if ( ! WP_Filesystem() ) {
+			return false;
+		}
+		return $wp_filesystem->copy( $source, $target, true, FS_CHMOD_FILE );
 	}
 
 	public static function audit( string $event, array $details = array(), ?string $connection_id = null, ?string $job_id = null ): void {
@@ -134,11 +140,16 @@ final class SpawnWP_Deploy_Database {
 		global $wpdb;
 		$table   = self::table( 'connections' );
 		$now     = current_time( 'mysql', true );
-		$expired = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status='pending' AND pair_expires IS NOT NULL AND pair_expires < %s", $now ) );
+		$expired = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE status='pending' AND pair_expires IS NOT NULL AND pair_expires < %s", $table, $now ) );
 		foreach ( $expired as $id ) {
 			$wpdb->update(
 				$table,
-				array( 'status' => 'expired', 'private_key' => '', 'pair_token_hash' => '', 'updated_at' => $now ),
+				array(
+					'status'          => 'expired',
+					'private_key'     => '',
+					'pair_token_hash' => '',
+					'updated_at'      => $now,
+				),
 				array( 'id' => $id ),
 				array( '%s', '%s', '%s', '%s' ),
 				array( '%s' )
@@ -151,7 +162,9 @@ final class SpawnWP_Deploy_Database {
 		$cutoff = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE c FROM {$table} c LEFT JOIN {$jobs} j ON j.connection_id=c.id WHERE c.status IN ('expired','revoked') AND c.updated_at < %s AND j.id IS NULL",
+				"DELETE c FROM %i c LEFT JOIN %i j ON j.connection_id=c.id WHERE c.status IN ('expired','revoked') AND c.updated_at < %s AND j.id IS NULL",
+				$table,
+				$jobs,
 				$cutoff
 			)
 		);

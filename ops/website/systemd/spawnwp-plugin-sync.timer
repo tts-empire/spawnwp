@@ -1,0 +1,12 @@
+[Unit]
+Description=Check WordPress.org for a stable SpawnWP Deploy release every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=30s
+Persistent=true
+Unit=spawnwp-plugin-sync.service
+
+[Install]
+WantedBy=timers.target

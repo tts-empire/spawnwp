@@ -1743,6 +1743,7 @@ async function showFiles(name, path = '') {
   };
   actions.append(
     mkBtn('⬆ Upload', 'btn-neutral btn-sm sensitive', 'Upload a file here', () => fmUpload(name, data.path)),
+    mkBtn('⬆ Upload folder', 'btn-neutral btn-sm sensitive', 'Upload a whole folder here, keeping its structure', () => fmUploadFolder(name, data.path)),
     mkBtn('📁 New folder', 'btn-neutral btn-sm sensitive', 'Create a folder here', () => fmMkdir(name, data.path)),
     mkBtn('⟳', 'icon-btn', 'Refresh', () => showFiles(name, data.path)),
   );
@@ -1779,6 +1780,9 @@ async function showFiles(name, path = '') {
     actTd.className = 'fm-row-actions';
     if (ent.type !== 'dir') {
       actTd.appendChild(mkBtn('⬇', 'icon-btn', 'Download', () => fmDownload(name, join)));
+      if (ent.name.toLowerCase().endsWith('.zip')) {
+        actTd.appendChild(mkBtn('📦', 'icon-btn sensitive', 'Extract here', () => fmUnzip(name, join, data.path)));
+      }
     }
     actTd.appendChild(mkBtn('✎', 'icon-btn sensitive', 'Rename / move', () => fmRename(name, join, data.path)));
     actTd.appendChild(mkBtn('🗑', 'icon-btn sensitive', 'Delete', () => fmDelete(name, join, ent.type, data.path)));
@@ -1906,6 +1910,84 @@ function fmUpload(name, dir) {
   input.click();
 }
 
+async function fmUploadOne(name, dir, file, relativePath) {
+  // Reuses the single-file endpoint: the folder tree is rebuilt client-side.
+  const targetDir = relativePath ? joinPath(dir, relativePath) : (dir || '');
+  const url = `${BASE}/files/${encodeURIComponent(name)}/upload`
+    + `?path=${encodeURIComponent(targetDir)}&filename=${encodeURIComponent(file.name)}`;
+  const res = await sensitiveFetch(url, { method: 'POST', body: file });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || res.statusText);
+  }
+}
+
+function joinPath(a, b) { return [a, b].filter(Boolean).join('/'); }
+
+function fmUploadFolder(name, dir) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.webkitdirectory = true;
+  input.multiple = true;
+  input.onchange = async () => {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    // webkitRelativePath is "<picked folder>/sub/dir/file.ext": everything up to
+    // the last segment is the folder this file belongs in.
+    const dirs = new Set();
+    for (const f of files) {
+      const parts = (f.webkitRelativePath || f.name).split('/').slice(0, -1);
+      for (let i = 1; i <= parts.length; i++) dirs.add(parts.slice(0, i).join('/'));
+    }
+
+    let done = 0;
+    showToast(`Uploading ${files.length} file(s)…`);
+    try {
+      // mkdir is already "-p", but the folders are created deepest-last so an
+      // empty directory in the tree survives even if it holds no files.
+      for (const d of Array.from(dirs).sort()) {
+        const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/mkdir`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: joinPath(dir, d) }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(`Could not create folder "${d}": ${data.detail || res.statusText}`);
+        }
+      }
+      // Serialised on purpose: parallel uploads would fight over guard_not_busy().
+      for (const f of files) {
+        const parts = (f.webkitRelativePath || f.name).split('/').slice(0, -1);
+        await fmUploadOne(name, dir, f, parts.join('/'));
+        done++;
+        if (done % 5 === 0 || done === files.length) {
+          showToast(`Uploading… ${done}/${files.length}`);
+        }
+      }
+      showToast(`Uploaded ${done} file(s)`);
+    } catch (e) {
+      showToast(`Stopped after ${done}/${files.length}: ${e.message}`, true);
+    }
+    showFiles(name, dir);
+  };
+  input.click();
+}
+
+async function fmUnzip(name, path, dir) {
+  if (!confirm(`Extract "${path}" here?\n\nExisting files with the same names will be overwritten.`)) return;
+  showToast('Extracting…');
+  try {
+    const res = await sensitiveFetch(`${BASE}/files/${encodeURIComponent(name)}/unzip`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    showToast(`Extracted ${data.entries} entr${data.entries === 1 ? 'y' : 'ies'}`);
+    showFiles(name, dir);
+  } catch (e) { showToast(e.message, true); }
+}
+
 // ── Temporary sites: expiry badge + extend/make-permanent ────────────────────
 function expiryBadge(p) {
   if (!p.expires_at) return '';
@@ -1976,9 +2058,71 @@ async function showWpAdmin(name) {
     btn.onclick = () => navigator.clipboard.writeText(d.password)
       .then(() => showToast('Password copied to clipboard'));
     body.appendChild(btn);
+    body.appendChild(await magicLoginControls(name));
   } catch (e) {
     appendLine(body, '❌ ' + e.message, true);
   }
+}
+
+// ── Magic login ──────────────────────────────────────────────────────────────
+// Off by default: it bypasses the WordPress login, so the mu-plugin only exists
+// on sites where it has been switched on explicitly.
+async function magicLoginControls(name) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-top:12px;padding-top:10px;border-top:1px solid var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  let enabled = false;
+  try {
+    const res = await fetch(`${BASE}/wp/${encodeURIComponent(name)}/autologin`, { cache: 'no-store' });
+    if (res.ok) enabled = (await res.json()).enabled;
+  } catch (e) { /* leave it off: the toggle below can still turn it on */ }
+
+  const go = document.createElement('button');
+  go.className = 'btn-primary btn-sm';
+  go.textContent = '🔑 Magic login';
+  go.title = 'Open wp-admin already signed in, with a single-use link';
+  go.disabled = !enabled;
+  go.onclick = async () => {
+    go.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/wp/${encodeURIComponent(name)}/magic-login`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      window.open(data.url, '_blank', 'noopener');
+      showToast(`Signing in… the link dies in ${data.expires_in}s or on first use`);
+    } catch (e) { showToast(e.message, true); }
+    go.disabled = false;
+  };
+
+  const toggle = document.createElement('button');
+  toggle.className = 'btn-neutral btn-sm sensitive';
+  const paint = () => {
+    toggle.textContent = enabled ? 'Disable magic login' : 'Enable magic login';
+    toggle.title = enabled
+      ? 'Remove the auto-login mu-plugin from this site'
+      : 'Install the auto-login mu-plugin on this site (it bypasses the WordPress login)';
+    go.disabled = !enabled;
+  };
+  paint();
+  toggle.onclick = async () => {
+    const turningOn = !enabled;
+    if (turningOn && !confirm('Enable magic login on this site?\n\nIt installs a must-use plugin that signs a user in from a single-use link, bypassing the WordPress login form. Only enable it on sites you control.')) return;
+    toggle.disabled = true;
+    try {
+      const res = await sensitiveFetch(`${BASE}/wp/${encodeURIComponent(name)}/autologin`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: turningOn }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      enabled = data.enabled;
+      paint();
+      showToast(enabled ? 'Magic login enabled' : 'Magic login disabled');
+    } catch (e) { showToast(e.message, true); }
+    toggle.disabled = false;
+  };
+
+  wrap.append(go, toggle);
+  return wrap;
 }
 
 // ── Snapshot / Restore ───────────────────────────────────────────────────────
@@ -2013,15 +2157,72 @@ function renderSnapshots(name, body, snaps) {
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:5px 0;border-top:1px solid var(--surface2)';
     const info = document.createElement('span');
     info.style.cssText = 'flex:1;font-family:monospace;font-size:12px';
-    info.innerHTML = `${fmtSnapTs(s.name)} <span style="color:var(--muted)">· DB ${fmtKB(s.db_kb)}${s.has_files ? ' · 📦 ' + fmtKB(s.files_kb) : ''}</span>`;
+    // The label is user-supplied: build it as a text node, never as innerHTML.
+    const labelSpan = document.createElement('span');
+    labelSpan.style.cssText = 'font-weight:600';
+    labelSpan.textContent = s.label || '';
+    const meta = document.createElement('span');
+    meta.innerHTML = `${fmtSnapTs(s.name)} <span style="color:var(--muted)">· DB ${fmtKB(s.db_kb)}${s.has_files ? ' · 📦 ' + fmtKB(s.files_kb) : ''}</span>`;
+    if (s.label) { info.appendChild(labelSpan); info.appendChild(document.createElement('br')); }
+    info.appendChild(meta);
+    info.title = 'Double-click to name this snapshot';
+    info.ondblclick = () => promptSnapshotLabel(name, s.name, s.label || '');
+
+    const rename = document.createElement('button');
+    rename.className = 'btn-neutral btn-sm';
+    rename.textContent = '✏️';
+    rename.title = s.label ? 'Rename this snapshot' : 'Name this snapshot';
+    rename.onclick = () => promptSnapshotLabel(name, s.name, s.label || '');
+
     const btn = document.createElement('button');
     btn.className = 'btn-danger btn-sm sensitive';
     btn.textContent = '↩ Restore';
     btn.onclick = () => doRestore(name, s.name, s.has_files);
+
+    const del = document.createElement('button');
+    del.className = 'btn-danger btn-sm sensitive';
+    del.textContent = '🗑';
+    del.title = 'Delete this snapshot';
+    del.onclick = () => doDeleteSnapshot(name, s.name, s.label || '', s.has_files);
+
     row.appendChild(info);
+    row.appendChild(rename);
     row.appendChild(btn);
+    row.appendChild(del);
     body.appendChild(row);
   }
+}
+
+async function promptSnapshotLabel(name, snapshot, current) {
+  const label = prompt(`Name for snapshot ${fmtSnapTs(snapshot)}\n\n(empty removes the name)`, current);
+  if (label === null) return;   // cancelled — leave the label untouched
+  try {
+    const res = await fetch(`${BASE}/snapshots/label`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: name, snapshot, label }),
+    });
+    if (!res.ok) { showToast(`Could not save the name (error ${res.status})`, true); return; }
+    showToast(label.trim() ? 'Snapshot named' : 'Name removed');
+    showSnapshots(name);
+  } catch (e) { showToast('❌ ' + e.message, true); }
+}
+
+async function doDeleteSnapshot(name, snapshot, label, hasFiles) {
+  if (blockedIfBusy()) return;
+  const what = label ? `“${label}” (${fmtSnapTs(snapshot)})` : fmtSnapTs(snapshot);
+  const contents = hasFiles ? 'database and uploads' : 'database';
+  if (!confirm(`⚠️ DELETE snapshot ${what}\n\nThis permanently removes the ${contents} saved in it.\nYou will no longer be able to restore the site to that point.\n\nProceed?`)) return;
+  try {
+    const res = await sensitiveFetch(`${BASE}/snapshots/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: name, snapshot }),
+    });
+    if (!res.ok) { showToast(`Could not delete the snapshot (error ${res.status})`, true); return; }
+    showToast('Snapshot deleted');
+    showSnapshots(name);
+  } catch (e) { showToast('❌ ' + e.message, true); }
 }
 
 function doRestore(name, snapshot, hasFiles) {

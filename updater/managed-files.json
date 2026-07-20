@@ -48,7 +48,8 @@
     "scripts/reset.sh",
     "scripts/restore.sh",
     "scripts/snapshot.sh",
-    "scripts/wait-for-wordpress.sh"
+    "scripts/wait-for-wordpress.sh",
+    "mu-plugins/spawnwp-autologin.php"
   ],
   "installer": [
     "docker-prune.service",

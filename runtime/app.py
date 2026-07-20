@@ -1,9 +1,11 @@
 import asyncio
 import base64
+import hashlib
 import json
 import os
 import posixpath
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -34,8 +36,9 @@ app.include_router(ingest_router)
 # valid session. Static high-impact actions plus the per-site file-manager
 # writes (whose paths carry a {project} segment, matched by regex).
 DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
-                     "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings"}
-FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir)$")
+                     "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings",
+                     "/api/snapshots/delete"}
+FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir|unzip)$")
 
 
 def requires_recent_auth(path: str) -> bool:
@@ -486,12 +489,53 @@ def run_action(body: ProjectAction):
     return sse_response(cmd, proj)
 
 
+SNAP_LABEL_MAX = 80
+
+
+def _snapshot_labels_file(proj: Path) -> Path:
+    return proj / "backups" / "labels.json"
+
+
+def read_snapshot_labels(proj: Path) -> dict:
+    """Snapshot labels, keyed by timestamp. The snapshot files themselves are
+    never renamed: the timestamp is both the id and the path-traversal defence
+    (SNAP_RE), so the human name lives in this sidecar instead.
+
+    A missing or corrupt sidecar means "no labels", never an error: labels are
+    cosmetic and must not be able to break the snapshot listing.
+    """
+    try:
+        data = json.loads(_snapshot_labels_file(proj).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, str) and SNAP_RE.match(str(k))}
+
+
+def write_snapshot_labels(proj: Path, labels: dict) -> None:
+    """Persist the sidecar atomically, so a crash mid-write cannot leave behind
+    a truncated file that read_snapshot_labels() would silently discard."""
+    path = _snapshot_labels_file(proj)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(labels, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def clean_snapshot_label(raw: str) -> str:
+    """Trim a user-supplied label: control characters out, one line, capped."""
+    label = "".join(c for c in (raw or "") if c.isprintable()).strip()
+    return label[:SNAP_LABEL_MAX]
+
+
 @app.get("/api/snapshots/{project}")
 def list_snapshots(project: str):
-    """List of the site's snapshots: name (timestamp), DB size, files present."""
+    """List of the site's snapshots: name (timestamp), label, DB size, files."""
     proj = resolve_project(project)
     db_dir = proj / "backups" / "db"
     files_dir = proj / "backups" / "files"
+    labels = read_snapshot_labels(proj)
     snaps = []
     if db_dir.is_dir():
         for f in db_dir.glob("*.sql.gz"):
@@ -507,6 +551,7 @@ def list_snapshots(project: str):
             files_kb = (files_tar.stat().st_size // 1024) if has_files else 0
             snaps.append({
                 "name": name,
+                "label": labels.get(name, ""),
                 "db_kb": st.st_size // 1024,
                 "has_files": has_files,
                 "files_kb": files_kb,
@@ -514,6 +559,57 @@ def list_snapshots(project: str):
             })
     snaps.sort(key=lambda s: s["name"], reverse=True)   # most recent first
     return snaps
+
+
+class SnapshotLabel(BaseModel):
+    project: str
+    snapshot: str
+    label: str = ""
+
+@app.post("/api/snapshots/label")
+def label_snapshot(body: SnapshotLabel):
+    """Name a snapshot (or clear the name with an empty label), so a restore
+    point can be recognised by what it marks rather than by its timestamp."""
+    if not SNAP_RE.match(body.snapshot):
+        raise HTTPException(400, "Invalid snapshot name")
+    proj = resolve_project(body.project)
+    if not (proj / "backups" / "db" / f"{body.snapshot}.sql.gz").is_file():
+        raise HTTPException(404, f"Snapshot '{body.snapshot}' not found")
+    label = clean_snapshot_label(body.label)
+    labels = read_snapshot_labels(proj)
+    if label:
+        labels[body.snapshot] = label
+    else:
+        labels.pop(body.snapshot, None)
+    write_snapshot_labels(proj, labels)
+    return {"project": proj.name, "snapshot": body.snapshot, "label": label}
+
+
+class DeleteSnapshot(BaseModel):
+    project: str
+    snapshot: str
+
+@app.post("/api/snapshots/delete")
+def delete_snapshot(body: DeleteSnapshot):
+    """Delete a snapshot: DB dump, uploads tarball, and its label. Destructive —
+    it removes a restore point — so it sits in DESTRUCTIVE_PATHS behind step-up
+    re-auth, like /api/restore."""
+    if not SNAP_RE.match(body.snapshot):
+        raise HTTPException(400, "Invalid snapshot name")
+    proj = resolve_project(body.project)
+    db_file = proj / "backups" / "db" / f"{body.snapshot}.sql.gz"
+    if not db_file.is_file():
+        raise HTTPException(404, f"Snapshot '{body.snapshot}' not found")
+    files_tar = proj / "backups" / "files" / f"{body.snapshot}.tar.gz"
+    try:
+        db_file.unlink()
+        files_tar.unlink(missing_ok=True)
+    except OSError as exc:
+        raise HTTPException(500, f"Could not delete snapshot: {exc}") from exc
+    labels = read_snapshot_labels(proj)
+    if labels.pop(body.snapshot, None) is not None:
+        write_snapshot_labels(proj, labels)
+    return {"project": proj.name, "snapshot": body.snapshot, "deleted": True}
 
 
 class RestoreSnapshot(BaseModel):
@@ -858,6 +954,109 @@ def wp_admin(project: str):
         "password": env.get("WP_ADMIN_PASS", ""),
         "email": env.get("WP_ADMIN_EMAIL", ""),
         "url": (home + "/wp-admin/") if home else "",
+    }
+
+
+# ── Magic login ──────────────────────────────────────────────────────────────
+# One click into wp-admin instead of copying a username and a password around.
+# It is an authentication bypass, so it is opt-in per site: the mu-plugin is
+# written on request and removed when the feature is turned off. No file on the
+# site, no way in.
+AUTOLOGIN_MU_PLUGIN = "wp-content/mu-plugins/spawnwp-autologin.php"
+AUTOLOGIN_SOURCE = PRIMARY_PROJECT / "mu-plugins" / "spawnwp-autologin.php"
+AUTOLOGIN_TTL_SECONDS = 120
+
+
+def _autologin_plugin_source() -> bytes:
+    # Deliberately not under runtime/assets: install.sh copies that whole folder
+    # into the cockpit's public /assets mount, and the mu-plugin has no business
+    # being downloadable from there.
+    try:
+        return AUTOLOGIN_SOURCE.read_bytes()
+    except OSError as exc:
+        raise HTTPException(500, f"Auto-login plugin bundle missing: {exc}") from exc
+
+
+def autologin_key(token: str) -> str:
+    """Transient name for a magic-login token.
+
+    Only the digest is ever stored, so the transient store never holds anything
+    that can be replayed; naming the transient already requires the token. Must
+    stay in step with spawnwp-autologin.php, which recomputes this same key.
+    """
+    return "spawnwp_autologin_" + hashlib.sha256(token.encode()).hexdigest()
+
+
+def _autologin_installed(proj: Path) -> bool:
+    probe = _php_exec(proj, ["test", "-f", jail_path(AUTOLOGIN_MU_PLUGIN)])
+    return probe.returncode == 0
+
+
+@app.get("/api/wp/{project}/autologin")
+def autologin_status(project: str):
+    proj = resolve_project(project)
+    return {"project": proj.name, "enabled": _autologin_installed(proj)}
+
+
+class AutologinToggle(BaseModel):
+    enabled: bool
+
+@app.post("/api/wp/{project}/autologin")
+def autologin_toggle(project: str, body: AutologinToggle):
+    """Install or remove the auto-login mu-plugin on this site."""
+    proj = resolve_project(project)
+    guard_not_busy()
+    target = jail_path(AUTOLOGIN_MU_PLUGIN)
+    if body.enabled:
+        mk = _php_exec(proj, ["mkdir", "-p", "--", jail_path("wp-content/mu-plugins")])
+        if mk.returncode != 0:
+            raise _exec_error(mk)
+        result = _php_exec(proj, ["dd", "of=" + target, "status=none"],
+                           input_bytes=_autologin_plugin_source())
+    else:
+        result = _php_exec(proj, ["rm", "-f", "--", target])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    return {"project": proj.name, "enabled": body.enabled}
+
+
+@app.post("/api/wp/{project}/magic-login")
+def magic_login(project: str):
+    """Mint a single-use sign-in URL for the site's admin user.
+
+    The cockpit stores only sha256(token), so the secret exists solely in the
+    URL handed back to the caller; the mu-plugin deletes the transient before it
+    authenticates, which is what makes the link genuinely single-use.
+    """
+    proj = resolve_project(project)
+    if not _autologin_installed(proj):
+        raise HTTPException(409, "Magic login is off for this site: enable it first")
+
+    env = _read_env(proj)
+    home = env.get("WP_HOME", "").rstrip("/")
+    if not home:
+        raise HTTPException(409, "Site has no WP_HOME: cannot build a sign-in URL")
+    user = env.get("WP_ADMIN_USER", "")
+    if not user:
+        raise HTTPException(409, "Site has no admin user recorded in .env")
+
+    lookup = _php_exec(proj, ["wp", "user", "get", user, "--field=ID"])
+    if lookup.returncode != 0:
+        raise _exec_error(lookup)
+    user_id = lookup.stdout.decode(errors="replace").strip()
+    if not user_id.isdigit():
+        raise HTTPException(500, "Could not resolve the admin user id")
+
+    token = secrets.token_urlsafe(32)
+    stored = _php_exec(proj, ["wp", "transient", "set", autologin_key(token), user_id,
+                              str(AUTOLOGIN_TTL_SECONDS)])
+    if stored.returncode != 0:
+        raise _exec_error(stored)
+
+    return {
+        "project": proj.name,
+        "url": f"{home}/?spawnwp_autologin={token}",
+        "expires_in": AUTOLOGIN_TTL_SECONDS,
     }
 
 
@@ -1386,6 +1585,91 @@ def files_mkdir(project: str, body: FilePath):
         raise _exec_error(result)
     _metric_incr("file_ops")
     return {"project": proj.name, "path": _rel(body.path)}
+
+
+UNZIP_MAX_TOTAL = 2 * 1024 ** 3     # refuse archives that expand past 2 GiB
+UNZIP_MAX_ENTRIES = 20000
+
+
+def unsafe_zip_entries(listing: str) -> list[str]:
+    """Entry names in `unzip -l` output that would escape the extraction folder.
+
+    `unzip` strips leading slashes and refuses "../" by default, but that is a
+    behaviour of the tool, not a guarantee we control: jail_path() validates the
+    path of the *archive*, and says nothing about its *contents*. So the archive
+    is inspected first and rejected outright — a zip-slip must never depend on a
+    single external binary continuing to behave.
+    """
+    unsafe = []
+    for line in listing.splitlines():
+        # Format: "  <size>  <date> <time>   <name>" — the name is the 4th field
+        # and may itself contain spaces, so split at most 3 times.
+        parts = line.split(None, 3)
+        if len(parts) < 4 or not parts[0].isdigit():
+            continue                      # header, separator or summary line
+        name = parts[3].strip()
+        if not name:
+            continue
+        if name.startswith("/") or name.startswith("\\") or ".." in Path(name).parts:
+            unsafe.append(name)
+        elif "\x00" in name or "\n" in name:
+            unsafe.append(name)
+    return unsafe
+
+
+def zip_uncompressed_size(listing: str) -> tuple[int, int]:
+    """(total uncompressed bytes, entry count) from `unzip -l` output."""
+    total = entries = 0
+    for line in listing.splitlines():
+        parts = line.split(None, 3)
+        if len(parts) < 4 or not parts[0].isdigit():
+            continue
+        total += int(parts[0])
+        entries += 1
+    return total, entries
+
+
+@app.post("/api/files/{project}/unzip")
+def files_unzip(project: str, body: FilePath):
+    """Extract a .zip in place, into the folder that contains it.
+
+    Uploading a zip and expanding it is the only practical way to get a theme or
+    a plugin tree into a site through the file manager, which otherwise takes one
+    file at a time.
+    """
+    proj = resolve_project(project)
+    rel = _rel(body.path)
+    if not rel:
+        raise HTTPException(400, "Provide the path of a .zip file")
+    if not rel.lower().endswith(".zip"):
+        raise HTTPException(400, "Only .zip archives can be extracted")
+    target = jail_path(rel)
+    dest = jail_path(posixpath.dirname(rel))
+    guard_not_busy()
+
+    listing = _php_exec(proj, ["unzip", "-l", "--", target])
+    if listing.returncode != 0:
+        raise _exec_error(listing)
+    text = listing.stdout.decode(errors="replace")
+
+    unsafe = unsafe_zip_entries(text)
+    if unsafe:
+        raise HTTPException(
+            400,
+            "Refusing to extract: the archive contains entries that would escape "
+            f"its folder (e.g. {unsafe[0]!r})",
+        )
+    total, entries = zip_uncompressed_size(text)
+    if entries > UNZIP_MAX_ENTRIES:
+        raise HTTPException(413, f"Archive has too many entries ({entries})")
+    if total > UNZIP_MAX_TOTAL:
+        raise HTTPException(413, "Archive would expand past the 2 GiB limit")
+
+    result = _php_exec(proj, ["unzip", "-o", "-q", "--", target, "-d", dest])
+    if result.returncode != 0:
+        raise _exec_error(result)
+    _metric_incr("file_ops")
+    return {"project": proj.name, "path": rel, "entries": entries, "bytes": total}
 
 
 @app.post("/api/files/{project}/rename")

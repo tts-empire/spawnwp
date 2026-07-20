@@ -4,6 +4,23 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.22
+
+- **Snapshots can be named and deleted.** A snapshot was a bare timestamp with no way to remove
+  it. Double-click one (or use the pencil) to name it, and 🗑 deletes it together with its
+  database dump and uploads tarball — behind the same security confirmation as a restore. The
+  files keep their timestamp names and the labels live in a `labels.json` sidecar, so the
+  restore path keeps the validation that stops it reading files elsewhere on disk.
+- **The file manager uploads whole folders and extracts zip archives.** "⬆ Upload folder" rebuilds
+  a directory tree on the site, and any `.zip` in the listing gains a 📦 extract button. Archives
+  are inspected first: any entry that would escape the destination folder (zip slip), or an
+  archive that would expand past the size or entry limits, is refused before anything is written.
+- **Magic login: one click into wp-admin, off by default.** Enabling it on a site installs a
+  must-use plugin that consumes single-use links, expiring in two minutes; disabling it removes
+  the plugin. SpawnWP stores only the SHA-256 of each link's secret, and the plugin invalidates a
+  link before it authenticates, so it cannot be replayed. Deploy packages exclude mu-plugins, so
+  magic login never travels to a destination site.
+
 ## 0.5.21
 
 - **Sites created with the "Install the SpawnWP Deploy plugin" checkbox now get the latest

@@ -169,6 +169,15 @@ grep -q '@app.post("/api/group/{project}")' "$ROOT/runtime/app.py"
 grep -q 'GROUP_RE' "$ROOT/runtime/app.py"
 grep -q 'id="sites-groupby"' "$ROOT/runtime/manage.html"
 grep -q 'id="new-group"' "$ROOT/runtime/deploy.html"
+# Deploy is a two-step workflow. Its headings must remain visually distinct from
+# generic section labels, and captured-site controls must stay hidden for v1 blueprints.
+grep -q '<h2 class="deploy-step-title"><span class="deploy-step-number" aria-hidden="true">1</span><span>Choose a blueprint</span></h2>' "$ROOT/runtime/deploy.html"
+grep -q '<h2 class="deploy-step-title"><span class="deploy-step-number" aria-hidden="true">2</span><span>Configure &amp; create</span></h2>' "$ROOT/runtime/deploy.html"
+grep -Fq '.deploy-step-title { display: flex;' "$ROOT/runtime/assets/cockpit.css"
+grep -Fq '.deploy-workspace { padding-top: 30px; border-top: 1px solid var(--border); }' "$ROOT/runtime/assets/cockpit.css"
+grep -Fq '.captured-panel[hidden] { display: none; }' "$ROOT/runtime/assets/cockpit.css"
+grep -Fq 'captured.hidden = item.schema_version !== 2;' "$ROOT/runtime/assets/cockpit.js"
+grep -Fq 'This blueprint restores the captured content, settings, uploads, plugins, and themes—but not user accounts or passwords.' "$ROOT/runtime/deploy.html"
 # 0.5.17: the group chip IS the editor. The group flow must never open the site's
 # log console again (its "output" header and copy icon are meaningless in a form).
 grep -q 'function editGroup' "$ROOT/runtime/assets/cockpit.js"

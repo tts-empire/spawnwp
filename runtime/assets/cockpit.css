@@ -311,6 +311,9 @@
   .inline-alert { border-left: 3px solid var(--yellow); color: var(--yellow); padding: 9px 12px; margin-bottom: 12px; background: #251f10; }
 
   /* Deploy: vertical flow — fields grid, optional PHP panel, launch bar. */
+  .deploy-step-title { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 22px; line-height: 1.2; font-weight: 650; letter-spacing: -.01em; margin-bottom: 18px; }
+  .deploy-step-number { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: var(--radius); background: var(--accent); color: #0d0d10; font-size: 14px; font-weight: 800; letter-spacing: 0; }
+  .deploy-workspace { padding-top: 30px; border-top: 1px solid var(--border); }
   .deploy-form { display: flex; flex-direction: column; gap: 16px; }
   .deploy-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; align-items: start; }
   .deploy-form label > span, .dl-cell > span { display: block; color: var(--muted); font-size: var(--font-label); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
@@ -336,6 +339,7 @@
   .deploy-optin span { font-size: var(--font-control); font-weight: 700; }
   .deploy-optin small { color: var(--muted); font-size: var(--font-small); }
   .captured-panel { border: 1px solid var(--yellow); border-radius: var(--radius); background: color-mix(in srgb, var(--yellow) 8%, var(--surface)); padding: 12px 14px; display: grid; gap: 10px; }
+  .captured-panel[hidden] { display: none; }
   .captured-panel .captured-warn { margin: 0; font-size: var(--font-small); color: var(--text); }
   .captured-panel .deploy-optin { background: var(--surface); }
   .php-advanced-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 12px 0 4px; }
@@ -400,6 +404,8 @@
     .resource-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .resource-ring,.uptime-kpi { min-height: 82px; }
     .deploy-fields { grid-template-columns: 1fr; }
+    .deploy-step-title { font-size: 20px; }
+    .deploy-step-number { width: 28px; height: 28px; flex-basis: 28px; }
     .update-panel { grid-template-columns: 1fr; }
     .update-panel > div { border-right: 0; border-bottom: 1px solid var(--border); }
   }

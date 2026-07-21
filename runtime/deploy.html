@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.23">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.24">
 </head>
 <body data-page="deploy">
   <header>
@@ -27,7 +27,7 @@
       <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
     </section>
     <section class="section">
-      <div class="section-title">1 · Choose a blueprint</div>
+      <h2 class="deploy-step-title"><span class="deploy-step-number" aria-hidden="true">1</span><span>Choose a blueprint</span></h2>
       <div id="blueprint-errors" class="inline-alert" hidden></div>
       <div id="blueprint-catalog" class="blueprint-catalog"><p class="loading-copy">Loading…</p></div>
       <p class="first-build-note">⏱ Times shown are for a ready PHP image. The <b>first</b> deploy on a
@@ -35,7 +35,7 @@
       every deploy on it runs at the times above.</p>
     </section>
     <section class="section deploy-workspace">
-      <div class="section-title">2 · Configure &amp; create</div>
+      <h2 class="deploy-step-title"><span class="deploy-step-number" aria-hidden="true">2</span><span>Configure &amp; create</span></h2>
       <form class="deploy-form" onsubmit="createProject(event)">
         <div class="deploy-fields">
           <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
@@ -76,7 +76,7 @@
           </div>
         </div>
         <div class="captured-panel" id="captured-panel" hidden>
-          <p class="captured-warn">⚠ This blueprint reproduces a full captured site. A <strong>fresh administrator</strong> is created for the new site — the source site's user accounts and passwords are never included.</p>
+          <p class="captured-warn">⚠ This blueprint restores the captured content, settings, uploads, plugins, and themes—but not user accounts or passwords. SpawnWP creates a <strong>fresh administrator</strong> for the new site; use the credentials shown on its Manage page.</p>
           <label class="deploy-optin">
             <input id="new-deactivate-plugins" type="checkbox" checked>
             <span>Start with all plugins deactivated</span>
@@ -103,6 +103,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.23"></script>
+  <script src="/assets/cockpit.js?v=0.5.24"></script>
 </body>
 </html>

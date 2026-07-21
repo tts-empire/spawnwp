@@ -4,6 +4,16 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.24
+
+- **The Deploy workflow now reads as two distinct steps.** “Choose a blueprint” and
+  “Configure & create” use prominent headings, numbered accent badges and a divider instead
+  of looking like small secondary labels.
+- **The captured-blueprint warning no longer appears for every blueprint.** Its grid style
+  overrode the HTML `hidden` state even though the selection logic was correct. It is now
+  visible only for captured content blueprints, with clearer wording about what is restored
+  and why a fresh administrator is created.
+
 ## 0.5.23
 
 - **New sites now come with magic login enabled.** In 0.5.22 it had to be switched on per

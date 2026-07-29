@@ -4,6 +4,20 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.27
+
+- **The 0.5.25 WP-Cron fix did not actually reach any existing site.** Two compounding
+  reasons: `DISABLE_WP_CRON` is never text in `wp-config.php` — the WordPress image
+  re-evaluates `WORDPRESS_CONFIG_EXTRA` from the container's environment on every
+  request, so `wp config delete` had nothing to find and remove. And `spawnwp update`
+  only ever rewrites `/srv/wp-dev`'s own `compose.yaml`; every other already-spawned
+  site's copy is frozen at whatever it was given at creation and is never touched
+  again. The migration now edits each site's own `compose.yaml` directly — that line
+  has been identical since SpawnWP's first release — and recreates its PHP container
+  so the corrected environment actually takes effect, but only for a site that is
+  currently running; one you have deliberately stopped stays stopped and picks up the
+  fix the next time you start it yourself.
+
 ## 0.5.26
 
 - **`spawnwp update` to 0.5.25 failed with a `FileNotFoundError` during migrations.**

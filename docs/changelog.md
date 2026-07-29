@@ -4,6 +4,19 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.28
+
+- **The 0.5.27 WP-Cron fix still didn't reach `/srv/wp-dev` itself.** `spawnwp update`'s
+  own file-sync step rewrites that one site's `compose.yaml` as a side effect, unrelated
+  to this migration — so by the time the migration ran, the file was already clean and
+  its container-recreate step was (wrongly) gated on "did I just change this file,"
+  which made it skip the container entirely. The environment fix on disk was correct;
+  it just never took effect. The recreate now always runs for a currently-running site,
+  regardless of whether this migration's own edit changed anything. Verified against
+  the real, already-affected `/srv/wp-dev`: its PHP container was recreated and
+  `DISABLE_WP_CRON` confirmed gone from the running environment, with a second run
+  confirmed as a clean no-op.
+
 ## 0.5.27
 
 - **The 0.5.25 WP-Cron fix did not actually reach any existing site.** Two compounding

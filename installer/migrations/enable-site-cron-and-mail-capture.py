@@ -84,14 +84,22 @@ def fix_site(site: Path) -> None:
     # spawn time (spawnwp update never touches it unless this IS /srv/wp-dev) — the
     # line has been identical since SpawnWP's first release, so a literal removal
     # is safe everywhere.
+    #
+    # /srv/wp-dev is a special case in the OTHER direction: it's also the fixed
+    # "runtime" sync target of spawnwp update itself (see TARGETS in
+    # updater/spawnwp), so its compose.yaml may already have been corrected by
+    # that unrelated file-sync step before this migration ever looks at it — in
+    # which case `.replace()` below finds nothing to do. That must NOT be read as
+    # "this site needs no recreate": the running container's environment is a
+    # separate fact from the file's current content, and wp-dev caught exactly
+    # this gap in testing (file already fixed, container still stale). So the
+    # recreate step below is never gated on whether THIS edit changed anything.
     compose_path = site / "compose.yaml"
-    compose_changed = False
     if compose_path.is_file():
         original = compose_path.read_text()
         updated = original.replace(DISABLE_WP_CRON_LINE, "")
         if updated != original:
             compose_path.write_text(updated)
-            compose_changed = True
 
     # Also try wp-cli, in case DISABLE_WP_CRON was ever set some other way (e.g. by
     # hand via `wp config set`) — a no-op on every normal site, since the constant
@@ -104,13 +112,14 @@ def fix_site(site: Path) -> None:
         print(f"warning: {site.name}: could not clear DISABLE_WP_CRON via wp-cli: "
               f"{result.stderr.strip()}", file=sys.stderr)
 
-    # The php container's environment is fixed at creation time: editing
-    # compose.yaml on disk does nothing until the container is recreated. Only
-    # recreate a site that is CURRENTLY running — never start one the user
-    # deliberately stopped; it picks up the now-corrected compose.yaml the next
-    # time it's started manually.
-    if not compose_changed:
-        return
+    # The php container's environment is fixed at creation time: whatever
+    # compose.yaml says now has no effect until the container is recreated —
+    # regardless of who last edited that file or when. Only recreate a site that
+    # is CURRENTLY running (`docker compose up -d` is itself idempotent: a site
+    # whose running environment already matches compose.yaml is a genuine no-op,
+    # so this is safe to attempt on every update, not just the first one after
+    # this fix ships). Never start one the user deliberately stopped; it picks up
+    # the now-corrected compose.yaml the next time it's started manually.
     running = subprocess.run(
         ["docker", "compose", "ps", "--services", "--filter", "status=running"],
         cwd=site, capture_output=True, text=True,

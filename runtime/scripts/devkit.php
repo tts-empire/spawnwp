@@ -1,17 +1,11 @@
 <?php
 /**
  * Plugin Name: SpawnWP Development Toolkit
- * Description: Development links and local email routing for SpawnWP environments.
+ * Description: Development links for SpawnWP environments. Mail routing to
+ * Mailpit lives in mail-capture.php, installed independently of this toolkit.
  * Version: 1.0.0
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-add_action( 'phpmailer_init', static function ( $mailer ) {
-	$mailer->isSMTP();
-	$mailer->Host = defined( 'SMTP_HOST' ) ? SMTP_HOST : 'mailpit';
-	$mailer->Port = defined( 'SMTP_PORT' ) ? SMTP_PORT : 1025;
-	$mailer->SMTPAuth = false;
-	$mailer->SMTPAutoTLS = false;
-} );
 add_action( 'wp_dashboard_setup', static function () {
 	if ( ! current_user_can( 'manage_options' ) ) { return; }
 	wp_add_dashboard_widget( 'spawnwp_devkit', 'SpawnWP Dev toolkit', static function () {

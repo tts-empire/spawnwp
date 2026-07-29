@@ -195,6 +195,8 @@ wp_block = """
         include /etc/nginx/snippets/spawnwp-proxy.conf;
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/wp-json/spawnwp-deploy/v1/;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_intercept_errors on;
         error_page 502 503 504 =502 @wp_down;
     }
@@ -205,6 +207,8 @@ wp_block = """
         client_max_body_size ${BODY_SIZE};
         proxy_set_header X-Forwarded-Prefix /${NAME};
         proxy_pass http://127.0.0.1:${PORT}/;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         # On the /wp-admin directory redirect, the backend (internal nginx) emits
         # an absolute http Location WITHOUT the prefix (e.g. http://host/wp-admin/):
         # we rewrite it, re-adding /${NAME} and forcing https. WordPress' own

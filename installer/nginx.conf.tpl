@@ -26,6 +26,8 @@ server {
     }
     location / {
         proxy_pass http://127.0.0.1:8080;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_intercept_errors on;
         error_page 502 503 504 =502 @wp_down;
     }

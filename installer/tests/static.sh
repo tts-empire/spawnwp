@@ -232,3 +232,48 @@ if deploy_plugin_version_newer 0.3.4-dev 0.3.4; then
   exit 1
 fi
 grep -q 'DEPLOY_PLUGIN_SOURCE="WordPress.org mirror (verified)"' "$ROOT/runtime/scripts/new-project.sh"
+
+# GitHub issue #13: the edge nginx proxying to a WordPress site had no explicit
+# proxy_read_timeout/proxy_send_timeout, so it fell back to nginx's compiled-in
+# 60s default — well under PHP's own max_execution_time (120s). Any plugin doing
+# a long synchronous request (e.g. a mail queue processed inline) got cut off and
+# shown "WordPress environment is not running" while PHP was still working fine.
+if [ "$(grep -c 'proxy_read_timeout 300s;' "$ROOT/installer/nginx.conf.tpl")" -lt 1 ]; then
+  echo "ERROR: installer/nginx.conf.tpl must set an explicit proxy_read_timeout on the WordPress site location" >&2
+  exit 1
+fi
+if [ "$(grep -c 'proxy_read_timeout 300s;' "$ROOT/runtime/scripts/new-project.sh")" -lt 2 ]; then
+  echo "ERROR: new-project.sh must set proxy_read_timeout on both per-site location blocks (deploy webhook + main)" >&2
+  exit 1
+fi
+grep -q 'migrations/add-site-proxy-timeouts.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the site proxy timeout migration is missing from managed-files.json" >&2
+  exit 1
+}
+
+# GitHub issue #13: WP-Cron was force-disabled on every spawned site with no
+# substitute trigger — every plugin relying on scheduled events (including a
+# mail queue) silently never ran. New sites must get WordPress's own default
+# pseudo-cron back.
+if grep -q 'DISABLE_WP_CRON' "$ROOT/runtime/compose.yaml"; then
+  echo "ERROR: runtime/compose.yaml must not force-disable WP-Cron on new sites" >&2
+  exit 1
+fi
+grep -q 'migrations/enable-site-cron-and-mail-capture.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the WP-Cron/mail-capture migration is missing from managed-files.json" >&2
+  exit 1
+}
+
+# GitHub issue #13: Mailpit was only wired up on the Development blueprint (it
+# rode along with devkit.php's debug-tools flag), so Clean/Demo sites silently
+# dropped outgoing mail instead of capturing it. mail-capture.php must install
+# unconditionally, at top-level (no leading indentation) — indented would mean
+# it slipped inside a conditional again, e.g. the devkit-only block below it.
+grep -q '^install -D -o 33 -g 33 -m 0644 scripts/mail-capture.php' "$ROOT/runtime/scripts/apply-blueprint.sh" || {
+  echo "ERROR: mail-capture.php must be installed unconditionally in apply-blueprint.sh" >&2
+  exit 1
+}
+grep -q 'scripts/mail-capture.php' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: scripts/mail-capture.php is missing from managed-files.json" >&2
+  exit 1
+}

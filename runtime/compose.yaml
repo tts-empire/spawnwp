@@ -72,7 +72,6 @@ services:
       WORDPRESS_DEBUG: "${WP_DEBUG:-}"
       WORDPRESS_CONFIG_EXTRA: |
         define('DISALLOW_FILE_EDIT', true);
-        define('DISABLE_WP_CRON', true);
         // Debug logs to wp-content/debug.log; on-screen display follows the
         // php.ini display_errors (the Deploy "display_errors" dev toggle) rather
         // than WordPress's default-on, so a stray plugin notice never breaks the

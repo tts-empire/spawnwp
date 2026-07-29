@@ -106,6 +106,8 @@ def main() -> int:
                 "migrations/install-site-expiry-units.py",
                 "migrations/add-ingest-nginx-location.py",
                 "migrations/enable-http2.py",
+                "migrations/add-site-proxy-timeouts.py",
+                "migrations/enable-site-cron-and-mail-capture.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -153,6 +155,8 @@ def main() -> int:
                 "installer/migrations/install-site-expiry-units.py",
                 "installer/migrations/add-ingest-nginx-location.py",
                 "installer/migrations/enable-http2.py",
+                "installer/migrations/add-site-proxy-timeouts.py",
+                "installer/migrations/enable-site-cron-and-mail-capture.py",
             ],
             "files": entries,
         }

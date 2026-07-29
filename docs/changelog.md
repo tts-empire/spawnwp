@@ -4,6 +4,24 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.25
+
+- **A mail-sending plugin could make a site return "WordPress environment is not
+  running."** Reported against MailerPress (issue #13): the edge proxy in front of every
+  WordPress site had no explicit read/send timeout, so it fell back to nginx's 60-second
+  default — well under PHP's own 120-second execution limit. Any request that ran longer
+  than that, WordPress still working underneath, got cut off and shown as a dead
+  environment. The proxy now allows 300 seconds, matching the container's own internal
+  timeout.
+- **WP-Cron never ran on a spawned site.** Every new site force-disabled it with no
+  substitute trigger, so any plugin relying on scheduled events — including a mail queue
+  processed in the background — silently never fired. New sites now get WordPress's
+  default pseudo-cron back, exactly as on any ordinary host.
+- **Mailpit only captured mail on the Development blueprint.** Clean and Demo sites
+  looked wired up (the `SMTP_HOST`/`SMTP_PORT` constants were there) but nothing acted on
+  them, so outgoing mail silently went nowhere instead of landing in Mailpit. It is now
+  captured on every blueprint.
+
 ## 0.5.24
 
 - **The Deploy workflow now reads as two distinct steps.** “Choose a blueprint” and

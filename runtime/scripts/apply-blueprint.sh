@@ -53,6 +53,9 @@ if [ -n "$BLUEPRINT_THEME" ]; then
   "${WP[@]}" theme install "$BLUEPRINT_THEME" --activate
 fi
 
+echo "==> Wiring outgoing mail to Mailpit..."
+install -D -o 33 -g 33 -m 0644 scripts/mail-capture.php projects/primary/wp-content/mu-plugins/mail-capture.php
+
 if [ "$BLUEPRINT_DEVKIT" = "1" ]; then
   echo "==> Installing SpawnWP development toolkit..."
   install -D -o 33 -g 33 -m 0644 scripts/devkit.php projects/primary/wp-content/mu-plugins/devkit.php

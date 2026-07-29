@@ -22,7 +22,24 @@ import sys
 from pathlib import Path
 
 PROJECTS_ROOT = Path(os.environ.get("SPAWNWP_PROJECTS_ROOT", "/srv"))
-SOURCE_MAIL_CAPTURE = Path(__file__).resolve().parents[2] / "runtime" / "scripts" / "mail-capture.php"
+
+
+def _default_mail_capture_source() -> Path:
+    # This migration is packaged under payload/lib/installer/migrations/, but
+    # runtime/ files (this one included) are packaged separately, straight under
+    # payload/runtime/ — NOT under payload/lib/. So the source lives at a sibling
+    # of this script's own "lib" root, not underneath it. Walking up for the
+    # "payload" directory itself (rather than hardcoding a parents[N] index) keeps
+    # this correct even if the packaging layout gains or loses a level later.
+    here = Path(__file__).resolve()
+    for ancestor in here.parents:
+        if ancestor.name == "payload":
+            return ancestor / "runtime" / "scripts" / "mail-capture.php"
+    raise RuntimeError(f"could not find a 'payload' ancestor above {here}")
+
+
+SOURCE_MAIL_CAPTURE = Path(os.environ["SPAWNWP_MAIL_CAPTURE_SOURCE"]) if "SPAWNWP_MAIL_CAPTURE_SOURCE" in os.environ \
+    else _default_mail_capture_source()
 
 
 def is_project(p: Path) -> bool:

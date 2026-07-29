@@ -4,6 +4,17 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.26
+
+- **`spawnwp update` to 0.5.25 failed with a `FileNotFoundError` during migrations.**
+  The new migration that installs `mail-capture.php` on existing sites assumed the
+  release payload mirrors the repository layout, but runtime files are packaged
+  separately from installer files. It looked for its source file in the wrong place
+  and the update aborted — safely, before activating anything: hosts on 0.5.24 were
+  left running, untouched. Fixed to locate the file correctly regardless of the
+  packaging layout, and verified this time against an actual built release archive,
+  not just the repository checkout.
+
 ## 0.5.25
 
 - **A mail-sending plugin could make a site return "WordPress environment is not

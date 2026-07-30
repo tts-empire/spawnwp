@@ -1,0 +1,467 @@
+#!/usr/bin/env python3
+"""Official command-line client for the SpawnWP Provisioning API."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import datetime as dt
+import hashlib
+import json
+import os
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from urllib.parse import urlparse
+
+VERSION = "0.1.0"
+DEFAULT_CONFIG = Path(
+    os.environ.get(
+        "SPAWNWP_API_CONFIG",
+        Path.home() / ".config" / "spawnwp" / "api.json",
+    )
+)
+SPKI_PREFIX = bytes.fromhex("302a300506032b6570032100")
+
+
+class ClientError(RuntimeError):
+    pass
+
+
+def b64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def parse_bundle(value: str) -> dict:
+    value = value.strip()
+    if not value.startswith("spawnbp1:"):
+        raise ClientError("The pairing code must begin with spawnbp1:")
+    try:
+        data = json.loads(b64url_decode(value.split(":", 1)[1]))
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise ClientError("The pairing code is malformed") from exc
+    required = {"server_url", "pairing_id", "token", "scope", "expires"}
+    if not isinstance(data, dict) or not required.issubset(data):
+        raise ClientError("The pairing code is incomplete")
+    parsed = urlparse(str(data["server_url"]))
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ClientError("The pairing server must use HTTPS")
+    if data["scope"] != "provision":
+        raise ClientError("This is not a provisioning API pairing code")
+    try:
+        expires = int(data["expires"])
+    except (TypeError, ValueError) as exc:
+        raise ClientError("The pairing code has an invalid expiry") from exc
+    if expires < int(time.time()):
+        raise ClientError("The pairing code has expired")
+    return data
+
+
+def require_openssl() -> str:
+    executable = shutil.which("openssl")
+    if not executable:
+        raise ClientError("OpenSSL is required but was not found in PATH")
+    return executable
+
+
+def run_openssl(arguments: list[str], *, data: bytes | None = None) -> bytes:
+    result = subprocess.run(
+        [require_openssl(), *arguments],
+        input=data,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode:
+        detail = result.stderr.decode(errors="replace").strip()
+        raise ClientError(f"OpenSSL failed: {detail or 'unknown error'}")
+    return result.stdout
+
+
+def generate_private_key(path: Path) -> None:
+    run_openssl(["genpkey", "-algorithm", "Ed25519", "-out", str(path)])
+    path.chmod(0o600)
+
+
+def public_key_b64(private_key: Path) -> str:
+    der = run_openssl(["pkey", "-in", str(private_key), "-pubout", "-outform", "DER"])
+    if len(der) != len(SPKI_PREFIX) + 32 or not der.startswith(SPKI_PREFIX):
+        raise ClientError("OpenSSL returned an unexpected Ed25519 public key")
+    return base64.b64encode(der[len(SPKI_PREFIX):]).decode()
+
+
+def sign_bytes(private_key: Path, message: bytes) -> str:
+    # OpenSSL's Ed25519 implementation is one-shot and therefore needs a
+    # seekable input so it can determine the complete message size.
+    descriptor, message_path = tempfile.mkstemp(prefix="spawnwp-api-sign-")
+    try:
+        os.write(descriptor, message)
+        os.close(descriptor)
+        descriptor = -1
+        signature = run_openssl(
+            [
+                "pkeyutl", "-sign", "-inkey", str(private_key),
+                "-rawin", "-in", message_path,
+            ],
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            os.unlink(message_path)
+        except FileNotFoundError:
+            pass
+    if len(signature) != 64:
+        raise ClientError("OpenSSL returned an unexpected Ed25519 signature")
+    return base64.b64encode(signature).decode()
+
+
+def canonical(method: str, path: str, timestamp: int, nonce: str, body: bytes) -> bytes:
+    digest = hashlib.sha256(body).hexdigest()
+    return f"{method.upper()}\n{path}\n{timestamp}\n{nonce}\n{digest}".encode()
+
+
+def format_detail(payload, fallback: str) -> str:
+    if not isinstance(payload, dict) or "detail" not in payload:
+        return fallback
+    detail = payload["detail"]
+    if isinstance(detail, str):
+        return detail
+    return json.dumps(detail, ensure_ascii=False)
+
+
+def http_json(
+    url: str,
+    *,
+    method: str = "GET",
+    body: bytes = b"",
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+) -> dict:
+    request = urllib.request.Request(
+        url,
+        data=body if method in {"POST", "PUT", "PATCH", "DELETE"} else None,
+        method=method,
+        headers={"Accept": "application/json", **(headers or {})},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        try:
+            payload = json.loads(raw)
+        except (ValueError, json.JSONDecodeError):
+            payload = None
+        raise ClientError(
+            f"API request failed ({exc.code}): "
+            f"{format_detail(payload, exc.reason or 'HTTP error')}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise ClientError(f"Unable to reach the SpawnWP server: {exc.reason}") from exc
+    try:
+        result = json.loads(raw)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise ClientError("The SpawnWP server returned invalid JSON") from exc
+    if not isinstance(result, dict):
+        raise ClientError("The SpawnWP server returned an unexpected response")
+    return result
+
+
+def atomic_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".api.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2)
+            handle.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def load_config(path: Path) -> dict:
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ClientError(f"No API connection found at {path}; run 'pair' first") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ClientError(f"Unable to read API configuration at {path}") from exc
+    required = {"server_url", "connection_id", "private_key"}
+    if not isinstance(config, dict) or not required.issubset(config):
+        raise ClientError(f"API configuration at {path} is incomplete")
+    key = Path(config["private_key"]).expanduser()
+    if not key.is_file():
+        raise ClientError(f"Private key not found at {key}")
+    config["private_key"] = str(key)
+    return config
+
+
+def signed_request(
+    config: dict,
+    method: str,
+    path: str,
+    *,
+    payload: dict | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+) -> dict:
+    body = (
+        json.dumps(payload, separators=(",", ":")).encode()
+        if payload is not None
+        else b""
+    )
+    timestamp = int(time.time())
+    nonce = secrets.token_hex(16)
+    signature = sign_bytes(
+        Path(config["private_key"]),
+        canonical(method, path, timestamp, nonce, body),
+    )
+    signed_headers = {
+        "X-SpawnWP-Connection": config["connection_id"],
+        "X-SpawnWP-Timestamp": str(timestamp),
+        "X-SpawnWP-Nonce": nonce,
+        "X-SpawnWP-Signature": signature,
+        **(headers or {}),
+    }
+    if payload is not None:
+        signed_headers["Content-Type"] = "application/json"
+    return http_json(
+        config["server_url"].rstrip("/") + path,
+        method=method,
+        body=body,
+        headers=signed_headers,
+        timeout=timeout,
+    )
+
+
+def parse_duration(value: str) -> int:
+    units = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+    try:
+        if value[-1:].lower() in units:
+            seconds = int(value[:-1]) * units[value[-1].lower()]
+        else:
+            seconds = int(value)
+    except (ValueError, IndexError) as exc:
+        raise argparse.ArgumentTypeError("use seconds or a duration such as 30m, 2h, 7d") from exc
+    if not 300 <= seconds <= 365 * 86400:
+        raise argparse.ArgumentTypeError("duration must be between 5m and 365d")
+    return seconds
+
+
+def iso_time(timestamp: int) -> str:
+    return dt.datetime.fromtimestamp(timestamp, dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def command_pair(args) -> dict:
+    bundle = parse_bundle(args.pairing_code)
+    config_path = args.config.expanduser().resolve()
+    key_path = config_path.with_suffix(".key")
+    if (config_path.exists() or key_path.exists()) and not args.force:
+        raise ClientError(
+            f"A connection already exists at {config_path}; use --force to replace it"
+        )
+    parent_was_missing = not config_path.parent.exists()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    if parent_was_missing:
+        config_path.parent.chmod(0o700)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".pairing-", dir=config_path.parent)
+    os.close(descriptor)
+    temporary_key = Path(temporary_name)
+    try:
+        generate_private_key(temporary_key)
+        public_key = public_key_b64(temporary_key)
+        source_host = args.source_host or socket.getfqdn()
+        proof = sign_bytes(
+            temporary_key,
+            f"pair|{bundle['pairing_id']}|{public_key}|{source_host}".encode(),
+        )
+        response = http_json(
+            bundle["server_url"].rstrip("/") + "/api/ingest/pair",
+            method="POST",
+            body=json.dumps(
+                {
+                    "pairing_id": bundle["pairing_id"],
+                    "token": bundle["token"],
+                    "source_public_key": public_key,
+                    "source_host": source_host,
+                    "label": args.label,
+                    "proof": proof,
+                },
+                separators=(",", ":"),
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        if response.get("scope") != "provision":
+            raise ClientError("The server did not grant provisioning scope")
+        os.replace(temporary_key, key_path)
+        key_path.chmod(0o600)
+        atomic_json(
+            config_path,
+            {
+                "version": 1,
+                "server_url": bundle["server_url"].rstrip("/"),
+                "connection_id": response["connection_id"],
+                "private_key": str(key_path),
+                "label": args.label,
+                "paired_at": int(time.time()),
+            },
+        )
+    finally:
+        try:
+            temporary_key.unlink()
+        except FileNotFoundError:
+            pass
+    return {
+        "status": "paired",
+        "server_url": bundle["server_url"].rstrip("/"),
+        "connection_id": response["connection_id"],
+        "config": str(config_path),
+    }
+
+
+def command_status(args) -> dict:
+    config = load_config(args.config.expanduser())
+    return signed_request(config, "GET", "/api/provision/status")
+
+
+def command_provision(args) -> dict:
+    config = load_config(args.config.expanduser())
+    payload = {
+        "blueprint": args.blueprint,
+        "expires_seconds": args.expires,
+        "role": args.role,
+        "group": args.group,
+    }
+    if args.name:
+        payload["name"] = args.name
+    return signed_request(
+        config,
+        "POST",
+        "/api/provision",
+        payload=payload,
+        headers={"Idempotency-Key": args.idempotency_key or secrets.token_urlsafe(18)},
+        timeout=args.timeout,
+    )
+
+
+def command_revoke(args) -> dict:
+    if not args.yes:
+        raise ClientError("Revocation requires --yes")
+    config_path = args.config.expanduser()
+    config = load_config(config_path)
+    result = signed_request(config, "DELETE", "/api/provision/connection")
+    key_path = Path(config["private_key"])
+    try:
+        key_path.unlink()
+    except FileNotFoundError:
+        pass
+    try:
+        config_path.unlink()
+    except FileNotFoundError:
+        pass
+    return result
+
+
+def print_human(command: str, result: dict) -> None:
+    if command == "pair":
+        print(f"Paired with:   {result['server_url']}")
+        print(f"Connection:   {result['connection_id']}")
+        print(f"Credentials:  {result['config']}")
+    elif command == "status":
+        connection = result["connection"]
+        print(f"Server:       SpawnWP {result['spawnwp_version']}")
+        print(f"Connection:   {connection['label'] or connection['id']}")
+        print(f"Usage:        {result['active_sites']}/{result['limits']['concurrent_sites']} active sites")
+        if result["sites"]:
+            print("\nActive sites:")
+            for site in result["sites"]:
+                print(f"  {site['project']}: {site['url']} (expires {iso_time(site['expires_at'])})")
+    elif command == "provision":
+        print(f"Project:      {result['project']}")
+        print(f"URL:          {result['url']}")
+        print(f"Expires:      {iso_time(result['expires_at'])}")
+        print(f"Username:     {result['username']}")
+        print(f"Password:     {result['password']}")
+        if result.get("magic_link"):
+            print(f"Magic link:   {result['magic_link']}")
+    elif command == "revoke":
+        print("Connection revoked.")
+        print(f"Active sites preserved: {result['active_sites']}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="spawnwp-api",
+        description="Pair with and use the SpawnWP Provisioning API.",
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG,
+        help=f"connection file (default: {DEFAULT_CONFIG})",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    pair = subparsers.add_parser("pair", help="pair using a cockpit-generated code")
+    pair.add_argument("pairing_code")
+    pair.add_argument("--label", default=socket.gethostname())
+    pair.add_argument("--source-host")
+    pair.add_argument("--force", action="store_true", help="replace local credentials")
+    pair.add_argument("--json", action="store_true")
+    pair.set_defaults(handler=command_pair)
+
+    status = subparsers.add_parser("status", help="show connection limits and active sites")
+    status.add_argument("--json", action="store_true")
+    status.set_defaults(handler=command_status)
+
+    provision = subparsers.add_parser("provision", help="create a temporary WordPress site")
+    provision.add_argument("--blueprint", required=True)
+    provision.add_argument("--expires", type=parse_duration, default=3600)
+    provision.add_argument(
+        "--role",
+        choices=["administrator", "editor", "author", "contributor", "subscriber"],
+        default="administrator",
+    )
+    provision.add_argument("--group", default="API")
+    provision.add_argument("--name")
+    provision.add_argument("--idempotency-key")
+    provision.add_argument("--timeout", type=int, default=610)
+    provision.add_argument("--json", action="store_true")
+    provision.set_defaults(handler=command_provision)
+
+    revoke = subparsers.add_parser("revoke", help="revoke this API connection")
+    revoke.add_argument("--yes", action="store_true", help="confirm permanent revocation")
+    revoke.add_argument("--json", action="store_true")
+    revoke.set_defaults(handler=command_revoke)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        result = args.handler(args)
+    except (ClientError, KeyError, OSError) as exc:
+        print(f"spawnwp-api: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print_human(args.command, result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -90,8 +90,8 @@ class IngestTests(unittest.TestCase):
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
-    def make_pairing(self) -> dict:
-        response = self.client.post("/api/blueprint-pairings")
+    def make_pairing(self, scope="ingest") -> dict:
+        response = self.client.post("/api/blueprint-pairings", json={"scope": scope})
         self.assertEqual(response.status_code, 200, response.text)
         data = response.json()
         encoded = data["bundle"].removeprefix("spawnbp1:")
@@ -195,6 +195,19 @@ class IngestTests(unittest.TestCase):
         response = self.pair(token="wrong-token")
         self.assertEqual(response.status_code, 403)
 
+    def test_pairing_without_body_defaults_to_ingest_scope(self):
+        response = self.client.post("/api/blueprint-pairings")
+        self.assertEqual(response.status_code, 200, response.text)
+        db = self.ingest._connect()
+        try:
+            row = db.execute(
+                "SELECT scope FROM connections WHERE id=?",
+                (response.json()["pairing_id"],),
+            ).fetchone()
+        finally:
+            db.close()
+        self.assertEqual(row["scope"], "ingest")
+
     def test_pair_single_use(self):
         bundle = self.make_pairing()
         self.assertEqual(self.pair(bundle=bundle).status_code, 200)
@@ -225,6 +238,11 @@ class IngestTests(unittest.TestCase):
         self.connection_id = "nope"
         response = self.signed("GET", "/api/ingest/preflight")
         self.assertEqual(response.status_code, 401)
+
+    def test_provision_scoped_connection_cannot_ingest(self):
+        self.assertEqual(self.pair(bundle=self.make_pairing(scope="provision")).status_code, 200)
+        response = self.signed("GET", "/api/ingest/preflight")
+        self.assertEqual(response.status_code, 403)
 
     def test_duplicate_id_needs_replace(self):
         self.pair()
@@ -349,6 +367,32 @@ class IngestTests(unittest.TestCase):
         response = self.client.delete(f"/api/blueprint-connections/{self.connection_id}")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.signed("GET", "/api/ingest/preflight").status_code, 401)
+
+    def test_admin_revoke_discards_stored_provision_credentials(self):
+        self.assertEqual(
+            self.pair(bundle=self.make_pairing(scope="provision")).status_code,
+            200,
+        )
+        db = self.ingest._connect()
+        try:
+            db.execute("CREATE TABLE provision_requests(connection_id TEXT,response_json TEXT)")
+            db.execute(
+                "INSERT INTO provision_requests VALUES (?,?)",
+                (self.connection_id, '{"password":"secret"}'),
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        response = self.client.delete(f"/api/blueprint-connections/{self.connection_id}")
+
+        self.assertEqual(response.status_code, 200)
+        db = self.ingest._connect()
+        try:
+            count = db.execute("SELECT COUNT(*) FROM provision_requests").fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(count, 0)
 
 
 if __name__ == "__main__":

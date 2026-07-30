@@ -79,6 +79,9 @@ trap cleanup EXIT
 
 rsync -a --exclude=docs --exclude=sitemap-pages.xml website/ "$stage/"
 install -m 0644 install.sh "$stage/install.sh"
+install -d "$stage/downloads"
+install -m 0755 clients/spawnwp-api "$stage/downloads/spawnwp-api"
+(cd "$stage/downloads" && sha256sum spawnwp-api > spawnwp-api.sha256)
 if (( PUBLISH )) && [[ -n "$previous" && -d "$previous/artifacts" ]]; then
   cp -a "$previous/artifacts" "$stage/artifacts"
 fi
@@ -111,13 +114,19 @@ mv -Tf "$next_link" "$PUBLIC_LINK"
 flipped=1
 
 base="https://$HOST"
-for path in / /wordpress-sandbox/ /alternatives/ /alternatives/instawp/ /alternatives/localwp/ /alternatives/tastewp/ /use-cases/ /use-cases/plugin-development/ /guides/ /guides/test-wordpress-multiple-php-versions/ /guides/wordpress-sandbox-vs-staging/ /docs/ /sitemap.xml /sitemap-pages.xml; do
+for path in / /wordpress-sandbox/ /alternatives/ /alternatives/instawp/ /alternatives/localwp/ /alternatives/tastewp/ /use-cases/ /use-cases/plugin-development/ /guides/ /guides/test-wordpress-multiple-php-versions/ /guides/wordpress-sandbox-vs-staging/ /docs/ /downloads/spawnwp-api /downloads/spawnwp-api.sha256 /sitemap.xml /sitemap-pages.xml; do
   curl --resolve "$HOST:443:127.0.0.1" -fsS -o /dev/null "$base$path"
 done
 
 live_hash=$(curl --resolve "$HOST:443:127.0.0.1" -fsS "$base/install.sh" | sha256sum | awk '{print $1}')
 repo_hash=$(sha256sum install.sh | awk '{print $1}')
 [[ "$live_hash" == "$repo_hash" ]] || { echo "live install.sh checksum mismatch" >&2; exit 1; }
+live_client_hash=$(curl --resolve "$HOST:443:127.0.0.1" -fsS "$base/downloads/spawnwp-api" | sha256sum | awk '{print $1}')
+repo_client_hash=$(sha256sum clients/spawnwp-api | awk '{print $1}')
+[[ "$live_client_hash" == "$repo_client_hash" ]] || {
+  echo "live spawnwp-api checksum mismatch" >&2
+  exit 1
+}
 bash ops/website/check-live-install.sh
 python3 ops/website/sync_wporg_plugin.py --check
 

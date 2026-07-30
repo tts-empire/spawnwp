@@ -4,6 +4,19 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.29
+
+- **Trusted integrations can provision temporary WordPress sites through a scoped API.**
+  Requests use paired Ed25519 credentials, replay protection, persistent idempotency, per-
+  connection quotas and compensating cleanup. The caller chooses expiry, blueprint, group and
+  initial WordPress role; `administrator` is the default.
+- **The official `spawnwp-api` client provides the complete integration lifecycle.** It pairs
+  from a single-use cockpit code, reports capacity and active sites, provisions with human or
+  JSON output, and revokes credentials without destroying existing temporary sites. It uses
+  Python's standard library and OpenSSL, with no third-party Python packages.
+- **The provisioning guide now starts with a copyable quickstart.** It includes CI examples,
+  credential rotation, error recovery, manual signing details and an OpenAPI 3.1 contract.
+
 ## 0.5.28
 
 - **The 0.5.27 WP-Cron fix still didn't reach `/srv/wp-dev` itself.** `spawnwp update`'s

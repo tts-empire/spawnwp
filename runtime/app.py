@@ -8,6 +8,7 @@ import re
 import secrets
 import shlex
 import shutil
+import signal
 import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from auth import initialize as initialize_auth
-from auth import is_enrolled, login_page, router as auth_router, session as auth_session, valid_csrf
+from auth import is_enrolled, login_page, rate_limit, router as auth_router, session as auth_session, valid_csrf
 from ingest import router as ingest_router
 
 @asynccontextmanager
@@ -48,13 +49,27 @@ def requires_recent_auth(path: str) -> bool:
 @app.middleware("http")
 async def application_authentication(request: Request, call_next):
     path = request.url.path
+    mutation = path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH", "DELETE"}
     public = path in {
         "/login", "/api/version", "/api/auth/state", "/api/auth/setup/start",
         "/api/auth/setup/finish", "/api/auth/passkey/start", "/api/auth/passkey/finish",
         "/api/auth/fallback",
-    } or path.startswith("/api/ingest/")  # signed-request auth lives in ingest.py
+    } or path.startswith("/api/ingest/") or path == "/api/provision" or path.startswith("/api/provision/")
+    # Signed-request auth for public machine paths lives in ingest.py/provision.py.
     active = None if public else auth_session(request)
-    if not public and not active:
+    response = None
+    # Authentication endpoints already have tighter, action-specific limits.
+    # Private endpoints are counted only after session auth, so an unauthenticated
+    # caller cannot exhaust the bucket used by a legitimate cockpit administrator.
+    if mutation and not path.startswith("/api/auth/") and (public or active):
+        try:
+            rate_limit(request, "api_mutation", limit=60)
+        except HTTPException as exc:
+            response = JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+            response.headers["Retry-After"] = "300"
+    if response is not None:
+        pass
+    elif not public and not active:
         if path.startswith("/api/"):
             response = JSONResponse({"detail": "Authentication required"}, status_code=401)
         else:
@@ -86,6 +101,8 @@ async def application_authentication(request: Request, call_next):
 
 PROJECTS_ROOT = Path("/srv")
 PRIMARY_PROJECT = PROJECTS_ROOT / "wp-dev"
+DOCKER_DATA_ROOT = Path(os.environ.get("SPAWNWP_DOCKER_DATA_ROOT", "/var/lib/docker"))
+CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG_ENV", "/etc/spawnwp/config.env"))
 TEMPLATE_MARKER = PRIMARY_PROJECT / ".spawnwp" / "template-only"
 BLUEPRINT_TOOL = PRIMARY_PROJECT / "scripts" / "blueprint.py"
 PHP_SWITCH_TOOL = PRIMARY_PROJECT / "scripts" / "php-switch-progress.py"
@@ -129,6 +146,8 @@ def validate_blueprint_choice(blueprint_id: str, php_version: str | None,
         raise HTTPException(400, result.stderr.strip().removeprefix("ERROR: ").strip())
 
 SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9\-]{0,30}$')
+WP_USERNAME_RE = re.compile(r'^[a-z0-9][a-z0-9._\-]{0,59}$')
+WP_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 SNAP_RE = re.compile(r'^\d{8}-\d{6}$')   # timestamp snapshot: YYYYMMDD-HHMMSS
 # Manage-dashboard group label: free text, but no '=' or newline (would corrupt
 # the site's .env) and no leading separator.
@@ -255,6 +274,63 @@ def guard_not_busy():
             "System under load: image build in progress. Action blocked to "
             "avoid instability. Try again shortly.",
         )
+
+
+# A cold PHP image build needs about 1.9 GiB on the measured production host.
+# Keep 3 GiB free to cover that image, one site and operational headroom.
+MIN_CAPACITY_FREE_BYTES = 3 * 1024**3
+
+
+def _capacity_roots() -> list[Path]:
+    """Return distinct existing filesystems used by sites and Docker data."""
+    roots = [PROJECTS_ROOT]
+    if DOCKER_DATA_ROOT.exists():
+        try:
+            if DOCKER_DATA_ROOT.stat().st_dev != PROJECTS_ROOT.stat().st_dev:
+                roots.append(DOCKER_DATA_ROOT)
+        except OSError:
+            roots.append(DOCKER_DATA_ROOT)
+    return roots
+
+
+def guard_capacity() -> None:
+    """Reject site creation before it can exhaust disk or the configured quota."""
+    for root in _capacity_roots():
+        try:
+            free = shutil.disk_usage(root).free
+        except OSError as exc:
+            raise HTTPException(507, f"Unable to determine free space on {root}") from exc
+        if free < MIN_CAPACITY_FREE_BYTES:
+            free_gib = free / 1024**3
+            raise HTTPException(
+                507,
+                f"Insufficient disk space on {root}: {free_gib:.1f} GiB free; "
+                "at least 3.0 GiB is required to create a site",
+            )
+
+    raw_limit = _config_env_get("SPAWNWP_MAX_SITES", "0").strip()
+    try:
+        max_sites = int(raw_limit or "0")
+    except ValueError as exc:
+        raise HTTPException(500, "Invalid SPAWNWP_MAX_SITES configuration") from exc
+    if max_sites < 0:
+        raise HTTPException(500, "Invalid SPAWNWP_MAX_SITES configuration")
+    if max_sites and len(get_projects()) >= max_sites:
+        raise HTTPException(
+            409,
+            f"Site capacity reached: SPAWNWP_MAX_SITES is {max_sites}",
+        )
+
+
+def random_project_name(prefix: str = "site", attempts: int = 5) -> str:
+    """Generate an unguessable path-safe project name, retrying collisions."""
+    if not SLUG_RE.match(prefix) or len(prefix) > 18:
+        raise ValueError("Invalid random project prefix")
+    for _ in range(attempts):
+        name = f"{prefix}-{secrets.token_hex(6)}"
+        if not is_project(PROJECTS_ROOT / name):
+            return name
+    raise HTTPException(503, "Unable to allocate a unique project name; retry shortly")
 
 # ── API ────────────────────────────────────────────────────────────────────────
 
@@ -418,10 +494,12 @@ def list_projects():
 
         expires_at = None
         days_left = None
+        seconds_left = None
         if env.get("SPAWNWP_EXPIRES", "").isdigit():
             import time as _time
             expires_at = int(env["SPAWNWP_EXPIRES"])
-            days_left = max(0, round((expires_at - _time.time()) / 86400, 1))
+            seconds_left = max(0, int(expires_at - _time.time()))
+            days_left = round(seconds_left / 86400, 1)
 
         group = env.get("SPAWNWP_GROUP", "")
         result.append({
@@ -431,6 +509,7 @@ def list_projects():
             "group_color": colors.get(group, 0) if group else 0,
             "expires_at": expires_at,
             "days_left": days_left,
+            "seconds_left": seconds_left,
             "php": env.get("PHP_VERSION", "?"),
             "port": env.get("WEB_PORT", "?"),
             "db_name": env.get("DB_NAME", "wordpress"),
@@ -756,28 +835,34 @@ class PhpIniSettings(BaseModel):
 
 
 class NewProject(BaseModel):
-    name: str
+    name: str | None = None
     blueprint: str = "development"
     php_version: str | None = None
     wordpress_version: str | None = None   # override the blueprint's pinned WP version (e.g. "latest")
     php_settings: PhpIniSettings | None = None
     lifetime_days: int = 0   # 0 = permanent; otherwise the site self-destructs
+    lifetime_seconds: int | None = None
     install_deploy_plugin: bool = False   # opt-in: bundle the SpawnWP Deploy plugin
     deactivate_plugins: bool = False   # captured blueprints: leave plugins inactive
     group: str = ""   # optional Manage-dashboard group label
 
-@app.post("/api/new-project")
-def new_project(body: NewProject):
-    if not SLUG_RE.match(body.name):
+
+def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None]:
+    """Validate one create request and return its stable name, command and env."""
+    name = body.name or random_project_name()
+    if not SLUG_RE.match(name):
         raise HTTPException(400, "Invalid name: use lowercase letters, digits and hyphens only")
     if not SLUG_RE.match(body.blueprint):
         raise HTTPException(400, "Invalid blueprint id")
     if not 0 <= body.lifetime_days <= 365:
         raise HTTPException(400, "lifetime_days must be between 0 and 365")
+    if body.lifetime_seconds is not None and not 300 <= body.lifetime_seconds <= 365 * 86400:
+        raise HTTPException(400, "lifetime_seconds must be between 300 and 31536000")
     validate_blueprint_choice(body.blueprint, body.php_version, body.wordpress_version)
     guard_not_busy()
-    if is_project(PROJECTS_ROOT / body.name):
-        raise HTTPException(409, f"Project '{body.name}' already exists")
+    guard_capacity()
+    if is_project(PROJECTS_ROOT / name):
+        raise HTTPException(409, f"Project '{name}' already exists")
     group = body.group.strip()
     if group and not GROUP_RE.match(group):
         raise HTTPException(400, "Invalid group: use letters, digits, spaces, dots, hyphens "
@@ -785,17 +870,76 @@ def new_project(body: NewProject):
     env = body.php_settings.validated().as_env() if body.php_settings else {}
     if group:
         env["SPAWNWP_GROUP"] = group
-    if body.lifetime_days:
+    if body.lifetime_seconds is not None:
+        env["SPAWNWP_SITE_LIFETIME_SECONDS"] = str(body.lifetime_seconds)
+    elif body.lifetime_days:
         env["SPAWNWP_SITE_LIFETIME_DAYS"] = str(body.lifetime_days)
     if body.install_deploy_plugin:
         env["SPAWNWP_INSTALL_DEPLOY_PLUGIN"] = "1"
     if body.deactivate_plugins:
         env["SPAWNWP_DEACTIVATE_PLUGINS"] = "1"
-    return sse_response(
-        ["bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"), body.name, body.blueprint, body.php_version or "", body.wordpress_version or ""],
-        PRIMARY_PROJECT,
-        env or None,
+    command = [
+        "bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"),
+        name, body.blueprint, body.php_version or "", body.wordpress_version or "",
+    ]
+    return name, command, env or None
+
+
+def run_project_creation(body: NewProject, timeout: int = 300) -> str:
+    """Run site creation to completion for machine callers."""
+    name, command, env = prepare_new_project(body)
+    proc = subprocess.Popen(
+        command,
+        cwd=PRIMARY_PROJECT,
+        env={**os.environ, **env} if env else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
     )
+    try:
+        output, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate()
+        raise HTTPException(504, f"Site creation exceeded the {timeout}-second timeout") from exc
+    if proc.returncode != 0:
+        detail = next(
+            (line.strip() for line in reversed(output.splitlines()) if line.strip()),
+            "Site creation failed",
+        )
+        status = 409 if "another site operation" in output.lower() else 500
+        raise HTTPException(status, detail[:500])
+    return name
+
+
+def cleanup_created_project(name: str) -> bool:
+    """Best-effort compensating cleanup after a post-create provisioning failure."""
+    proj = PROJECTS_ROOT / name
+    if not is_project(proj):
+        return True
+    try:
+        subprocess.run(
+            ["docker", "compose", "down", "--remove-orphans"],
+            cwd=proj, capture_output=True, timeout=120,
+        )
+        result = subprocess.run(
+            ["bash", str(PRIMARY_PROJECT / "scripts" / "destroy-project.sh"), name, "--yes"],
+            cwd=PRIMARY_PROJECT, capture_output=True, timeout=120,
+        )
+        return result.returncode == 0 and not proj.exists()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+@app.post("/api/new-project")
+def new_project(body: NewProject):
+    _, command, env = prepare_new_project(body)
+    return sse_response(command, PRIMARY_PROJECT, env)
 
 
 def _running_count(proj: Path) -> int:
@@ -957,6 +1101,59 @@ def wp_admin(project: str):
     }
 
 
+WP_USER_ROLES = {"administrator", "editor", "author", "contributor", "subscriber"}
+
+
+class WpUserCreate(BaseModel):
+    role: str
+    username: str | None = None
+    email: str | None = None
+
+
+def create_wp_user(project: str, body: WpUserCreate) -> dict:
+    proj = resolve_project(project)
+    role = body.role.strip().lower()
+    if role not in WP_USER_ROLES:
+        raise HTTPException(400, f"Invalid role; choose one of: {', '.join(sorted(WP_USER_ROLES))}")
+    username = (body.username or f"{proj.name}-{secrets.token_hex(3)}").strip().lower()
+    if not WP_USERNAME_RE.match(username):
+        raise HTTPException(
+            400,
+            "Invalid username: use lowercase letters, digits, dots, hyphens or underscores",
+        )
+    email = (body.email or f"{username}@spawnwp.invalid").strip().lower()
+    if len(email) > 100 or not WP_EMAIL_RE.match(email):
+        raise HTTPException(400, "Invalid email address")
+
+    password = secrets.token_urlsafe(24)
+    result = _php_exec(
+        proj,
+        [
+            "wp", "user", "create", username, email,
+            f"--role={role}", f"--user_pass={password}", "--porcelain",
+        ],
+    )
+    if result.returncode != 0:
+        raise _exec_error(result)
+    user_id = result.stdout.decode(errors="replace").strip()
+    if not user_id.isdigit():
+        raise HTTPException(500, "WordPress created the user but returned an invalid user id")
+    return {
+        "project": proj.name,
+        "id": int(user_id),
+        "username": username,
+        "email": email,
+        "role": role,
+        "password": password,
+    }
+
+
+@app.post("/api/wp/{project}/users")
+def wp_user_create(project: str, body: WpUserCreate):
+    """Create a least-privilege WordPress user; the password is returned once."""
+    return create_wp_user(project, body)
+
+
 # ── Magic login ──────────────────────────────────────────────────────────────
 # One click into wp-admin instead of copying a username and a password around.
 # It is an authentication bypass, so it is opt-in per site: the mu-plugin is
@@ -1020,15 +1217,8 @@ def autologin_toggle(project: str, body: AutologinToggle):
     return {"project": proj.name, "enabled": body.enabled}
 
 
-@app.post("/api/wp/{project}/magic-login")
-def magic_login(project: str):
-    """Mint a single-use sign-in URL for the site's admin user.
-
-    The cockpit stores only sha256(token), so the secret exists solely in the
-    URL handed back to the caller; the mu-plugin deletes the transient before it
-    authenticates, which is what makes the link genuinely single-use.
-    """
-    proj = resolve_project(project)
+def mint_magic_login(proj: Path, user: str) -> dict:
+    """Mint a single-use sign-in URL for one user on an auto-login-enabled site."""
     if not _autologin_installed(proj):
         raise HTTPException(409, "Magic login is off for this site: enable it first")
 
@@ -1036,9 +1226,8 @@ def magic_login(project: str):
     home = env.get("WP_HOME", "").rstrip("/")
     if not home:
         raise HTTPException(409, "Site has no WP_HOME: cannot build a sign-in URL")
-    user = env.get("WP_ADMIN_USER", "")
     if not user:
-        raise HTTPException(409, "Site has no admin user recorded in .env")
+        raise HTTPException(409, "No WordPress user was supplied")
 
     lookup = _php_exec(proj, ["wp", "user", "get", user, "--field=ID"])
     if lookup.returncode != 0:
@@ -1058,6 +1247,21 @@ def magic_login(project: str):
         "url": f"{home}/?spawnwp_autologin={token}",
         "expires_in": AUTOLOGIN_TTL_SECONDS,
     }
+
+
+@app.post("/api/wp/{project}/magic-login")
+def magic_login(project: str):
+    """Mint a single-use sign-in URL for the site's admin user.
+
+    The cockpit stores only sha256(token), so the secret exists solely in the
+    URL handed back to the caller; the mu-plugin deletes the transient before it
+    authenticates, which is what makes the link genuinely single-use.
+    """
+    proj = resolve_project(project)
+    user = _read_env(proj).get("WP_ADMIN_USER", "")
+    if not user:
+        raise HTTPException(409, "Site has no admin user recorded in .env")
+    return mint_magic_login(proj, user)
 
 
 @app.get("/api/db/{project}/login", response_class=HTMLResponse)
@@ -1224,10 +1428,11 @@ def disk_project(project: str):
 
 # ── Site expiry: extend or remove a temporary site's lifetime ─────────────────
 # Only lengthens or removes the deadline (never shortens to "now"): the actual
-# destruction is done by the hourly spawnwp-site-expiry timer via site-expiry.sh.
+# destruction is done by the five-minute spawnwp-site-expiry timer via site-expiry.sh.
 
 class SiteExpiry(BaseModel):
-    lifetime_days: int   # counted from now; 0 = make the site permanent
+    lifetime_days: int = 0   # counted from now; 0 = make the site permanent
+    lifetime_seconds: int | None = None
 
 
 @app.post("/api/expiry/{project}")
@@ -1237,13 +1442,22 @@ def set_expiry(project: str, body: SiteExpiry):
         raise HTTPException(400, "The primary stack cannot expire")
     if not 0 <= body.lifetime_days <= 365:
         raise HTTPException(400, "lifetime_days must be between 0 and 365")
+    if body.lifetime_seconds is not None and not 300 <= body.lifetime_seconds <= 365 * 86400:
+        raise HTTPException(400, "lifetime_seconds must be between 300 and 31536000")
     env_file = proj / ".env"
     lines = [l for l in env_file.read_text().splitlines() if not l.startswith("SPAWNWP_EXPIRES=")]
-    if body.lifetime_days:
+    if body.lifetime_seconds is not None:
+        import time as _time
+        lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_seconds}")
+    elif body.lifetime_days:
         import time as _time
         lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_days * 86400}")
     env_file.write_text("\n".join(lines) + "\n")
-    return {"project": proj.name, "lifetime_days": body.lifetime_days}
+    return {
+        "project": proj.name,
+        "lifetime_days": body.lifetime_days,
+        "lifetime_seconds": body.lifetime_seconds,
+    }
 
 
 # ── Site group: a free-text label used to group sites on the Manage dashboard ──
@@ -1706,7 +1920,6 @@ def files_delete(project: str, body: FilePath):
 # deploy on that PHP version rebuilds it (~5 min). Nothing rebuilds or deletes
 # automatically unless the admin opts into the auto-delete setting below.
 
-CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG_ENV", "/etc/spawnwp/config.env"))
 METRICS_FILE = Path(os.environ.get("SPAWNWP_METRICS_FILE", "/var/lib/spawnwp/metrics.json"))
 
 
@@ -1878,6 +2091,12 @@ def set_image_settings(body: ImageSettings):
         raise HTTPException(400, "autodelete_days must be between 0 and 365")
     _config_env_set("SPAWNWP_IMAGE_AUTODELETE_DAYS", str(body.autodelete_days))
     return {"autodelete_days": body.autodelete_days}
+
+
+# Imported after the site-service functions it consumes, avoiding duplicate
+# validation and keeping the cockpit's existing SSE contract independent.
+from provision import router as provision_router
+app.include_router(provision_router)
 
 
 # ── Cockpit pages and shared assets ───────────────────────────────────────────

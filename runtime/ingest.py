@@ -25,6 +25,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import machine_auth
 
@@ -94,6 +95,7 @@ def _connect() -> sqlite3.Connection:
             remote_host TEXT NOT NULL DEFAULT '', public_key TEXT NOT NULL DEFAULT '',
             private_key TEXT NOT NULL DEFAULT '', pair_token_hash TEXT NOT NULL DEFAULT '',
             pair_expires INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+            scope TEXT NOT NULL DEFAULT 'ingest',
             created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS jobs(
             id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, state TEXT NOT NULL,
@@ -106,6 +108,10 @@ def _connect() -> sqlite3.Connection:
             connection_id TEXT NOT NULL, nonce_hash TEXT NOT NULL,
             created_at INTEGER NOT NULL, UNIQUE(connection_id, nonce_hash));
     """)
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(connections)")}
+    if "scope" not in columns:
+        db.execute("ALTER TABLE connections ADD COLUMN scope TEXT NOT NULL DEFAULT 'ingest'")
+        db.commit()
     if fresh:
         try:
             os.chmod(path, 0o600)
@@ -130,32 +136,6 @@ def _janitor(db: sqlite3.Connection) -> None:
                     shutil.rmtree(entry, ignore_errors=True)
             except OSError:
                 continue
-
-
-async def _authorize(request: Request, db: sqlite3.Connection) -> tuple[sqlite3.Row, bytes]:
-    connection_id = request.headers.get("x-spawnwp-connection", "")
-    nonce = request.headers.get("x-spawnwp-nonce", "")
-    signature = request.headers.get("x-spawnwp-signature", "")
-    try:
-        timestamp = int(request.headers.get("x-spawnwp-timestamp", ""))
-    except ValueError:
-        timestamp = 0
-    if not connection_id or not timestamp or len(nonce) < machine_auth.MIN_NONCE_LENGTH or not signature:
-        raise HTTPException(401, "Signed connection headers are required")
-    row = db.execute("SELECT * FROM connections WHERE id=? AND status='active'",
-                     (connection_id,)).fetchone()
-    body = await request.body()
-    if not row or not machine_auth.verify(row["public_key"], signature, request.method,
-                                          request.url.path, timestamp, nonce, body):
-        raise HTTPException(401, "Request signature is invalid")
-    inserted = db.execute("INSERT OR IGNORE INTO nonces(connection_id, nonce_hash, created_at) "
-                          "VALUES (?,?,?)",
-                          (connection_id, hashlib.sha256(nonce.encode()).hexdigest(),
-                           int(time.time()))).rowcount
-    db.commit()
-    if inserted != 1:
-        raise HTTPException(409, "Request nonce has already been used")
-    return row, body
 
 
 def _catalog_ids() -> dict[str, str]:
@@ -203,20 +183,27 @@ def _metric_incr(key: str, n: int = 1) -> None:
 
 # ── Session-authenticated endpoints (cockpit UI) ───────────────────────────────
 
+class PairingCreate(BaseModel):
+    scope: str = "ingest"
+
+
 @router.post("/api/blueprint-pairings")
-def create_pairing(request: Request):
+def create_pairing(request: Request, body: PairingCreate | None = None):
     db = _connect()
     try:
         _janitor(db)
+        scope = body.scope.strip().lower() if body else "ingest"
+        if scope not in {"ingest", "provision"}:
+            raise HTTPException(400, "scope must be ingest or provision")
         keys = machine_auth.generate_keypair()
         pairing_id = secrets.token_hex(16)
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         expires = now + PAIRING_TTL
         db.execute("INSERT INTO connections(id, private_key, public_key, pair_token_hash, "
-                   "pair_expires, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                   "pair_expires, status, scope, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
                    (pairing_id, keys["private"], keys["public"],
-                    hashlib.sha256(token.encode()).hexdigest(), expires, "pending", now, now))
+                    hashlib.sha256(token.encode()).hexdigest(), expires, "pending", scope, now, now))
         db.commit()
         bundle = {
             "version": 1,
@@ -224,6 +211,7 @@ def create_pairing(request: Request):
             "pairing_id": pairing_id,
             "token": token,
             "server_public_key": keys["public"],
+            "scope": scope,
             "expires": expires,
         }
         encoded = base64.urlsafe_b64encode(json.dumps(bundle, separators=(",", ":")).encode()).decode().rstrip("=")
@@ -237,7 +225,7 @@ def list_pairings():
     db = _connect()
     try:
         _janitor(db)
-        rows = db.execute("SELECT id, label, remote_host, status, pair_expires, created_at "
+        rows = db.execute("SELECT id, label, remote_host, status, scope, pair_expires, created_at "
                           "FROM connections WHERE status IN ('pending','active') "
                           "ORDER BY created_at DESC").fetchall()
         return {"connections": [dict(row) for row in rows]}
@@ -252,6 +240,16 @@ def revoke_connection(connection_id: str):
         updated = db.execute("UPDATE connections SET status='revoked', public_key='', "
                              "private_key='', pair_token_hash='', updated_at=? WHERE id=?",
                              (int(time.time()), connection_id)).rowcount
+        db.execute("DELETE FROM nonces WHERE connection_id=?", (connection_id,))
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='provision_requests'",
+        ).fetchone():
+            # Idempotent provisioning responses contain generated WordPress
+            # credentials, so discard them when an administrator revokes the key.
+            db.execute(
+                "DELETE FROM provision_requests WHERE connection_id=?",
+                (connection_id,),
+            )
         db.commit()
         if not updated:
             raise HTTPException(404, "Unknown connection")
@@ -311,6 +309,7 @@ async def pair(request: Request):
         return {
             "connection_id": row["id"],
             "server_public_key": row["public_key"],
+            "scope": row["scope"],
             "ingest_format": INGEST_FORMAT,
             "spawnwp_version": _spawnwp_version(),
         }
@@ -323,7 +322,7 @@ async def preflight(request: Request):
     db = _connect()
     try:
         _janitor(db)
-        await _authorize(request, db)
+        await machine_auth.authorize(request, db, "ingest")
         root = _payload_root()
         root.mkdir(parents=True, exist_ok=True)
         return {
@@ -343,7 +342,7 @@ async def create_job(request: Request):
     db = _connect()
     try:
         _janitor(db)
-        connection, body = await _authorize(request, db)
+        connection, body = await machine_auth.authorize(request, db, "ingest")
         try:
             data = json.loads(body)
         except json.JSONDecodeError:
@@ -419,7 +418,7 @@ def _load_job(db: sqlite3.Connection, connection_id: str, job_id: str) -> sqlite
 async def upload_chunk(job_id: str, index: int, request: Request):
     db = _connect()
     try:
-        connection, body = await _authorize(request, db)
+        connection, body = await machine_auth.authorize(request, db, "ingest")
         job = _load_job(db, connection["id"], job_id)
         if job["state"] != "uploading":
             raise HTTPException(409, f"Job is not accepting chunks (state: {job['state']})")
@@ -446,7 +445,7 @@ async def upload_chunk(job_id: str, index: int, request: Request):
 async def finalize_job(job_id: str, request: Request):
     db = _connect()
     try:
-        connection, _ = await _authorize(request, db)
+        connection, _ = await machine_auth.authorize(request, db, "ingest")
         job = _load_job(db, connection["id"], job_id)
         if job["state"] != "uploading":
             raise HTTPException(409, f"Job cannot be finalized (state: {job['state']})")
@@ -465,7 +464,7 @@ async def finalize_job(job_id: str, request: Request):
 async def job_status(job_id: str, request: Request):
     db = _connect()
     try:
-        connection, _ = await _authorize(request, db)
+        connection, _ = await machine_auth.authorize(request, db, "ingest")
         job = _load_job(db, connection["id"], job_id)
         return {"state": job["state"], "received": job["received"],
                 "of": job["chunk_count"], "error": job["error"]}
@@ -477,7 +476,7 @@ async def job_status(job_id: str, request: Request):
 async def revoke_own_connection(request: Request):
     db = _connect()
     try:
-        connection, _ = await _authorize(request, db)
+        connection, _ = await machine_auth.authorize(request, db, "ingest")
         db.execute("UPDATE connections SET status='revoked', public_key='', private_key='', "
                    "updated_at=? WHERE id=?", (int(time.time()), connection["id"]))
         db.commit()

@@ -3,6 +3,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 RUNTIME = Path(__file__).parents[1]
 sys.path.insert(0, str(RUNTIME))
@@ -74,6 +76,42 @@ class ParseWpCliCommandTests(unittest.TestCase):
     def test_prompt_flag_rejected(self):
         self.assert_rejected("user create --prompt", "interactive")
         self.assert_rejected("post create --prompt=post_title", "interactive")
+
+    def test_random_project_name_is_path_safe_and_retries_collision(self):
+        with mock.patch.object(self.app.secrets, "token_hex", side_effect=["a" * 12, "b" * 12]), \
+             mock.patch.object(self.app, "is_project", side_effect=[True, False]):
+            name = self.app.random_project_name()
+        self.assertEqual(name, "site-" + "b" * 12)
+        self.assertIsNotNone(self.app.SLUG_RE.fullmatch(name))
+
+    def test_random_project_name_stops_after_five_collisions(self):
+        with mock.patch.object(self.app, "is_project", return_value=True):
+            with self.assertRaises(self.http_exception) as ctx:
+                self.app.random_project_name()
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    def test_create_wp_user_validates_role_before_exec(self):
+        body = self.app.WpUserCreate(role="super-admin")
+        with mock.patch.object(self.app, "resolve_project", return_value=Path("/srv/site-test")), \
+             mock.patch.object(self.app, "_php_exec") as execute:
+            with self.assertRaises(self.http_exception) as ctx:
+                self.app.create_wp_user("site-test", body)
+        self.assertEqual(ctx.exception.status_code, 400)
+        execute.assert_not_called()
+
+    def test_create_wp_user_returns_generated_credentials_once(self):
+        body = self.app.WpUserCreate(
+            role="editor", username="demo-editor", email="editor@example.test",
+        )
+        result = SimpleNamespace(returncode=0, stdout=b"42\n", stderr=b"")
+        with mock.patch.object(self.app, "resolve_project", return_value=Path("/srv/site-test")), \
+             mock.patch.object(self.app, "_php_exec", return_value=result) as execute, \
+             mock.patch.object(self.app.secrets, "token_urlsafe", return_value="secret-password"):
+            payload = self.app.create_wp_user("site-test", body)
+        self.assertEqual(payload["id"], 42)
+        self.assertEqual(payload["role"], "editor")
+        self.assertEqual(payload["password"], "secret-password")
+        self.assertIn("--role=editor", execute.call_args.args[1])
 
 
 if __name__ == "__main__":

@@ -89,7 +89,7 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "requirements.txt"}
+            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "provision.py", "requirements.txt"}
                       else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
@@ -108,6 +108,8 @@ def main() -> int:
                 "migrations/enable-http2.py",
                 "migrations/add-site-proxy-timeouts.py",
                 "migrations/enable-site-cron-and-mail-capture.py",
+                "migrations/retime-site-expiry.py",
+                "migrations/add-provision-nginx-location.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -157,6 +159,8 @@ def main() -> int:
                 "installer/migrations/enable-http2.py",
                 "installer/migrations/add-site-proxy-timeouts.py",
                 "installer/migrations/enable-site-cron-and-mail-capture.py",
+                "installer/migrations/retime-site-expiry.py",
+                "installer/migrations/add-provision-nginx-location.py",
             ],
             "files": entries,
         }

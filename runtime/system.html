@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>System · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}</style>
-  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.28">
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.29">
 </head>
 <body data-page="system">
   <header>
@@ -57,9 +57,12 @@
     </section>
 
     <section class="section system-panel" aria-labelledby="system-blueprint-title">
-      <div class="section-title" id="system-blueprint-title">Blueprint capture</div>
-      <p class="system-intro">Capture an existing WordPress site as a reusable blueprint. Install the SpawnWP Deploy plugin on the configured site, then connect it with a single-use code that expires after 15 minutes.</p>
-      <div class="system-primary-action"><button class="btn-primary sensitive" type="button" id="bp-pair-generate" onclick="generateBlueprintPairing()">Generate pairing code</button></div>
+      <div class="section-title" id="system-blueprint-title">Machine connections</div>
+      <p class="system-intro">Create a scoped connection for blueprint capture or for a trusted temporary-site API integrator. Pairing codes are single-use and expire after 15 minutes.</p>
+      <div class="system-primary-action">
+        <button class="btn-primary sensitive" type="button" id="bp-pair-generate" onclick="generateBlueprintPairing()">Generate blueprint pairing</button>
+        <button class="btn-neutral sensitive" type="button" id="api-pair-generate" onclick="generateProvisionPairing()">Generate provisioning API pairing</button>
+      </div>
       <div id="bp-bundle-box" class="pairing-code-panel" hidden>
         <textarea id="bp-bundle" class="bp-bundle-code" rows="4" readonly onclick="this.select()"></textarea>
         <p class="field-help" id="bp-bundle-expiry"></p>
@@ -79,6 +82,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.28"></script>
+  <script src="/assets/cockpit.js?v=0.5.29"></script>
 </body>
 </html>

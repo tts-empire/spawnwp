@@ -197,6 +197,12 @@ def _rate_limit(connection, request: Request, action: str, limit: int = 8) -> No
         connection.execute("UPDATE rate_limits SET attempts=attempts+1 WHERE bucket=?", (bucket,))
 
 
+def rate_limit(request: Request, action: str, limit: int = 8) -> None:
+    """Apply the shared, persistent per-IP rate limit to a request."""
+    with db(immediate=True) as connection:
+        _rate_limit(connection, request, action, limit)
+
+
 def _challenge(kind: str, challenge: bytes, payload: dict) -> str:
     identifier = secrets.token_urlsafe(32)
     with db() as connection:

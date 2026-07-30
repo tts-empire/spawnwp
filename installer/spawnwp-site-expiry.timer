@@ -1,9 +1,9 @@
 [Unit]
-Description=Hourly SpawnWP check for expired temporary sites
+Description=SpawnWP check for expired temporary sites every five minutes
 
 [Timer]
-OnCalendar=hourly
-RandomizedDelaySec=5min
+OnCalendar=*:0/5
+RandomizedDelaySec=30
 Persistent=true
 
 [Install]

@@ -97,6 +97,14 @@ class AuthenticationTests(unittest.TestCase):
             bootstrap = connection.execute("SELECT * FROM bootstrap").fetchone()
             self.assertEqual(bootstrap["code_hash"], self.auth._digest(code))
 
+    def test_shared_rate_limit_is_persistent(self):
+        request = self.request()
+        self.auth.rate_limit(request, "api-mutation-test", limit=2)
+        self.auth.rate_limit(request, "api-mutation-test", limit=2)
+        with self.assertRaises(HTTPException) as ctx:
+            self.auth.rate_limit(request, "api-mutation-test", limit=2)
+        self.assertEqual(ctx.exception.status_code, 429)
+
     def reauth_fixture(self):
         now = int(time.time())
         with self.auth.db() as connection:

@@ -8,6 +8,7 @@ on:
       - docs/**
       - mkdocs.yml
       - install.sh
+      - clients/spawnwp-api
       - ops/website/**
       - .github/workflows/site.yml
   pull_request:
@@ -16,6 +17,7 @@ on:
       - docs/**
       - mkdocs.yml
       - install.sh
+      - clients/spawnwp-api
       - ops/website/**
       - .github/workflows/site.yml
   workflow_dispatch:
@@ -38,6 +40,9 @@ jobs:
           mkdir -p /tmp/spawnwp-public
           rsync -a --exclude=docs --exclude=sitemap-pages.xml website/ /tmp/spawnwp-public/
           install -m 0644 install.sh /tmp/spawnwp-public/install.sh
+          install -d /tmp/spawnwp-public/downloads
+          install -m 0755 clients/spawnwp-api /tmp/spawnwp-public/downloads/spawnwp-api
+          (cd /tmp/spawnwp-public/downloads && sha256sum spawnwp-api > spawnwp-api.sha256)
           python ops/website/generate-sitemap.py --root website --repo . --output /tmp/spawnwp-public/sitemap-pages.xml
           mkdocs build --strict -f website/mkdocs-public.yml -d /tmp/spawnwp-public/docs
           python ops/website/check-site.py --root /tmp/spawnwp-public --sitemap /tmp/spawnwp-public/sitemap-pages.xml

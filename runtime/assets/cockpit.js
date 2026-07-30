@@ -2385,12 +2385,12 @@ async function loadBlueprintCapture() {
       const status = connection.status === 'active'
         ? '<span class="badge badge-green">connected</span>'
         : `<span class="badge badge-yellow">pending · expires ${new Date(connection.pair_expires * 1000).toLocaleTimeString()}</span>`;
-      return `<tr><td>${esc(connection.remote_host || connection.label || connection.id.slice(0, 8))}</td><td>${status}</td>
+      return `<tr><td>${esc(connection.remote_host || connection.label || connection.id.slice(0, 8))}</td><td><span class="badge badge-gray">${esc(connection.scope || 'ingest')}</span></td><td>${status}</td>
         <td>${new Date(connection.created_at * 1000).toLocaleDateString()}</td>
         <td><button class="btn-neutral btn-sm" onclick="revokeBlueprintConnection('${esc(connection.id)}')">Revoke</button></td></tr>`;
     }).join('');
     box.innerHTML = rows
-      ? `<table class="svc-table"><thead><tr><th>Site</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      ? `<table class="svc-table"><thead><tr><th>Client</th><th>Scope</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
       : '<p class="field-help">No connections yet.</p>';
     const templates = (catalog.blueprints || []).filter(item => item.schema_version === 2);
     list.innerHTML = templates.length
@@ -2405,20 +2405,33 @@ async function loadBlueprintCapture() {
 }
 
 async function generateBlueprintPairing() {
+  return generateMachinePairing('ingest');
+}
+
+async function generateProvisionPairing() {
+  return generateMachinePairing('provision');
+}
+
+async function generateMachinePairing(scope) {
   try {
-    const response = await sensitiveFetch(`${BASE}/blueprint-pairings`, { method: 'POST' });
+    const response = await sensitiveFetch(`${BASE}/blueprint-pairings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+    });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || response.statusText);
     document.getElementById('bp-bundle-box').hidden = false;
     document.getElementById('bp-bundle').value = payload.bundle;
     document.getElementById('bp-bundle-expiry').textContent =
-      `Paste this code in the SpawnWP Deploy plugin on the site to capture. Expires ${new Date(payload.expires * 1000).toLocaleString()}.`;
+      scope === 'provision'
+        ? `Give this code to the trusted API integrator. It grants provisioning only after pairing and expires ${new Date(payload.expires * 1000).toLocaleString()}.`
+        : `Paste this code in the SpawnWP Deploy plugin on the site to capture. Expires ${new Date(payload.expires * 1000).toLocaleString()}.`;
     loadBlueprintCapture();
   } catch (error) { showToast(error.message, true); }
 }
 
 async function revokeBlueprintConnection(id) {
-  if (!confirm('Revoke this template connection? The site will no longer be able to push blueprints to this server.')) return;
+  if (!confirm('Revoke this machine connection? It will immediately lose its current API access.')) return;
   try {
     const response = await fetch(`${BASE}/blueprint-connections/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);

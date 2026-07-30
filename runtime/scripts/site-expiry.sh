@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Destroy expired temporary sites (SPAWNWP_EXPIRES in a site's .env, written at
-# creation when a lifetime is chosen, or later via the cockpit). Runs hourly via
+# creation when a lifetime is chosen, or later via the cockpit). Runs every five minutes via
 # spawnwp-site-expiry.timer. Destruction is complete and final — containers,
 # volumes, directory and nginx block — exactly like a manual Destroy; temporary
 # sites keep no backups by design. The primary stack is never touched.
@@ -8,6 +8,12 @@ set -euo pipefail
 
 PRIMARY="/srv/wp-dev"
 now=$(date +%s)
+
+exec 9>/run/lock/spawnwp-projects.lock
+if ! flock -n 9; then
+  echo "site-expiry: another site operation is in progress; will retry next run."
+  exit 0
+fi
 
 for env_file in /srv/*/.env; do
   [ -f "$env_file" ] || continue
@@ -20,10 +26,10 @@ for env_file in /srv/*/.env; do
     name=$(basename "$proj_dir")
     echo "site-expiry: '${name}' expired on $(date -d "@${expires}" '+%Y-%m-%d %H:%M'), destroying..."
     (cd "$proj_dir" && docker compose down --remove-orphans) || true
-    if bash "${PRIMARY}/scripts/destroy-project.sh" "$name" --yes; then
+    if SPAWNWP_PROJECT_LOCK_HELD=1 bash "${PRIMARY}/scripts/destroy-project.sh" "$name" --yes; then
       source "${PRIMARY}/scripts/lib-metrics.sh" 2>/dev/null && metric_incr sites_expired_auto
     else
-      echo "site-expiry: failed to destroy '${name}' (will retry next hour)" >&2
+      echo "site-expiry: failed to destroy '${name}' (will retry next run)" >&2
     fi
   fi
 done

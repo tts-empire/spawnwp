@@ -30,6 +30,14 @@ if [ ! -d "$PROJ_DIR" ]; then
   exit 1
 fi
 
+if [ "${SPAWNWP_PROJECT_LOCK_HELD:-0}" != "1" ]; then
+  exec 9>/run/lock/spawnwp-projects.lock
+  if ! flock -n 9; then
+    echo "ERROR: another site operation is already in progress." >&2
+    exit 1
+  fi
+fi
+
 cd "$PROJ_DIR"
 
 # Containers must be down (the cockpit already checks, but we re-check).

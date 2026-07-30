@@ -6,6 +6,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 RUNTIME = Path(__file__).parents[1]
 sys.path.insert(0, str(RUNTIME))
@@ -85,6 +87,60 @@ class FileManagerTests(unittest.TestCase):
         # same step-up as /api/restore. Naming one is cosmetic and does not.
         self.assertTrue(self.app.requires_recent_auth("/api/snapshots/delete"))
         self.assertFalse(self.app.requires_recent_auth("/api/snapshots/label"))
+
+
+class CapacityGuardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temp.cleanup)
+        (Path(cls.temp.name) / "assets").mkdir()
+        os.environ["SPAWNWP_STATIC_DIR"] = cls.temp.name
+        try:
+            from fastapi import HTTPException
+            import app as cockpit_app
+        except Exception as exc:
+            raise unittest.SkipTest(f"cockpit app dependencies not available: {exc}")
+        cls.app = cockpit_app
+        cls.http_exception = HTTPException
+
+    def test_capacity_accepts_unlimited_with_enough_disk(self):
+        usage = SimpleNamespace(free=4 * 1024**3)
+        with mock.patch.object(self.app, "_capacity_roots", return_value=[Path("/srv")]), \
+             mock.patch.object(self.app.shutil, "disk_usage", return_value=usage), \
+             mock.patch.object(self.app, "_config_env_get", return_value="0"), \
+             mock.patch.object(self.app, "get_projects", return_value=[Path("/srv/one")]):
+            self.app.guard_capacity()
+
+    def test_capacity_rejects_low_disk(self):
+        usage = SimpleNamespace(free=2 * 1024**3)
+        with mock.patch.object(self.app, "_capacity_roots", return_value=[Path("/srv")]), \
+             mock.patch.object(self.app.shutil, "disk_usage", return_value=usage):
+            with self.assertRaises(self.http_exception) as ctx:
+                self.app.guard_capacity()
+        self.assertEqual(ctx.exception.status_code, 507)
+        self.assertIn("3.0 GiB", ctx.exception.detail)
+
+    def test_capacity_rejects_site_limit(self):
+        usage = SimpleNamespace(free=4 * 1024**3)
+        projects = [Path("/srv/one"), Path("/srv/two")]
+        with mock.patch.object(self.app, "_capacity_roots", return_value=[Path("/srv")]), \
+             mock.patch.object(self.app.shutil, "disk_usage", return_value=usage), \
+             mock.patch.object(self.app, "_config_env_get", return_value="2"), \
+             mock.patch.object(self.app, "get_projects", return_value=projects):
+            with self.assertRaises(self.http_exception) as ctx:
+                self.app.guard_capacity()
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("SPAWNWP_MAX_SITES is 2", ctx.exception.detail)
+
+    def test_capacity_rejects_invalid_site_limit(self):
+        usage = SimpleNamespace(free=4 * 1024**3)
+        with mock.patch.object(self.app, "_capacity_roots", return_value=[Path("/srv")]), \
+             mock.patch.object(self.app.shutil, "disk_usage", return_value=usage), \
+             mock.patch.object(self.app, "_config_env_get", return_value="many"):
+            with self.assertRaises(self.http_exception) as ctx:
+                self.app.guard_capacity()
+        self.assertEqual(ctx.exception.status_code, 500)
 
 
 class SnapshotLabelTests(unittest.TestCase):

@@ -74,6 +74,7 @@ nav:
       - Import an existing site: importing-a-site.md
       - Publishing a finished site: deploying-a-site.md
       - CLI reference: cli-reference.md
+      - Provisioning API: provisioning-api.md
   - Reference:
       - Architecture: architecture.md
       - Security: security.md

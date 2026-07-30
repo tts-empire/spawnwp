@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: SpawnWP Provisioning API
+  version: "1"
+  description: Signed API for creating short-lived WordPress sites.
+servers:
+  - url: https://{cockpitHost}
+    variables:
+      cockpitHost:
+        default: spawnwp.example.com
+security:
+  - SpawnWPSignature: []
+paths:
+  /api/provision/status:
+    get:
+      summary: Inspect the connection and its active sites
+      operationId: provisioningStatus
+      responses:
+        "200":
+          description: Current connection status and capacity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/WrongScope"
+  /api/provision:
+    post:
+      summary: Create a temporary WordPress site
+      operationId: provisionSite
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9._:-]{8,128}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionRequest"
+      responses:
+        "200":
+          description: The site and its one-time credentials
+          headers:
+            Idempotent-Replayed:
+              description: Present and true when returning a stored result.
+              schema:
+                type: string
+                const: "true"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/WrongScope"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/InvalidBody"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+  /api/provision/connection:
+    delete:
+      summary: Revoke the calling connection
+      operationId: revokeProvisioningConnection
+      responses:
+        "200":
+          description: Connection revoked; existing sites are preserved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, active_sites]
+                properties:
+                  status:
+                    type: string
+                    const: revoked
+                  active_sites:
+                    type: integer
+                    minimum: 0
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/WrongScope"
+components:
+  securitySchemes:
+    SpawnWPSignature:
+      type: apiKey
+      in: header
+      name: X-SpawnWP-Signature
+      description: |
+        This signature is accompanied by X-SpawnWP-Connection,
+        X-SpawnWP-Timestamp, and X-SpawnWP-Nonce. See the integration guide.
+  schemas:
+    ProvisionRequest:
+      type: object
+      required: [blueprint]
+      additionalProperties: false
+      properties:
+        blueprint:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+        expires_seconds:
+          type: integer
+          minimum: 300
+          maximum: 31536000
+          default: 3600
+        role:
+          type: string
+          enum: [administrator, editor, author, contributor, subscriber]
+          default: administrator
+        group:
+          type: string
+          default: API
+          maxLength: 32
+        name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+    ProvisionResult:
+      type: object
+      required: [project, url, expires_at, username, password]
+      properties:
+        project:
+          type: string
+        url:
+          type: string
+          format: uri
+        expires_at:
+          type: integer
+          description: Unix timestamp.
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+        magic_link:
+          type: string
+          format: uri
+    ProvisionSite:
+      type: object
+      required: [project, url, status, expires_at, created_at]
+      properties:
+        project:
+          type: string
+        url:
+          type: string
+        status:
+          type: string
+        expires_at:
+          type: integer
+        created_at:
+          type: integer
+    ProvisionStatus:
+      type: object
+      required:
+        - api_version
+        - spawnwp_version
+        - connection
+        - defaults
+        - limits
+        - active_sites
+        - sites
+      properties:
+        api_version:
+          type: integer
+          const: 1
+        spawnwp_version:
+          type: string
+        connection:
+          type: object
+          required: [id, label, scope]
+          properties:
+            id:
+              type: string
+            label:
+              type: string
+            scope:
+              type: string
+              const: provision
+        defaults:
+          type: object
+          properties:
+            expires_seconds:
+              type: integer
+            role:
+              type: string
+            group:
+              type: string
+        limits:
+          type: object
+          properties:
+            min_expires_seconds:
+              type: integer
+            max_expires_seconds:
+              type: integer
+            concurrent_sites:
+              type: integer
+            provision_timeout_seconds:
+              type: integer
+        active_sites:
+          type: integer
+        sites:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProvisionSite"
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: {}
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid signed credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    WrongScope:
+      description: A provisioning connection is required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Idempotency, nonce, quota, or operation conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidBody:
+      description: Request body validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InsufficientStorage:
+      description: Insufficient free disk space
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

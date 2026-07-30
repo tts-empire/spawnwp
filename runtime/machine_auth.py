@@ -8,10 +8,12 @@ detached signature and timestamps are accepted within +-300 seconds.
 
 import base64
 import hashlib
+import sqlite3
 import time
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from fastapi import HTTPException, Request
 
 CLOCK_SKEW = 300
 MIN_NONCE_LENGTH = 16
@@ -49,3 +51,35 @@ def verify(public_b64: str, signature_b64: str, method: str, path: str,
     if abs(int(time.time()) - timestamp) > CLOCK_SKEW or len(nonce) < MIN_NONCE_LENGTH:
         return False
     return verify_detached(public_b64, signature_b64, canonical(method, path, timestamp, nonce, body))
+
+
+async def authorize(request: Request, db: sqlite3.Connection,
+                    required_scope: str) -> tuple[sqlite3.Row, bytes]:
+    """Verify one signed request, enforce its connection scope and burn its nonce."""
+    connection_id = request.headers.get("x-spawnwp-connection", "")
+    nonce = request.headers.get("x-spawnwp-nonce", "")
+    signature = request.headers.get("x-spawnwp-signature", "")
+    try:
+        timestamp = int(request.headers.get("x-spawnwp-timestamp", ""))
+    except ValueError:
+        timestamp = 0
+    if not connection_id or not timestamp or len(nonce) < MIN_NONCE_LENGTH or not signature:
+        raise HTTPException(401, "Signed connection headers are required")
+    row = db.execute(
+        "SELECT * FROM connections WHERE id=? AND status='active'",
+        (connection_id,),
+    ).fetchone()
+    body = await request.body()
+    if not row or not verify(row["public_key"], signature, request.method,
+                             request.url.path, timestamp, nonce, body):
+        raise HTTPException(401, "Request signature is invalid")
+    if row["scope"] != required_scope:
+        raise HTTPException(403, f"A {required_scope} connection is required")
+    inserted = db.execute(
+        "INSERT OR IGNORE INTO nonces(connection_id, nonce_hash, created_at) VALUES (?,?,?)",
+        (connection_id, hashlib.sha256(nonce.encode()).hexdigest(), int(time.time())),
+    ).rowcount
+    db.commit()
+    if inserted != 1:
+        raise HTTPException(409, "Request nonce has already been used")
+    return row, body

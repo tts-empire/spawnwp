@@ -46,9 +46,9 @@ php_ini_defaults
 source "$(dirname "${BASH_SOURCE[0]}")/lib-metrics.sh"
 CREATE_START=$(date +%s)
 
-exec 9>/run/lock/spawnwp-new-project.lock
+exec 9>/run/lock/spawnwp-projects.lock
 if ! flock -n 9; then
-  echo "ERROR: another site creation is already in progress." >&2
+  echo "ERROR: another site operation is already in progress." >&2
   rm -f "$RESOLVED_BLUEPRINT"
   exit 1
 fi
@@ -159,10 +159,15 @@ ADMINER_PORT=${ADMINER_PORT}
 REDIS_PASSWORD=${REDIS_PASS}
 EOF
 
-# Temporary site: record the self-destruct deadline (enforced by the hourly
-# spawnwp-site-expiry timer). 0/unset = permanent.
+# Temporary site: record the self-destruct deadline (enforced by the five-minute
+# spawnwp-site-expiry timer). Seconds take precedence over days; 0/unset means permanent.
+LIFETIME_SECONDS="${SPAWNWP_SITE_LIFETIME_SECONDS:-0}"
 LIFETIME_DAYS="${SPAWNWP_SITE_LIFETIME_DAYS:-0}"
-if [[ "$LIFETIME_DAYS" =~ ^[0-9]+$ ]] && [ "$LIFETIME_DAYS" -gt 0 ]; then
+if [[ "$LIFETIME_SECONDS" =~ ^[0-9]+$ ]] && [ "$LIFETIME_SECONDS" -gt 0 ]; then
+  EXPIRES=$(( $(date +%s) + LIFETIME_SECONDS ))
+  echo "SPAWNWP_EXPIRES=${EXPIRES}" >> "${PROJ_DIR}/.env"
+  echo "==> Temporary site: it will be destroyed automatically around $(date -d "@${EXPIRES}" '+%Y-%m-%d %H:%M') (${LIFETIME_SECONDS} second(s) from now)."
+elif [[ "$LIFETIME_DAYS" =~ ^[0-9]+$ ]] && [ "$LIFETIME_DAYS" -gt 0 ]; then
   EXPIRES=$(( $(date +%s) + LIFETIME_DAYS * 86400 ))
   echo "SPAWNWP_EXPIRES=${EXPIRES}" >> "${PROJ_DIR}/.env"
   echo "==> Temporary site: it will be destroyed automatically around $(date -d "@${EXPIRES}" '+%Y-%m-%d %H:%M') (${LIFETIME_DAYS} day(s) from now)."
@@ -467,7 +472,9 @@ case "$BLUEPRINT_ID" in
   clean|demo|development) metric_incr "blueprint_${BLUEPRINT_ID}" ;;
   *) metric_incr blueprint_custom ;;
 esac
-[ "${LIFETIME_DAYS:-0}" -gt 0 ] 2>/dev/null && metric_incr sites_temporary_created
+if [ "${LIFETIME_SECONDS:-0}" -gt 0 ] 2>/dev/null || [ "${LIFETIME_DAYS:-0}" -gt 0 ] 2>/dev/null; then
+  metric_incr sites_temporary_created
+fi
 if [ -n "${SPAWNWP_PHP_MEMORY_LIMIT:-}${SPAWNWP_PHP_UPLOAD_MAX_FILESIZE:-}${SPAWNWP_PHP_POST_MAX_SIZE:-}${SPAWNWP_PHP_MAX_EXECUTION_TIME:-}${SPAWNWP_PHP_MAX_INPUT_VARS:-}${SPAWNWP_PHP_MAX_INPUT_TIME:-}${SPAWNWP_PHP_DISPLAY_ERRORS:-}" ]; then
   metric_incr php_settings_customized
 fi

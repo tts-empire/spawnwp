@@ -45,6 +45,25 @@ Always use the trailing slash: `/<site>/wp-admin/`. SpawnWP's nginx already rewr
 no-slash form, but if you customized the vhost, ensure the per-site `proxy_redirect` line
 is present.
 
+## A plugin link loses the `/<site>/` prefix
+
+SpawnWP serves each WordPress environment below `https://DOMAIN/<site>/`. It sets
+`WP_HOME` and `WP_SITEURL`, forwards the external prefix and restores it in the WordPress
+request URI. WordPress core and plugins that build URLs with helpers such as `admin_url()`,
+`home_url()` and `rest_url()` therefore retain the site prefix.
+
+A plugin that hardcodes a root-relative URL such as `/wp-admin/admin.php` or `/wp-json/`
+bypasses those values. The browser leaves the current environment and requests the root
+of `DOMAIN`, which can appear as a 404, a different site, or **WordPress environment not
+running**. Compare the broken URL with the expected
+`/<site>/wp-admin/...` path in the browser's address bar or Network panel.
+
+Report the root-relative URL to the plugin author and ask them to use the corresponding
+WordPress URL helper or a server-provided localized URL. SpawnWP deliberately does not
+rewrite arbitrary HTML and JavaScript responses: with multiple independent sites on one
+hostname, a global rewrite could send a request to the wrong environment or alter
+legitimate application paths.
+
 ## Port already allocated
 
 Each site claims the next free loopback ports. If a manual container or another service

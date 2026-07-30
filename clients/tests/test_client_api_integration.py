@@ -14,6 +14,13 @@ from urllib.parse import urlparse
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+# The production cockpit mounts static files at import time. CI has no installed
+# /srv/wp-cockpit tree, so give this isolated integration process a real mount.
+IMPORT_TEMP = tempfile.TemporaryDirectory()
+STATIC_ROOT = Path(IMPORT_TEMP.name)
+(STATIC_ROOT / "assets").mkdir()
+os.environ["SPAWNWP_STATIC_DIR"] = str(STATIC_ROOT)
+
 import app as cockpit
 import ingest
 import provision

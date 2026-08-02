@@ -10,6 +10,7 @@ import shlex
 import shutil
 import signal
 import subprocess
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -21,7 +22,7 @@ from pydantic import BaseModel
 
 from auth import initialize as initialize_auth
 from auth import is_enrolled, login_page, rate_limit, router as auth_router, session as auth_session, valid_csrf
-from ingest import router as ingest_router
+from ingest import router as ingest_router, spawnwp_version
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -107,7 +108,6 @@ TEMPLATE_MARKER = PRIMARY_PROJECT / ".spawnwp" / "template-only"
 BLUEPRINT_TOOL = PRIMARY_PROJECT / "scripts" / "blueprint.py"
 PHP_SWITCH_TOOL = PRIMARY_PROJECT / "scripts" / "php-switch-progress.py"
 SPAWNWP_CLI = Path("/usr/local/bin/spawnwp")
-SPAWNWP_VERSION = Path("/var/lib/spawnwp/VERSION")
 UPDATE_SERVICE = "spawnwp-update.service"
 
 # Every project dir contains a compose.yaml and a Makefile
@@ -336,8 +336,7 @@ def random_project_name(prefix: str = "site", attempts: int = 5) -> str:
 
 @app.get("/api/version")
 def version_info():
-    version = SPAWNWP_VERSION.read_text().strip() if SPAWNWP_VERSION.is_file() else "0.1.0"
-    return {"version": version}
+    return {"version": spawnwp_version()}
 
 
 @app.get("/api/platform")
@@ -885,6 +884,24 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None]:
     return name, command, env or None
 
 
+CREATION_SECRET_RE = re.compile(
+    r"(?i)\b(password|pass|token|secret)(\s*[:=]\s*)(\S+)",
+)
+
+
+def creation_failure_detail(output: str) -> str:
+    """Select a useful, single-line creation error without returning secrets."""
+    for raw in reversed(output.splitlines()):
+        line = raw.strip()
+        lower = line.lower()
+        if not line or lower.startswith(("==>", "->", "!! creation failed", "rolling back")):
+            continue
+        if lower.startswith(("admin credentials:", "user:", "pass:", "password:")):
+            continue
+        return CREATION_SECRET_RE.sub(r"\1\2[redacted]", line)[:500]
+    return "Site creation failed"
+
+
 def run_project_creation(body: NewProject, timeout: int = 300) -> str:
     """Run site creation to completion for machine callers."""
     name, command, env = prepare_new_project(body)
@@ -908,12 +925,14 @@ def run_project_creation(body: NewProject, timeout: int = 300) -> str:
             proc.communicate()
         raise HTTPException(504, f"Site creation exceeded the {timeout}-second timeout") from exc
     if proc.returncode != 0:
-        detail = next(
-            (line.strip() for line in reversed(output.splitlines()) if line.strip()),
-            "Site creation failed",
+        detail = creation_failure_detail(output)
+        print(
+            f"[provision] project={name} rc={proc.returncode} error={detail}",
+            file=sys.stderr,
+            flush=True,
         )
         status = 409 if "another site operation" in output.lower() else 500
-        raise HTTPException(status, detail[:500])
+        raise HTTPException(status, detail)
     return name
 
 

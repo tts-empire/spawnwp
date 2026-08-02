@@ -3,7 +3,7 @@ Contributors: wpvoicer
 Tags: deployment, migration, staging, development, blueprint
 Requires at least: 6.8
 Tested up to: 7.0
-Stable tag: 0.3.4
+Stable tag: 0.3.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,8 +50,9 @@ An administrator can explicitly pair the plugin with either:
 During a requested deployment or capture, the plugin sends the selected package and
 technical metadata to that administrator-selected endpoint. Depending on the selected
 options, this can include plugin and theme files, media uploads, database content,
-WordPress and PHP versions, plugin names and versions, package checksums, job identifiers
-and connection signatures. WordPress user and user-meta tables are excluded.
+WordPress and PHP versions, the database table prefix, plugin names and versions, package
+checksums, job identifiers and connection signatures. WordPress user and user-meta tables
+are excluded.
 
 The remote endpoint is operated by the site administrator or their chosen provider. Its
 privacy and retention practices are therefore controlled by that operator. SpawnWP is
@@ -121,6 +122,10 @@ expiry. Rollback data is retained for up to seven days.
 
 == Changelog ==
 
+= 0.3.5 =
+
+* Added the exact source table prefix to authenticated blueprint captures so SpawnWP can safely distinguish active tables from abandoned table sets.
+
 = 0.3.4 =
 
 * Added remembered blueprint capture fields and safe patch-version suggestions.
@@ -129,6 +134,6 @@ expiry. Rollback data is retained for up to seven days.
 
 == Upgrade Notice ==
 
-= 0.3.4 =
+= 0.3.5 =
 
-Initial WordPress.org release candidate.
+Recommended for database blueprints, especially sites that have changed their WordPress table prefix.

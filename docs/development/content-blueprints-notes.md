@@ -7,17 +7,20 @@ description: Internal implementation notes and gotchas for the 0.4.0 content-blu
 > Internal development notes from the 0.4.0 implementation. Not part of the public
 > MkDocs navigation.
 
-## Source table prefix is derived, not declared
+## Source table prefix stays outside the manifest
 
 The blueprint manifest schema v2 deliberately carries **no `source_prefix` field**
-(unlike the site-to-site deploy manifest). `runtime/scripts/import-database.php`
-derives it from the export itself: it scans the `{"type":"table"}` records and picks
-the table ending in `options` that has a sibling `posts` table with the same prefix.
-Exactly one candidate must match, otherwise the import aborts. This is robust against
-plugin tables like `wp_plugin_options` (no `wp_plugin_posts` sibling) but assumes
-single-site captures — which the plugin's guard already enforces. If schema v3 ever
-adds fields, prefer keeping the manifest free of source-identifying data (privacy:
-the manifest must not reveal the source site).
+(unlike the site-to-site deploy manifest). Since SpawnWP Deploy 0.3.5, the signed ingest
+request carries the exact source prefix in `archive.source_prefix`. The server verifies
+that the corresponding `options` and `posts` tables exist, then stores it in a
+`<payload>.source-prefix` sidecar. Keeping it out of schema v2 preserves manifest and
+updater-rollback compatibility.
+
+Older captures have no sidecar. `runtime/scripts/import-database.php` then derives the
+prefix from the export only when exactly one `options`/`posts` pair exists; ambiguity is
+reported with the candidate names and requires a re-capture rather than a guess. Do not
+fall back to `users`/`usermeta` (the exporter excludes them) or `siteurl`/`home` (stale
+options tables can contain both).
 
 ## nginx changes reach existing hosts via a migration
 

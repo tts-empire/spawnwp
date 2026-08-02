@@ -200,6 +200,15 @@ final class SpawnWP_Deploy_Blueprint {
 			}
 			throw $error;
 		}
+		$archive = array(
+			'bytes'       => $manifest['archive_bytes'],
+			'sha256'      => $manifest['archive_sha256'],
+			'chunk_size'  => $manifest['chunk_size'],
+			'chunk_count' => $manifest['chunk_count'],
+		);
+		if ( $fields['capture']['database'] ) {
+			$archive['source_prefix'] = $manifest['source_prefix'];
+		}
 		$remote = self::remote(
 			$connection,
 			'POST',
@@ -207,18 +216,13 @@ final class SpawnWP_Deploy_Blueprint {
 			wp_json_encode(
 				array(
 					'blueprint' => $blueprint,
-					'archive'   => array(
-						'bytes'       => $manifest['archive_bytes'],
-						'sha256'      => $manifest['archive_sha256'],
-						'chunk_size'  => $manifest['chunk_size'],
-						'chunk_count' => $manifest['chunk_count'],
-					),
+					'archive'   => $archive,
 					// phpcs:ignore WordPress.Security.NonceVerification.Missing -- ajax_step() verifies the request nonce before calling this helper.
 					'replace'   => ! empty( $_POST['replace'] ),
 				)
 			)
 		);
-		$state = array(
+		$state  = array(
 			'local'       => $local,
 			'job'         => $remote['job_id'],
 			'chunk_size'  => (int) $manifest['chunk_size'],

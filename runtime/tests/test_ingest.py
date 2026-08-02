@@ -36,6 +36,19 @@ def build_zip(entries: dict[str, bytes]) -> bytes:
     return buffer.getvalue()
 
 
+def database_export(*prefixes: str) -> bytes:
+    records = []
+    for prefix in prefixes:
+        for table in ("options", "posts"):
+            name = prefix + table
+            records.append(json.dumps({
+                "type": "table",
+                "name": name,
+                "create": f"CREATE TABLE `{name}` (`id` bigint)",
+            }, separators=(",", ":")))
+    return ("\n".join(records) + "\n").encode()
+
+
 def blueprint_fields(**overrides) -> dict:
     fields = {
         "schema_version": 2,
@@ -62,9 +75,11 @@ class IngestTests(unittest.TestCase):
         root = Path(self.temp.name)
         self.custom = root / "custom"
         self.payloads = root / "payloads"
+        self.version_file = root / "VERSION"
+        self.current_version_file = root / "current-VERSION"
         self.custom.mkdir()
         self.payloads.mkdir()
-        (root / "VERSION").write_text("0.4.0\n")
+        self.version_file.write_text("0.4.0\n")
         (root / "config.env").write_text("COCKPIT_DOMAIN=cockpit.example.com\n")
         os.environ.update(
             SPAWNWP_INGEST_DB=str(root / "ingest.db"),
@@ -72,7 +87,8 @@ class IngestTests(unittest.TestCase):
             SPAWNWP_CUSTOM_BLUEPRINTS=str(self.custom),
             SPAWNWP_BLUEPRINT_TOOL=str(RUNTIME / "scripts/blueprint.py"),
             SPAWNWP_BUILTIN_BLUEPRINTS=str(RUNTIME / "blueprints"),
-            SPAWNWP_VERSION_FILE=str(root / "VERSION"),
+            SPAWNWP_VERSION_FILE=str(self.version_file),
+            SPAWNWP_CURRENT_VERSION_FILE=str(self.current_version_file),
             SPAWNWP_CONFIG=str(root / "config.env"),
             SPAWNWP_METRICS_FILE=str(root / "metrics.json"),
         )
@@ -132,14 +148,18 @@ class IngestTests(unittest.TestCase):
         headers.update(extra_headers or {})
         return self.client.request(method, path, content=body, headers=headers)
 
-    def upload(self, payload: bytes, blueprint=None, replace=False, chunk_size=1024):
+    def upload(self, payload: bytes, blueprint=None, replace=False, chunk_size=1024,
+               source_prefix=None):
         import hashlib
         blueprint = blueprint or blueprint_fields()
         chunk_count = -(-len(payload) // chunk_size)
+        archive = {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
+                   "chunk_size": chunk_size, "chunk_count": chunk_count}
+        if source_prefix is not None:
+            archive["source_prefix"] = source_prefix
         body = json.dumps({
             "blueprint": blueprint,
-            "archive": {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
-                        "chunk_size": chunk_size, "chunk_count": chunk_count},
+            "archive": archive,
             "replace": replace,
         }).encode()
         response = self.signed("POST", "/api/ingest/jobs", body)
@@ -167,7 +187,7 @@ class IngestTests(unittest.TestCase):
 
     def good_payload(self) -> bytes:
         return build_zip({
-            "database.jsonl": b'{"type":"table"}\n',
+            "database.jsonl": database_export("wp_"),
             "content/plugins/woocommerce/woocommerce.php": b"<?php // plugin",
         })
 
@@ -187,9 +207,72 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(manifest["schema_version"], 2)
         payload_file = self.payloads / "agency-base" / manifest["payload"]["file"]
         self.assertTrue(payload_file.is_file())
+        self.assertEqual(
+            payload_file.with_name(payload_file.name + ".source-prefix").read_text(),
+            "wp_\n",
+        )
         metrics = json.loads(Path(os.environ["SPAWNWP_METRICS_FILE"]).read_text())
         self.assertEqual(metrics["blueprint_captures"], 1)
         self.assertFalse((self.payloads / ".staging" / job_id).exists())
+
+    def test_declared_prefix_disambiguates_orphaned_tables(self):
+        self.assertEqual(self.pair().status_code, 200)
+        payload = build_zip({"database.jsonl": database_export("pdtnqy_wp_", "wp_")})
+        response, job_id = self.upload(payload, source_prefix="pdtnqy_wp_")
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(self.wait_for(job_id)["state"], "complete")
+        manifest = json.loads((self.custom / "agency-base.json").read_text())
+        self.assertNotIn("source_prefix", manifest)
+        payload_file = self.payloads / "agency-base" / manifest["payload"]["file"]
+        self.assertEqual(
+            payload_file.with_name(payload_file.name + ".source-prefix").read_text(),
+            "pdtnqy_wp_\n",
+        )
+
+    def test_legacy_ambiguous_prefix_is_rejected_with_candidates(self):
+        self.assertEqual(self.pair().status_code, 200)
+        payload = build_zip({"database.jsonl": database_export("pdtnqy_wp_", "wp_")})
+        response, job_id = self.upload(payload)
+        self.assertEqual(response.status_code, 202, response.text)
+        state = self.wait_for(job_id)
+        self.assertEqual(state["state"], "failed")
+        self.assertIn("pdtnqy_wp_, wp_", state["error"])
+        self.assertIn("capture the blueprint again", state["error"])
+        self.assertFalse((self.custom / "agency-base.json").exists())
+
+    def test_declared_prefix_must_match_export(self):
+        self.assertEqual(self.pair().status_code, 200)
+        response, job_id = self.upload(self.good_payload(), source_prefix="other_")
+        self.assertEqual(response.status_code, 202, response.text)
+        state = self.wait_for(job_id)
+        self.assertEqual(state["state"], "failed")
+        self.assertIn("missing: other_options, other_posts", state["error"])
+
+    def test_source_prefix_transport_validation(self):
+        self.assertEqual(self.pair().status_code, 200)
+        response, job_id = self.upload(self.good_payload(), source_prefix="bad-prefix")
+        self.assertEqual(response.status_code, 422)
+        self.assertIsNone(job_id)
+        self.assertIn("archive.source_prefix", response.text)
+
+    def test_source_prefix_requires_database_capture(self):
+        self.assertEqual(self.pair().status_code, 200)
+        payload = build_zip({"content/plugins/example/example.php": b"<?php"})
+        blueprint = blueprint_fields()
+        blueprint["capture"]["database"] = False
+        response, job_id = self.upload(
+            payload,
+            blueprint=blueprint,
+            source_prefix="wp_",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIsNone(job_id)
+        self.assertIn("only valid when the database is captured", response.text)
+
+    def test_version_falls_back_to_current_release(self):
+        self.version_file.unlink()
+        self.current_version_file.write_text("0.5.30\n")
+        self.assertEqual(self.ingest.spawnwp_version(), "0.5.30")
 
     def test_pair_rejects_bad_token(self):
         response = self.pair(token="wrong-token")
@@ -258,6 +341,11 @@ class IngestTests(unittest.TestCase):
         self.assertNotEqual(manifest["payload"]["file"], old_payload)
         remaining = list((self.payloads / "agency-base").glob("payload*.zip"))
         self.assertEqual([p.name for p in remaining], [manifest["payload"]["file"]])
+        sidecars = list((self.payloads / "agency-base").glob("payload*.zip.source-prefix"))
+        self.assertEqual(
+            [p.name for p in sidecars],
+            [manifest["payload"]["file"] + ".source-prefix"],
+        )
 
     def test_builtin_id_never_replaceable(self):
         self.pair()

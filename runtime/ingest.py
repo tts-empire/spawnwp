@@ -42,6 +42,7 @@ JOB_ROW_TTL = 7 * 86400
 EXPANSION_LIMIT = 5
 BLUEPRINT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+TABLE_PREFIX_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 ALLOWED_TOP_LEVEL = {"database.jsonl", "content"}
 
 
@@ -65,11 +66,19 @@ def _staging_root() -> Path:
     return _payload_root() / ".staging"
 
 
-def _spawnwp_version() -> str:
-    try:
-        return Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION")).read_text().strip()
-    except OSError:
-        return "unknown"
+def spawnwp_version() -> str:
+    candidates = (
+        Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION")),
+        Path(os.environ.get("SPAWNWP_CURRENT_VERSION_FILE", "/opt/spawnwp/current/VERSION")),
+    )
+    for candidate in candidates:
+        try:
+            version = candidate.read_text().strip()
+        except OSError:
+            continue
+        if version:
+            return version
+    return "unknown"
 
 
 def _server_url(request: Request) -> str:
@@ -311,7 +320,7 @@ async def pair(request: Request):
             "server_public_key": row["public_key"],
             "scope": row["scope"],
             "ingest_format": INGEST_FORMAT,
-            "spawnwp_version": _spawnwp_version(),
+            "spawnwp_version": spawnwp_version(),
         }
     finally:
         db.close()
@@ -326,7 +335,7 @@ async def preflight(request: Request):
         root = _payload_root()
         root.mkdir(parents=True, exist_ok=True)
         return {
-            "spawnwp_version": _spawnwp_version(),
+            "spawnwp_version": spawnwp_version(),
             "ingest_format": INGEST_FORMAT,
             "max_archive_bytes": MAX_ARCHIVE_BYTES,
             "max_chunk_bytes": MAX_CHUNK_BYTES,
@@ -359,6 +368,7 @@ async def create_job(request: Request):
         archive_sha256 = archive.get("sha256", "")
         chunk_size = archive.get("chunk_size")
         chunk_count = archive.get("chunk_count")
+        source_prefix = archive.get("source_prefix")
         if not isinstance(archive_bytes, int) or not 1 <= archive_bytes <= MAX_ARCHIVE_BYTES:
             raise HTTPException(422, "archive.bytes must be between 1 and 2 GiB")
         if not isinstance(archive_sha256, str) or not HEX64_RE.fullmatch(archive_sha256):
@@ -368,6 +378,17 @@ async def create_job(request: Request):
         expected_chunks = -(-archive_bytes // chunk_size)
         if not isinstance(chunk_count, int) or chunk_count != expected_chunks or chunk_count > MAX_CHUNKS:
             raise HTTPException(422, "archive.chunk_count does not match archive.bytes")
+        capture = blueprint.get("capture")
+        captures_database = isinstance(capture, dict) and capture.get("database") is True
+        if source_prefix is not None:
+            if not isinstance(source_prefix, str) or not TABLE_PREFIX_RE.fullmatch(source_prefix):
+                raise HTTPException(
+                    422, "archive.source_prefix must contain 1-64 letters, digits or underscores",
+                )
+            if not captures_database:
+                raise HTTPException(
+                    422, "archive.source_prefix is only valid when the database is captured",
+                )
         proposal = dict(blueprint)
         proposal["payload"] = {"file": "payload.zip", "bytes": archive_bytes,
                                "sha256": archive_sha256}
@@ -394,10 +415,15 @@ async def create_job(request: Request):
             raise HTTPException(507, "Not enough free disk space on the SpawnWP server")
         job_id = secrets.token_hex(16)
         now = int(time.time())
+        stored_blueprint = dict(blueprint)
+        if source_prefix is not None:
+            # Transport-only metadata. It is authenticated as part of the signed
+            # request but deliberately kept out of the public schema-v2 manifest.
+            stored_blueprint["_source_prefix"] = source_prefix
         db.execute("INSERT INTO jobs(id, connection_id, state, blueprint_json, replace_existing, "
                    "archive_bytes, archive_sha256, chunk_size, chunk_count, created_at, updated_at) "
                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                   (job_id, connection["id"], "uploading", json.dumps(blueprint),
+                   (job_id, connection["id"], "uploading", json.dumps(stored_blueprint),
                     int(replace), archive_bytes, archive_sha256, chunk_size, chunk_count, now, now))
         db.commit()
         (_staging_root() / job_id / "chunks").mkdir(parents=True, exist_ok=True)
@@ -487,7 +513,48 @@ async def revoke_own_connection(request: Request):
 
 # ── Finalize (runs in a worker thread) ─────────────────────────────────────────
 
-def _harden_archive(path: Path, archive_bytes: int, expect_database: bool) -> None:
+def _database_source_prefix(archive: zipfile.ZipFile, declared: str | None) -> str:
+    tables: set[str] = set()
+    try:
+        with archive.open("database.jsonl") as database:
+            for raw in database:
+                if not raw.startswith(b'{"type":"table"'):
+                    continue
+                try:
+                    record = json.loads(raw)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("Database export contains invalid table metadata") from exc
+                name = record.get("name")
+                if not isinstance(name, str) or not name:
+                    raise ValueError("Database export contains an invalid table name")
+                tables.add(name)
+    except KeyError as exc:
+        raise ValueError("Database capture is missing database.jsonl") from exc
+
+    candidates = sorted(
+        name[:-len("options")]
+        for name in tables
+        if name.endswith("options") and name[:-len("options")] + "posts" in tables
+    )
+    if declared is not None:
+        missing = [name for name in (declared + "options", declared + "posts") if name not in tables]
+        if missing:
+            raise ValueError(
+                "Declared source table prefix does not match the database export; "
+                f"missing: {', '.join(missing)}"
+            )
+        return declared
+    if len(candidates) != 1:
+        found = ", ".join(candidates) if candidates else "none"
+        raise ValueError(
+            "Unable to determine a unique source table prefix from this legacy capture; "
+            f"candidates: {found}. Update SpawnWP Deploy and capture the blueprint again."
+        )
+    return candidates[0]
+
+
+def _harden_archive(path: Path, archive_bytes: int, expect_database: bool,
+                    declared_source_prefix: str | None = None) -> str | None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         total = 0
@@ -506,6 +573,9 @@ def _harden_archive(path: Path, archive_bytes: int, expect_database: bool) -> No
         has_database = "database.jsonl" in names
         if expect_database != has_database:
             raise ValueError("Archive contents do not match the capture flags")
+        if has_database:
+            return _database_source_prefix(archive, declared_source_prefix)
+    return None
 
 
 def _finalize(job_id: str) -> None:
@@ -516,6 +586,7 @@ def _finalize(job_id: str) -> None:
         if not job:
             return
         blueprint = json.loads(job["blueprint_json"])
+        declared_source_prefix = blueprint.pop("_source_prefix", None)
         blueprint_id = blueprint["id"]
         assembled = staging / "payload.zip"
         digest = hashlib.sha256()
@@ -529,7 +600,9 @@ def _finalize(job_id: str) -> None:
         if size != job["archive_bytes"] or digest.hexdigest() != job["archive_sha256"]:
             raise ValueError("Assembled archive does not match the announced checksum")
         expect_database = bool(blueprint.get("capture", {}).get("database"))
-        _harden_archive(assembled, job["archive_bytes"], expect_database)
+        source_prefix = _harden_archive(
+            assembled, job["archive_bytes"], expect_database, declared_source_prefix,
+        )
         payload_name = f"payload-{job_id[:8]}.zip"
         manifest = dict(blueprint)
         manifest["payload"] = {"file": payload_name, "bytes": job["archive_bytes"],
@@ -544,6 +617,11 @@ def _finalize(job_id: str) -> None:
         dest_dir = _payload_root() / blueprint_id
         dest_dir.mkdir(parents=True, exist_ok=True)
         shutil.move(str(assembled), dest_dir / payload_name)
+        prefix_path = dest_dir / f"{payload_name}.source-prefix"
+        if source_prefix is not None:
+            prefix_tmp = prefix_path.with_suffix(prefix_path.suffix + ".tmp")
+            prefix_tmp.write_text(source_prefix + "\n", encoding="ascii")
+            os.replace(prefix_tmp, prefix_path)
         manifest_path = _custom_dir() / f"{blueprint_id}.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = manifest_path.with_suffix(".json.tmp")
@@ -551,6 +629,9 @@ def _finalize(job_id: str) -> None:
         os.replace(tmp, manifest_path)
         for stale in dest_dir.glob("payload*.zip"):
             if stale.name != payload_name:
+                stale.unlink(missing_ok=True)
+        for stale in dest_dir.glob("payload*.zip.source-prefix"):
+            if stale.name != prefix_path.name:
                 stale.unlink(missing_ok=True)
         db.execute("UPDATE jobs SET state='complete', updated_at=? WHERE id=?",
                    (int(time.time()), job_id))

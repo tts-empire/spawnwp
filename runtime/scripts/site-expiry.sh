@@ -6,21 +6,29 @@
 # sites keep no backups by design. The primary stack is never touched.
 set -euo pipefail
 
-PRIMARY="/srv/wp-dev"
-now=$(date +%s)
+PROJECTS_ROOT="${SPAWNWP_PROJECTS_ROOT:-/srv}"
+PRIMARY="${SPAWNWP_PRIMARY_PROJECT:-${PROJECTS_ROOT}/wp-dev}"
+PROJECT_LOCK="${SPAWNWP_PROJECT_LOCK:-/run/lock/spawnwp-projects.lock}"
+now="${SPAWNWP_NOW:-$(date +%s)}"
 
-exec 9>/run/lock/spawnwp-projects.lock
+exec 9>"$PROJECT_LOCK"
 if ! flock -n 9; then
   echo "site-expiry: another site operation is in progress; will retry next run."
   exit 0
 fi
 
-for env_file in /srv/*/.env; do
+for env_file in "$PROJECTS_ROOT"/*/.env; do
   [ -f "$env_file" ] || continue
   proj_dir=$(dirname "$env_file")
   [ "$proj_dir" = "$PRIMARY" ] && continue
   [ -f "$proj_dir/compose.yaml" ] || continue
-  expires=$(grep -E '^SPAWNWP_EXPIRES=' "$env_file" | head -1 | cut -d= -f2)
+  expires=""
+  while IFS='=' read -r key value || [ -n "$key" ]; do
+    if [ "$key" = "SPAWNWP_EXPIRES" ]; then
+      expires="$value"
+      break
+    fi
+  done < "$env_file"
   [[ "$expires" =~ ^[0-9]+$ ]] || continue
   if [ "$now" -ge "$expires" ]; then
     name=$(basename "$proj_dir")

@@ -46,6 +46,8 @@ $assert( file_exists( WPMU_PLUGIN_DIR . '/spawnwp-deploy-loader.php' ), 'Recover
 
 $assert( class_exists( 'SpawnWP_Deploy_Blueprint' ), 'Blueprint capture class loaded' );
 $assert( false !== has_action( 'wp_ajax_spawnwp_blueprint_step' ), 'Blueprint capture ajax handler registered' );
+$blueprint_source = (string) file_get_contents( SPAWNWP_DEPLOY_DIR . 'src/class-spawnwp-deploy-blueprint.php' );
+$assert( str_contains( $blueprint_source, "\$archive['source_prefix'] = \$manifest['source_prefix']" ), 'Database blueprint transport includes the exact source table prefix' );
 $inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 $assert( isset( $inventory['wporg'], $inventory['premium'] ) && is_array( $inventory['wporg'] ) && is_array( $inventory['premium'] ), 'Plugin inventory classifies wp.org and premium plugins' );
 

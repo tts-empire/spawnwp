@@ -6,6 +6,8 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -156,6 +158,38 @@ class ProvisionTests(unittest.TestCase):
     def test_default_role_is_administrator(self):
         payload = self.provision.ProvisionRequest(blueprint="development")
         self.assertEqual(payload.role, "administrator")
+
+    def test_creation_failure_reports_error_before_rollback_notice(self):
+        process = mock.Mock()
+        process.returncode = 1
+        process.communicate.return_value = (
+            "==> Importing captured database...\n"
+            "Error: Unable to determine the source table prefix from the export.\n"
+            "!! Creation failed; rolling back partial resources...\n",
+            None,
+        )
+        stderr = StringIO()
+        with mock.patch.object(
+            self.cockpit, "prepare_new_project",
+            return_value=("broken-site", ["false"], None),
+        ), mock.patch.object(
+            self.cockpit.subprocess, "Popen", return_value=process,
+        ), redirect_stderr(stderr), self.assertRaises(HTTPException) as raised:
+            self.cockpit.run_project_creation(mock.Mock(), timeout=10)
+        self.assertEqual(raised.exception.status_code, 500)
+        self.assertEqual(
+            raised.exception.detail,
+            "Error: Unable to determine the source table prefix from the export.",
+        )
+        self.assertIn("project=broken-site rc=1", stderr.getvalue())
+        self.assertNotIn("rolling back", stderr.getvalue())
+
+    def test_creation_failure_redacts_secrets(self):
+        detail = self.cockpit.creation_failure_detail(
+            "ERROR: upstream token=do-not-return\n"
+            "!! Creation failed; rolling back partial resources...\n"
+        )
+        self.assertEqual(detail, "ERROR: upstream token=[redacted]")
 
     def test_status_reports_defaults_limits_and_sites(self):
         project = self.projects / "api-site"

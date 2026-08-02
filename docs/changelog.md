@@ -4,6 +4,20 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.30
+
+- **Captured databases now carry an exact, verified source table prefix.** Prefix metadata is
+  authenticated separately from the schema-v2 manifest and stored beside its payload. Legacy
+  captures with one candidate remain compatible; ambiguous captures stop with the candidate names
+  instead of risking the wrong table set.
+- **Provisioning failures now expose the real command error.** The rollback notice and progress
+  lines no longer replace the useful failure detail, while journal logging remains bounded and
+  redacts secret-like values.
+- **Permanent sites no longer stop the expiry timer.** A missing `SPAWNWP_EXPIRES` value is treated
+  as a normal permanent site, so later expired sandboxes are still reclaimed.
+- **Version reporting tolerates a missing state file**, falling back to the active signed release,
+  and the provisioning guide now documents every request constraint, error shape and status field.
+
 ## 0.5.29
 
 - **Trusted integrations can provision temporary WordPress sites through a scoped API.**

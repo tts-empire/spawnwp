@@ -11,7 +11,7 @@
  * whole site.
  *
  * Invoked by apply-content-blueprint.sh:
- *   wp eval-file import-database.php <database.jsonl> <admin-login>
+ *   wp eval-file import-database.php <database.jsonl> <admin-login> [source-prefix]
  */
 
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
@@ -19,9 +19,11 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 }
 
 if ( count( $args ) < 2 ) {
-	WP_CLI::error( 'Usage: wp eval-file import-database.php <database.jsonl> <admin-login>' );
+	WP_CLI::error( 'Usage: wp eval-file import-database.php <database.jsonl> <admin-login> [source-prefix]' );
 }
-list( $import_file, $admin_login ) = $args;
+$import_file      = $args[0];
+$admin_login     = $args[1];
+$declared_prefix = $args[2] ?? '';
 if ( ! is_readable( $import_file ) ) {
 	WP_CLI::error( "Database export not readable: {$import_file}" );
 }
@@ -35,7 +37,7 @@ if ( ! $admin ) {
  * export itself: the prefix is the name of the options table minus "options",
  * confirmed by the presence of a sibling posts table.
  */
-function spawnwp_source_prefix( string $file ): string {
+function spawnwp_source_prefix( string $file, string $declared = '' ): string {
 	$handle = fopen( $file, 'rb' );
 	if ( ! $handle ) {
 		WP_CLI::error( 'Unable to open the database export.' );
@@ -58,14 +60,30 @@ function spawnwp_source_prefix( string $file ): string {
 			}
 		}
 	}
+	if ( '' !== $declared ) {
+		if ( ! preg_match( '/^[A-Za-z0-9_]{1,64}$/D', $declared ) ) {
+			WP_CLI::error( 'The declared source table prefix is invalid.' );
+		}
+		$missing = array();
+		foreach ( array( 'options', 'posts' ) as $required ) {
+			if ( ! isset( $tables[ $declared . $required ] ) ) {
+				$missing[] = $declared . $required;
+			}
+		}
+		if ( $missing ) {
+			WP_CLI::error( 'Declared source table prefix does not match the export; missing: ' . implode( ', ', $missing ) );
+		}
+		return $declared;
+	}
 	if ( 1 !== count( $candidates ) ) {
-		WP_CLI::error( 'Unable to determine the source table prefix from the export.' );
+		$found = $candidates ? implode( ', ', $candidates ) : 'none';
+		WP_CLI::error( 'Unable to determine a unique source table prefix from this legacy capture; candidates: ' . $found . '. Update SpawnWP Deploy and capture the blueprint again.' );
 	}
 	return $candidates[0];
 }
 
 global $wpdb;
-$source_prefix = spawnwp_source_prefix( $import_file );
+$source_prefix = spawnwp_source_prefix( $import_file, $declared_prefix );
 $short         = substr( md5( uniqid( '', true ) ), 0, 6 );
 
 $handle = fopen( $import_file, 'rb' );

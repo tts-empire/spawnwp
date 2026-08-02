@@ -84,13 +84,17 @@ done
 
 if [ "$CAPTURE_DATABASE" = "1" ]; then
   echo "==> Importing captured database..."
+  SOURCE_PREFIX=""
+  if [ -f "${BLUEPRINT_PAYLOAD}.source-prefix" ]; then
+    IFS= read -r SOURCE_PREFIX < "${BLUEPRINT_PAYLOAD}.source-prefix"
+  fi
   rm -rf "$IMPORT_DIR"
   mkdir -p "$IMPORT_DIR"
   mv "$STAGE/database.jsonl" "$IMPORT_DIR/database.jsonl"
   cp scripts/import-database.php "$IMPORT_DIR/import-database.php"
   chown -R 33:33 "$IMPORT_DIR"
   "${WP[@]}" eval-file /var/www/html/wp-content/.spawnwp-import/import-database.php \
-    /var/www/html/wp-content/.spawnwp-import/database.jsonl "$WP_ADMIN_USER"
+    /var/www/html/wp-content/.spawnwp-import/database.jsonl "$WP_ADMIN_USER" "$SOURCE_PREFIX"
   rm -rf "$IMPORT_DIR"
   echo "==> Rewriting blueprint URLs to ${WP_HOME}..."
   # New site: rewrite guid too (--skip-columns= overrides the guid default).

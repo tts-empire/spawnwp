@@ -171,6 +171,21 @@ Only `blueprint` is required:
 }
 ```
 
+Request fields are validated before any site is reserved:
+
+| Field | Required | Constraint and behavior |
+| --- | --- | --- |
+| `blueprint` | yes | Lowercase slug matching `^[a-z0-9][a-z0-9-]{0,30}$` |
+| `expires_seconds` | no | Integer from `300` to `31536000`; defaults to `3600` |
+| `role` | no | `administrator`, `editor`, `author`, `contributor`, or `subscriber` |
+| `group` | no | 1–32 letters, digits, spaces, dots, underscores, or hyphens; defaults to `API` |
+| `name` | no | Project slug matching `^[a-z0-9][a-z0-9-]{0,30}$` |
+
+`name` is the project identifier used in the URL, not a display name. Omit it to receive a
+random name. Supplying an existing project name returns `409`. Optional fields must be omitted
+when they have no value: an empty string is still a value and fails validation for fields such
+as `group` and `name`.
+
 The response contains credentials once provisioning finishes:
 
 ```json
@@ -186,6 +201,48 @@ The response contains credentials once provisioning finishes:
 
 Provisioning is synchronous. The application timeout is 300 seconds and the reverse proxy allows
 600 seconds for the application to return its result and cleanup status.
+
+### Status response
+
+`GET /api/provision/status` returns the connection, defaults, limits, and every site currently
+counted against this connection:
+
+```json
+{
+  "api_version": 1,
+  "spawnwp_version": "0.5.30",
+  "connection": {
+    "id": "0123456789abcdef",
+    "label": "Demo integration",
+    "scope": "provision"
+  },
+  "defaults": {
+    "expires_seconds": 3600,
+    "role": "administrator",
+    "group": "API"
+  },
+  "limits": {
+    "min_expires_seconds": 300,
+    "max_expires_seconds": 31536000,
+    "concurrent_sites": 3,
+    "provision_timeout_seconds": 300
+  },
+  "active_sites": 1,
+  "sites": [
+    {
+      "project": "customer-demo",
+      "url": "https://wp.example.com/customer-demo",
+      "status": "active",
+      "expires_at": 1785402000,
+      "created_at": 1785398400
+    }
+  ]
+}
+```
+
+There is no separate `remaining` field. Compute available connection capacity as
+`limits.concurrent_sites - active_sites`. A separate host-wide ceiling can still reject a
+request before that connection limit is reached.
 
 ## Limits and errors
 
@@ -207,6 +264,30 @@ may also apply.
 
 If a post-create step fails, SpawnWP removes the partial site. If that cleanup also fails, the
 error includes the project and `status: "cleanup_required"` for operator intervention.
+
+All FastAPI errors use the top-level `detail` property, never `message`. Most operational errors
+contain a string:
+
+```json
+{"detail":"Project 'customer-demo' already exists"}
+```
+
+Request-schema failures return an array in `detail`, so custom clients must accept either form:
+
+```json
+{
+  "detail": [
+    {
+      "type": "string_pattern_mismatch",
+      "loc": ["name"],
+      "msg": "String should match pattern '^[a-z0-9][a-z0-9-]{0,30}$'"
+    }
+  ]
+}
+```
+
+If compensating cleanup also fails, `detail` is an object containing the underlying error,
+project name, and `status: "cleanup_required"`. The official client formats all three forms.
 
 ## Implementing a custom client
 

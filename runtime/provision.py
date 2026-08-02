@@ -310,7 +310,7 @@ async def provision_status(request: Request):
     quota = _connection_quota()
     return {
         "api_version": API_VERSION,
-        "spawnwp_version": ingest._spawnwp_version(),
+        "spawnwp_version": ingest.spawnwp_version(),
         "connection": {
             "id": connection["id"],
             "label": connection["label"],

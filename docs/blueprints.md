@@ -110,6 +110,10 @@ Defaults and guarantees:
   every site spawned from the blueprint.
 - The source site URL is rewritten to a fixed placeholder before upload and never
   reaches the server; every spawned site rewrites the placeholder to its own URL.
+- Database captures record the exact active WordPress table prefix as signed technical
+  metadata. SpawnWP verifies that it matches the exported `options` and `posts` tables,
+  then keeps it beside that payload so abandoned tables from an older prefix cannot make
+  the blueprint ambiguous.
 - Plugins that are not from WordPress.org are listed in the manifest and flagged at
   capture time and on the Deploy card: spawned sites may require new license keys or
   re-activation for them. If the payload exceeds 2 GiB, exclude the uploads and
@@ -125,6 +129,11 @@ Defaults and guarantees:
 The payload never leaves your server and is not part of telemetry. Content
 blueprints can be deleted — manifest and payload — from **System → Content
 blueprints**; existing sites are unaffected.
+
+Blueprints captured before SpawnWP Deploy 0.3.5 do not contain the exact prefix. SpawnWP
+continues to restore them when the export has one unambiguous `options`/`posts` pair. If
+several candidate prefixes exist, the restore stops and names them rather than guessing;
+update SpawnWP Deploy and capture the blueprint again.
 
 Validate the catalog from the server with:
 

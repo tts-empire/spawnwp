@@ -111,6 +111,7 @@ components:
         blueprint:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+          description: Blueprint identifier, not a display name.
         expires_seconds:
           type: integer
           minimum: 300
@@ -123,10 +124,12 @@ components:
         group:
           type: string
           default: API
+          pattern: "^[A-Za-z0-9][A-Za-z0-9 ._\\-]{0,31}$"
           maxLength: 32
         name:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+          description: Optional project and URL slug. Omit it to generate a random name.
     ProvisionResult:
       type: object
       required: [project, url, expires_at, username, password]

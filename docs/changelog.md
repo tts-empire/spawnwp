@@ -4,6 +4,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.31
+
+- **Version fallback now resolves the active release symlink correctly.** When the installed
+  state file is missing, both the API and updater derive the version from the validated SemVer
+  directory targeted by `/opt/spawnwp/current`; release directories intentionally do not contain
+  a second `VERSION` file.
+
 ## 0.5.30
 
 - **Captured databases now carry an exact, verified source table prefix.** Prefix metadata is
@@ -15,8 +22,9 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   redacts secret-like values.
 - **Permanent sites no longer stop the expiry timer.** A missing `SPAWNWP_EXPIRES` value is treated
   as a normal permanent site, so later expired sandboxes are still reclaimed.
-- **Version reporting tolerates a missing state file**, falling back to the active signed release,
-  and the provisioning guide now documents every request constraint, error shape and status field.
+- **Version reporting uses one shared resolver**, and the provisioning guide now documents every
+  request constraint, error shape and status field. The missing-state-file fallback introduced in
+  this release was corrected in 0.5.31 to resolve the active release symlink itself.
 
 ## 0.5.29
 

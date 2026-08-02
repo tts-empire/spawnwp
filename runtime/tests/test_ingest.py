@@ -76,7 +76,7 @@ class IngestTests(unittest.TestCase):
         self.custom = root / "custom"
         self.payloads = root / "payloads"
         self.version_file = root / "VERSION"
-        self.current_version_file = root / "current-VERSION"
+        self.current_link = root / "current"
         self.custom.mkdir()
         self.payloads.mkdir()
         self.version_file.write_text("0.4.0\n")
@@ -88,7 +88,7 @@ class IngestTests(unittest.TestCase):
             SPAWNWP_BLUEPRINT_TOOL=str(RUNTIME / "scripts/blueprint.py"),
             SPAWNWP_BUILTIN_BLUEPRINTS=str(RUNTIME / "blueprints"),
             SPAWNWP_VERSION_FILE=str(self.version_file),
-            SPAWNWP_CURRENT_VERSION_FILE=str(self.current_version_file),
+            SPAWNWP_CURRENT_LINK=str(self.current_link),
             SPAWNWP_CONFIG=str(root / "config.env"),
             SPAWNWP_METRICS_FILE=str(root / "metrics.json"),
         )
@@ -271,8 +271,17 @@ class IngestTests(unittest.TestCase):
 
     def test_version_falls_back_to_current_release(self):
         self.version_file.unlink()
-        self.current_version_file.write_text("0.5.30\n")
-        self.assertEqual(self.ingest.spawnwp_version(), "0.5.30")
+        release = self.current_link.parent / "releases" / "0.5.31"
+        release.mkdir(parents=True)
+        self.current_link.symlink_to(release)
+        self.assertEqual(self.ingest.spawnwp_version(), "0.5.31")
+
+    def test_version_rejects_non_semver_current_target(self):
+        self.version_file.unlink()
+        release = self.current_link.parent / "releases" / "candidate"
+        release.mkdir(parents=True)
+        self.current_link.symlink_to(release)
+        self.assertEqual(self.ingest.spawnwp_version(), "unknown")
 
     def test_pair_rejects_bad_token(self):
         response = self.pair(token="wrong-token")

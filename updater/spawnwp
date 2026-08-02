@@ -51,7 +51,15 @@ def version_tuple(value: str) -> tuple[int, int, int]:
 
 def current_version() -> str:
     if VERSION_FILE.is_file():
-        return VERSION_FILE.read_text().strip()
+        version = VERSION_FILE.read_text().strip()
+        if SEMVER.fullmatch(version):
+            return version
+    try:
+        version = CURRENT_LINK.resolve(strict=True).name
+    except OSError:
+        version = ""
+    if SEMVER.fullmatch(version):
+        return version
     return "0.0.0"
 
 

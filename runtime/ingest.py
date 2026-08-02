@@ -43,6 +43,7 @@ EXPANSION_LIMIT = 5
 BLUEPRINT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 TABLE_PREFIX_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
+SPAWNWP_VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 ALLOWED_TOP_LEVEL = {"database.jsonl", "content"}
 
 
@@ -67,17 +68,25 @@ def _staging_root() -> Path:
 
 
 def spawnwp_version() -> str:
-    candidates = (
-        Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION")),
-        Path(os.environ.get("SPAWNWP_CURRENT_VERSION_FILE", "/opt/spawnwp/current/VERSION")),
-    )
-    for candidate in candidates:
-        try:
-            version = candidate.read_text().strip()
-        except OSError:
-            continue
-        if version:
-            return version
+    state_file = Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION"))
+    try:
+        version = state_file.read_text().strip()
+    except OSError:
+        version = ""
+    if SPAWNWP_VERSION_RE.fullmatch(version):
+        return version
+
+    # Signed releases are extracted under /opt/spawnwp/releases/<semver> and
+    # /opt/spawnwp/current points at the active directory. The release itself
+    # deliberately has no duplicate VERSION file, so derive the fallback from
+    # the resolved directory name and accept only a stable semantic version.
+    current_link = Path(os.environ.get("SPAWNWP_CURRENT_LINK", "/opt/spawnwp/current"))
+    try:
+        version = current_link.resolve(strict=True).name
+    except OSError:
+        version = ""
+    if SPAWNWP_VERSION_RE.fullmatch(version):
+        return version
     return "unknown"
 
 

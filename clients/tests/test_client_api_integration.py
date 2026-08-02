@@ -44,7 +44,7 @@ class ClientApiIntegrationTests(unittest.TestCase):
             SPAWNWP_VERSION_FILE=str(root / "VERSION"),
             SPAWNWP_PROVISION_MAX_SITES_PER_CONNECTION="3",
         )
-        (root / "VERSION").write_text("test-version\n")
+        (root / "VERSION").write_text("9.8.7\n")
         self.old_projects_root = cockpit.PROJECTS_ROOT
         cockpit.PROJECTS_ROOT = self.projects
         api = FastAPI()
@@ -101,7 +101,7 @@ class ClientApiIntegrationTests(unittest.TestCase):
         status_args = SimpleNamespace(config=self.config)
         with mock.patch.object(api_client, "http_json", side_effect=self.bridge):
             status = api_client.command_status(status_args)
-        self.assertEqual(status["spawnwp_version"], "test-version")
+        self.assertEqual(status["spawnwp_version"], "9.8.7")
         self.assertEqual(status["defaults"]["role"], "administrator")
         self.assertEqual(status["active_sites"], 0)
 

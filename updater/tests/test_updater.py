@@ -22,6 +22,17 @@ updater = load_updater()
 
 
 class UpdaterTests(unittest.TestCase):
+    def test_current_version_falls_back_to_active_release_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            release = root / "releases" / "0.5.31"
+            release.mkdir(parents=True)
+            current = root / "current"
+            current.symlink_to(release)
+            with mock.patch.object(updater, "VERSION_FILE", root / "missing-VERSION"), \
+                    mock.patch.object(updater, "CURRENT_LINK", current):
+                self.assertEqual(updater.current_version(), "0.5.31")
+
     def test_semver_accepts_stable_versions(self):
         self.assertEqual((1, 12, 3), updater.version_tuple("1.12.3"))
 

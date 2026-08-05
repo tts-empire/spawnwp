@@ -264,6 +264,26 @@ grep -q 'migrations/enable-site-cron-and-mail-capture.py' "$ROOT/updater/managed
   exit 1
 }
 
+# GitHub issue #14: stopped sites still own their published loopback ports. The
+# allocator and migration must both ship in the signed release, otherwise fresh
+# creates or already-affected installations would retain half of the fix.
+grep -q 'port_allocator.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the stopped-site-aware port allocator is missing from managed-files.json" >&2
+  exit 1
+}
+grep -q 'migrations/repair-duplicate-project-ports.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the duplicate-port migration is missing from managed-files.json" >&2
+  exit 1
+}
+grep -q '"installer/migrations/repair-duplicate-project-ports.py"' "$ROOT/updater/build-release.py" || {
+  echo "ERROR: the duplicate-port migration is missing from the release manifest" >&2
+  exit 1
+}
+grep -q 'PORT_ALLOCATOR=' "$ROOT/runtime/scripts/new-project.sh" || {
+  echo "ERROR: new-project.sh is not using the stopped-site-aware port allocator" >&2
+  exit 1
+}
+
 # GitHub issue #13: Mailpit was only wired up on the Development blueprint (it
 # rode along with devkit.php's debug-tools flag), so Clean/Demo sites silently
 # dropped outgoing mail instead of capturing it. mail-capture.php must install

@@ -74,23 +74,13 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Find next available web port starting from 8081
-PORT=8081
-while ss -tlnp | grep -q ":${PORT}\b"; do
-  PORT=$((PORT + 1))
-done
-
-# Find next available mailpit port starting from 8026 (8025 = primary)
-MAILPIT_PORT=8026
-while ss -tlnp | grep -q ":${MAILPIT_PORT}\b"; do
-  MAILPIT_PORT=$((MAILPIT_PORT + 1))
-done
-
-# Find next available adminer port starting from 9002 (9001 = primary)
-ADMINER_PORT=9002
-while ss -tlnp | grep -q ":${ADMINER_PORT}\b"; do
-  ADMINER_PORT=$((ADMINER_PORT + 1))
-done
+# Reserve ports from every existing project's .env as well as active listeners.
+# Looking only at `ss` used to reuse a stopped site's ports, making the two sites
+# mutually exclusive the next time both were started (GitHub issue #14).
+PORT_ALLOCATOR=${SPAWNWP_PORT_ALLOCATOR:-/usr/local/lib/spawnwp/installer/port_allocator.py}
+PORT_ASSIGNMENTS=$(python3 "$PORT_ALLOCATOR" allocate --projects-root /srv --shell)
+eval "$PORT_ASSIGNMENTS"
+PORT=$WEB_PORT
 
 if [ -d "$PROJ_DIR" ]; then
   echo "ERROR: $PROJ_DIR already exists." >&2

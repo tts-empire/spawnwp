@@ -110,6 +110,8 @@ def main() -> int:
                 "migrations/enable-site-cron-and-mail-capture.py",
                 "migrations/retime-site-expiry.py",
                 "migrations/add-provision-nginx-location.py",
+                "migrations/repair-duplicate-project-ports.py",
+                "port_allocator.py",
                 "telemetry.py",
             } else "0644"
             add_entry(entries, package, ROOT / "installer" / relative,
@@ -161,6 +163,7 @@ def main() -> int:
                 "installer/migrations/enable-site-cron-and-mail-capture.py",
                 "installer/migrations/retime-site-expiry.py",
                 "installer/migrations/add-provision-nginx-location.py",
+                "installer/migrations/repair-duplicate-project-ports.py",
             ],
             "files": entries,
         }

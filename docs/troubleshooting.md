@@ -66,8 +66,14 @@ legitimate application paths.
 
 ## Port already allocated
 
-Each site claims the next free loopback ports. If a manual container or another service
-grabbed one, free it (or stop the conflicting container) and retry.
+SpawnWP reserves each site's WordPress, Mailpit and Adminer loopback ports even while that
+site is Down. Release 0.5.32 also repairs duplicate assignments left by older releases during
+the update, without starting stopped sites.
+
+If Docker still reports that a port is already allocated, a manually-created container or
+another host service may have claimed it after the SpawnWP site was created. Identify the
+listener with `sudo ss -ltnp`, then stop or reconfigure that external service before starting
+the site again.
 
 ## Cockpit unreachable after a reboot
 

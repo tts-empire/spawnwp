@@ -4,6 +4,16 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.32
+
+- **Stopped sites now keep ownership of their host ports.** Port allocation reserves the
+  WordPress, Mailpit and Adminer ports recorded by every project, not just ports with a
+  currently-listening container. Creating a site while another is Down can no longer make the
+  two environments mutually exclusive when they are started together.
+- **Existing duplicate assignments are repaired during update.** The migration preserves the
+  running service where one exists, remaps only the other claimant, updates its `.env` and
+  marked nginx blocks transactionally, and never starts a site the operator stopped.
+
 ## 0.5.31
 
 - **Version fallback now resolves the active release symlink correctly.** When the installed

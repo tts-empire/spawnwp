@@ -56,6 +56,7 @@
   "installer": [
     "docker-prune.service",
     "docker-prune.timer",
+    "port_allocator.py",
     "migrations/remove-legacy-access.py",
     "migrations/remove-obsolete-network-gate.py",
     "migrations/install-dashboard-update-service.py",
@@ -68,6 +69,7 @@
     "migrations/enable-site-cron-and-mail-capture.py",
     "migrations/retime-site-expiry.py",
     "migrations/add-provision-nginx-location.py",
+    "migrations/repair-duplicate-project-ports.py",
     "nginx-http.conf.tpl",
     "spawnwp-image-gc.service",
     "spawnwp-image-gc.timer",

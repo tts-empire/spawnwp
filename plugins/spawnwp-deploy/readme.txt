@@ -1,14 +1,14 @@
-=== SpawnWP Deploy ===
+=== SpawnWP Deploy — WordPress Blueprint Capture & Site Migration ===
 Contributors: wpvoicer
 Tags: deployment, migration, staging, development, blueprint
 Requires at least: 6.8
 Tested up to: 7.0
-Stable tag: 0.3.5
+Stable tag: 0.3.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Capture a configured site as a reusable blueprint, or publish it once to a separate empty WordPress installation.
+Deploy and migrate WordPress sites with reusable blueprints — capture a configured site once, publish it to a fresh installation.
 
 == Description ==
 
@@ -121,6 +121,10 @@ expiry. Rollback data is retained for up to seven days.
 4. Generate a short-lived connection key on an eligible destination.
 
 == Changelog ==
+
+= 0.3.6 =
+
+* Rewrote the plugin listing title and short description for discoverability. No functional changes.
 
 = 0.3.5 =
 

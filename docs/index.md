@@ -7,6 +7,7 @@ description: Install, configure and use SpawnWP to create isolated WordPress dev
 
 **A self-hosted WordPress lab for disposable dev environments.**
 
+<!-- kept in sync with README.md intro -->
 SpawnWP turns a fresh Debian or Ubuntu server — cloud VM/VPS, dedicated or bare
 metal — into a WordPress lab for temporary, isolated and
 sacrificable development environments. A single installer sets up Docker, an

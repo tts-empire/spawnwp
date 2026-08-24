@@ -81,10 +81,14 @@ triggers include pricing, free-tier, expiry, hosting, export or self-hosting cha
 
 ## Measurement
 
-Matomo site 6 is the operational analytics source. The shared script records page views
-and **SEO Funnel** events for requirements, installation, GitHub and command-copy actions;
-the event label is the landing path.
+Matomo site 6 is the operational analytics source. The shared script records page views,
+**SEO Funnel** events for requirements, installation, GitHub and command-copy actions, and
+**SEO Navigation** events for movement between comparison and category pages. The event
+name is the page where the action happened.
 
-Search Console is not currently verified. When credentials or a verification token become
-available, verify the property, submit https://spawnwp.com/sitemap.xml, and monitor indexed
-pages, queries, CTR and cannibalization.
+The `sc-domain:spawnwp.com` Search Console property is verified through DNS. Read-only OAuth
+credentials power the private SEO snapshots and reports; keep them outside the repository,
+rotate them if they appear in logs, and verify that the snapshot date continues to advance.
+The `https://spawnwp.com/sitemap.xml` index is submitted and should report zero errors and
+warnings. After reconnecting OAuth, confirm that status, then monitor indexed pages, queries,
+CTR, average position and cannibalization together with Matomo conversions.

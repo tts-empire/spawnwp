@@ -9,6 +9,11 @@ by the service group, the included systemd units, and the included Nginx rate-li
 location snippets. Uvicorn access logging must remain disabled.
 
 Run `/usr/local/sbin/spawnwp-telemetry-report` as root for local aggregate summaries.
+The report distinguishes all observed pseudonymous IDs from confirmed installations
+(two reports at least 24 hours apart), provisional installations, and suspected
+automated cohorts. A cohort is excluded from fleet aggregates when at least 20
+one-shot IDs with the same version and host fingerprint arrive within six hours.
+Raw retained rows are not deleted or modified by this classification.
 The public endpoint is intentionally unauthenticated, so results are directional rather
 than suitable for billing, security decisions or authoritative usage counts.
 

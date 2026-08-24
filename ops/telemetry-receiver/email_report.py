@@ -103,15 +103,27 @@ def _kpi(value, label) -> str:
 
 
 def render_html(report: dict, now: datetime) -> str:
-    kpis = [(report["installations"], "Installations"),
-            (report["environments_current"], "Live environments")]
+    observed = report.get("observed_installations", report["installations"])
+    confirmed = report.get("confirmed_installations", report["installations"])
+    provisional = report.get("provisional_installations", 0)
+    anomalous = report.get("anomalous_installations", 0)
+    kpis = [(observed, "Observed IDs"),
+            (confirmed, "Confirmed"),
+            (provisional, "Provisional"),
+            (anomalous, "Anomalous")]
     outcomes = (report.get("performance") or {}).get("outcomes") or {}
-    if outcomes:
-        kpis.append((outcomes["succeeded"] + outcomes["failed"], "Creates"))
-        kpis.append((f'{outcomes["failure_rate"]:.1f}%', "Failure rate"))
     kpi_cells = "".join(_kpi(v, l) for v, l in kpis)
 
     sections = ""
+    cohorts = report.get("anomalous_cohorts") or []
+    if cohorts:
+        pairs = [
+            (f"{cohort['count']} excluded IDs",
+             f"SpawnWP {cohort['spawnwp_version']} · {cohort['system']} · "
+             f"{cohort['first_seen']} → {cohort['last_seen']}")
+            for cohort in cohorts
+        ]
+        sections += _section("Suspected anomalous cohorts", _rows_table(pairs))
     if report["versions"]:
         sections += _section("SpawnWP versions", _rows_table(report["versions"]))
     duo = ""
@@ -182,7 +194,9 @@ def render_html(report: dict, now: datetime) -> str:
   <tr><td style="padding:24px 28px 26px">
     <div style="border-top:1px solid {BORDER};padding-top:16px;font:400 12px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:{MUTED}">
       Anonymous, aggregate and directional — never domains, IP addresses, site names, content or credentials.
-      Counts come from installations that consented within the last 90 days and are not authoritative.<br>
+      Observed IDs come from telemetry consented within the last 90 days and are not authoritative.
+      Confirmed installations have reported at least twice, 24 hours apart; suspected automated bursts
+      are excluded from fleet aggregates.<br>
       Generated {now:%Y-%m-%d %H:%M %Z}.
     </div>
   </td></tr>

@@ -27,7 +27,18 @@ class EmailReportTests(unittest.TestCase):
 
         now = datetime(2026, 6, 29, 8, tzinfo=ZoneInfo("Europe/Rome"))
         report = {
+            "observed_installations": 22,
             "installations": 2,
+            "confirmed_installations": 1,
+            "provisional_installations": 1,
+            "anomalous_installations": 20,
+            "anomalous_cohorts": [{
+                "count": 20, "spawnwp_version": "0.3.8",
+                "system": "Linux 6.18-test / x86_64",
+                "first_seen": "2026-08-23 15:00 UTC",
+                "last_seen": "2026-08-23 17:00 UTC",
+                "reason": "20+ one-shot IDs with an identical host fingerprint within 6 hours",
+            }],
             "versions": [("0.5.6", 2)],
             "operating_systems": [("Linux", 2)],
             "architectures": [("x86_64", 2)],
@@ -51,8 +62,12 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("2026-06-29", message["Subject"])
         plain = message.get_body(preferencelist=("plain",)).get_content()
         html = message.get_body(preferencelist=("html",)).get_content()
-        self.assertIn("Active installations (seen within 90 days): 2", plain)
+        self.assertIn("Observed IDs (seen within 90 days): 22", plain)
+        self.assertIn("Credible active installations: 2", plain)
+        self.assertIn("Suspected anomalous IDs excluded: 20", plain)
         self.assertIn("blueprints captured: 3", plain)
+        self.assertIn("Observed IDs", html)
+        self.assertIn("Suspected anomalous cohorts", html)
         self.assertIn("SpawnWP versions", html)
         self.assertIn("blueprints captured", html)
 

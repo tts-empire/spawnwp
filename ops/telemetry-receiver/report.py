@@ -8,10 +8,20 @@ import argparse
 import json
 import os
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 DB = Path(os.environ.get("SPAWNWP_TELEMETRY_DB", "/var/lib/spawnwp-telemetry-receiver/telemetry.sqlite3"))
+
+# A genuine installation keeps its pseudonymous ID and reports weekly. A dense
+# burst of one-shot IDs with an otherwise identical host fingerprint is therefore
+# much more likely to be automation hitting the public endpoint than a real fleet.
+# Keep the thresholds deliberately conservative: release-day traffic should not
+# be hidden merely because several users run the same Linux distribution.
+ANOMALY_MIN_COHORT = 20
+ANOMALY_WINDOW_SECONDS = 6 * 60 * 60
+CONFIRMATION_MIN_GAP_SECONDS = 24 * 60 * 60
 
 # Fleet feature-usage counters, in display order. Keep in sync with the METRIC_KEYS
 # whitelist in app.py and the cockpit's telemetry sender.
@@ -45,30 +55,99 @@ def _bucket(value, edges):
     return f">={edges[-1]}"
 
 
+def _utc(timestamp):
+    return datetime.fromtimestamp(timestamp, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _classify(rows):
+    """Return trusted rows, confidence counts and suspicious one-shot cohorts."""
+    groups = defaultdict(list)
+    for index, row in enumerate(rows):
+        if row["heartbeat_count"] != 1:
+            continue
+        fingerprint = (
+            row["spawnwp_version"], row["os_family"], row["os_version"],
+            row["architecture"], row["features_json"],
+        )
+        groups[fingerprint].append((row["first_seen"], index))
+
+    anomalous_indexes = set()
+    for members in groups.values():
+        members.sort()
+        left = 0
+        for right, (timestamp, _) in enumerate(members):
+            while timestamp - members[left][0] > ANOMALY_WINDOW_SECONDS:
+                left += 1
+            if right - left + 1 >= ANOMALY_MIN_COHORT:
+                anomalous_indexes.update(index for _, index in members[left:right + 1])
+
+    cohorts = []
+    anomalous_by_fingerprint = defaultdict(list)
+    for index in sorted(anomalous_indexes):
+        row = rows[index]
+        fingerprint = (
+            row["spawnwp_version"], row["os_family"], row["os_version"],
+            row["architecture"], row["features_json"],
+        )
+        anomalous_by_fingerprint[fingerprint].append(row)
+    for fingerprint, members in anomalous_by_fingerprint.items():
+        version, os_family, os_version, architecture, _ = fingerprint
+        cohorts.append({
+            "count": len(members),
+            "spawnwp_version": version,
+            "system": f"{os_family} {os_version} / {architecture}",
+            "first_seen": _utc(min(row["first_seen"] for row in members)),
+            "last_seen": _utc(max(row["first_seen"] for row in members)),
+            "reason": (f"{ANOMALY_MIN_COHORT}+ one-shot IDs with an identical host "
+                       f"fingerprint within {ANOMALY_WINDOW_SECONDS // 3600} hours"),
+        })
+    cohorts.sort(key=lambda cohort: (-cohort["count"], cohort["first_seen"]))
+
+    trusted = [row for index, row in enumerate(rows) if index not in anomalous_indexes]
+    confirmed = [
+        row for row in trusted
+        if row["heartbeat_count"] >= 2
+        and row["last_seen"] - row["first_seen"] >= CONFIRMATION_MIN_GAP_SECONDS
+    ]
+    return trusted, confirmed, cohorts
+
+
 def collect(db_path: Path = DB) -> dict:
     """Read-only aggregate snapshot of the telemetry database as structured data."""
     if not db_path.is_file():
         raise SystemExit("Telemetry database does not exist")
     with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as db:
+        db.row_factory = sqlite3.Row
         columns = {row[1] for row in db.execute("PRAGMA table_info(installations)")}
         extended = {"metrics_json", "hardware_json"} <= columns
-        select = "SELECT spawnwp_version,os_family,architecture,features_json,environments_current"
-        select += ",metrics_json,hardware_json" if extended else ",NULL,NULL"
+        select = ("SELECT first_seen,last_seen,heartbeat_count,spawnwp_version,os_family,"
+                  "os_version,architecture,features_json,environments_current")
+        select += (",metrics_json,hardware_json" if extended
+                   else ",NULL AS metrics_json,NULL AS hardware_json")
         rows = db.execute(select + " FROM installations").fetchall()
 
+    observed_installations = len(rows)
+    rows, confirmed, anomalous_cohorts = _classify(rows)
+    anomalous_installations = sum(cohort["count"] for cohort in anomalous_cohorts)
+
     report: dict = {
+        "observed_installations": observed_installations,
         "installations": len(rows),
-        "versions": Counter(r[0] for r in rows).most_common(),
-        "operating_systems": Counter(r[1] for r in rows).most_common(),
-        "architectures": Counter(r[2] for r in rows).most_common(),
+        "confirmed_installations": len(confirmed),
+        "provisional_installations": len(rows) - len(confirmed),
+        "anomalous_installations": anomalous_installations,
+        "anomalous_cohorts": anomalous_cohorts,
+        "versions": Counter(r["spawnwp_version"] for r in rows).most_common(),
+        "operating_systems": Counter(r["os_family"] for r in rows).most_common(),
+        "architectures": Counter(r["architecture"] for r in rows).most_common(),
         "features": Counter(
-            key for r in rows for key, enabled in json.loads(r[3]).items() if enabled
+            key for r in rows for key, enabled in json.loads(r["features_json"]).items() if enabled
         ).most_common(),
-        "environments_current": sum(r[4] for r in rows),
+        "environments_current": sum(r["environments_current"] for r in rows),
     }
 
-    metrics = [json.loads(r[5]) for r in rows if r[5]]
-    hardware = [json.loads(r[6]) for r in rows if r[6]]
+    metrics = [json.loads(r["metrics_json"]) for r in rows if r["metrics_json"]]
+    hardware = [json.loads(r["hardware_json"]) for r in rows if r["hardware_json"]]
     report["metrics_installations"] = len(metrics)
 
     def metric_sum(key):
@@ -117,7 +196,21 @@ def collect(db_path: Path = DB) -> dict:
 
 
 def render_text(report: dict) -> str:
-    lines = [f"Active installations (seen within 90 days): {report['installations']}"]
+    lines = [
+        f"Observed IDs (seen within 90 days): {report['observed_installations']}",
+        f"Credible active installations: {report['installations']}",
+        f"  confirmed (2+ reports at least 24h apart): {report['confirmed_installations']}",
+        f"  provisional: {report['provisional_installations']}",
+        f"Suspected anomalous IDs excluded: {report['anomalous_installations']}",
+    ]
+    if report["anomalous_cohorts"]:
+        lines.append("\nSuspected anomalous cohorts:")
+        for cohort in report["anomalous_cohorts"]:
+            lines.append(
+                f"  {cohort['count']} IDs: SpawnWP {cohort['spawnwp_version']}, "
+                f"{cohort['system']}, {cohort['first_seen']} to {cohort['last_seen']}"
+            )
+            lines.append(f"    reason: {cohort['reason']}")
     for label, key in (("Versions", "versions"), ("Operating systems", "operating_systems"),
                        ("Architectures", "architectures")):
         lines.append(f"\n{label}:")

@@ -89,7 +89,7 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "provision.py", "requirements.txt"}
+            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "module_api.py", "provision.py", "requirements.txt"}
                       else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
@@ -111,6 +111,7 @@ def main() -> int:
                 "migrations/retime-site-expiry.py",
                 "migrations/add-provision-nginx-location.py",
                 "migrations/repair-duplicate-project-ports.py",
+                "migrations/add-module-include.py",
                 "port_allocator.py",
                 "telemetry.py",
             } else "0644"
@@ -120,8 +121,12 @@ def main() -> int:
                   "lib", "installer/install.sh", "0755")
         add_entry(entries, package, ROOT / "updater/spawnwp", "payload/bin/spawnwp",
                   "bin", "spawnwp", "0755")
+        add_entry(entries, package, ROOT / "updater/module_manager.py",
+                  "payload/lib/module_manager.py", "lib", "module_manager.py", "0755")
         add_entry(entries, package, ROOT / "updater/release-public.pem",
                   "payload/lib/release-public.pem", "lib", "release-public.pem")
+        add_entry(entries, package, ROOT / "updater/release-public.pem",
+                  "payload/lib/module-public.pem", "lib", "module-public.pem")
 
         # The SpawnWP Deploy plugin, bundled so the cockpit can install it on
         # sites created with the opt-in checkbox. Generated (not a repo file),
@@ -164,6 +169,7 @@ def main() -> int:
                 "installer/migrations/retime-site-expiry.py",
                 "installer/migrations/add-provision-nginx-location.py",
                 "installer/migrations/repair-duplicate-project-ports.py",
+                "installer/migrations/add-module-include.py",
             ],
             "files": entries,
         }

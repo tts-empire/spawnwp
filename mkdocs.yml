@@ -75,6 +75,7 @@ nav:
       - Publishing a finished site: deploying-a-site.md
       - CLI reference: cli-reference.md
       - Provisioning API: provisioning-api.md
+      - Optional modules: modules.md
   - Reference:
       - Architecture: architecture.md
       - Security: security.md

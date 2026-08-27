@@ -19,7 +19,7 @@ footer>p{flex:1 1 240px}@media(max-width:1050px){footer{flex-wrap:wrap}}
 .spawn-grid::before{content:"";position:absolute;inset:-2px;background-image:radial-gradient(circle,#1b1b21 1.4px,transparent 1.7px);background-size:30px 30px;-webkit-mask-image:radial-gradient(130% 95% at 82% 4%,#000,transparent 68%);mask-image:radial-gradient(130% 95% at 82% 4%,#000,transparent 68%)}
 .spawn-grid i{position:absolute;width:9px;height:9px;border-radius:2px;background:var(--apricot);box-shadow:0 0 16px rgba(246,178,105,.45);opacity:.92}
 /* Entrance animations play once per browser session (site.js sets .intro-animate). */
-.intro-animate .spawn-grid i{opacity:0;transform:scale(.3);animation:spawn .6s cubic-bezier(.2,.8,.2,1) forwards}
+.intro-animate .spawn-grid i{opacity:.92;transform:scale(.3);animation:spawn .6s cubic-bezier(.2,.8,.2,1) forwards}
 .spawn-grid i.ghost{background:transparent;border:1.5px solid var(--apricot);box-shadow:none}
 .spawn-grid i:nth-child(1){top:16px;right:120px;animation-delay:.10s}
 .spawn-grid i:nth-child(2){top:16px;right:84px;animation-delay:.20s}

@@ -100,6 +100,8 @@ class ClientTests(unittest.TestCase):
             role="administrator",
             group="API",
             name=None,
+            access_profile="restricted-admin",
+            credentials_mode="managed",
             idempotency_key="deployment-0001",
             timeout=610,
         )
@@ -116,10 +118,29 @@ class ClientTests(unittest.TestCase):
         _, method, path = signed.call_args.args
         self.assertEqual((method, path), ("POST", "/api/provision"))
         self.assertEqual(signed.call_args.kwargs["payload"]["role"], "administrator")
+        self.assertEqual(signed.call_args.kwargs["payload"]["access_profile"], "restricted-admin")
+        self.assertEqual(signed.call_args.kwargs["payload"]["credentials_mode"], "managed")
         self.assertEqual(
             signed.call_args.kwargs["headers"]["Idempotency-Key"],
             "deployment-0001",
         )
+
+    def test_magic_link_is_scoped_to_project_path(self):
+        args = SimpleNamespace(config=Path("/tmp/config"), project="demo-site")
+        config = {
+            "server_url": "https://server.example", "connection_id": "id",
+            "private_key": "/tmp/key",
+        }
+        with mock.patch.object(client, "load_config", return_value=config), mock.patch.object(
+            client, "signed_request", return_value={"url": "https://example.test/magic"},
+        ) as signed:
+            client.command_magic_link(args)
+        self.assertEqual(
+            signed.call_args.args[1:],
+            ("POST", "/api/provision/sites/demo-site/magic-link"),
+        )
+        with self.assertRaises(client.ClientError):
+            client.command_magic_link(SimpleNamespace(config=args.config, project="../bad"))
 
     def test_revoke_removes_local_credentials_after_server_success(self):
         with tempfile.TemporaryDirectory() as directory:

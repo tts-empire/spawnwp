@@ -41,6 +41,8 @@ if grep -q 'badge badge-yellow">Template' "$ROOT/runtime/assets/cockpit.js"; the
 fi
 grep -q 'class="section system-panel"' "$ROOT/runtime/system.html"
 grep -q 'class="btn-primary sensitive" type="button" id="bp-pair-generate"' "$ROOT/runtime/system.html"
+grep -Fq '.telemetry-card a.btn-primary { display: inline-block; color: #0d0d10;' "$ROOT/runtime/assets/cockpit.css"
+grep -q 'cockpit.js?v=0.5.33' "$ROOT/runtime/modules.html"
 grep -q '#reauth-dialog { position:fixed; inset:0;' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'prefers-reduced-motion: reduce' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'input,button{width:100%;min-height:44px' "$ROOT/runtime/auth.py"
@@ -199,12 +201,27 @@ fi
 # Asset cache-busting must match the release: a stale ?v= serves users the old
 # cockpit.js/css from browser cache (the 0.3.14 System-tab "Loading" bug).
 VERSION_STR=$(tr -d '[:space:]' < "$ROOT/VERSION")
-for page in manage deploy updates system; do
+for page in manage deploy modules updates system; do
   if grep -Eo '\?v=[0-9a-zA-Z.]+' "$ROOT/runtime/${page}.html" | grep -qv "?v=${VERSION_STR}$"; then
     echo "runtime/${page}.html has an asset ?v= that does not match VERSION (${VERSION_STR})" >&2
     exit 1
   fi
 done
+
+# Optional modules need all three integration points in every signed release:
+# the restricted demo guard, updater/runtime manager, and existing-install nginx migration.
+grep -q 'mu-plugins/spawnwp-restricted-admin.php' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: restricted-admin MU plugin is missing from managed-files.json" >&2
+  exit 1
+}
+grep -q 'migrations/add-module-include.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: module nginx migration is missing from managed-files.json" >&2
+  exit 1
+}
+grep -q 'include /etc/nginx/spawnwp-modules/\*.conf;' "$ROOT/installer/nginx.conf.tpl" || {
+  echo "ERROR: fresh-install nginx template has no module include" >&2
+  exit 1
+}
 
 # Magic login (0.5.23) ships enabled on new sites: the default lives in a ":-1"
 # parameter expansion, which is exactly the sort of thing a refactor flips to 0
@@ -283,6 +300,18 @@ grep -q 'PORT_ALLOCATOR=' "$ROOT/runtime/scripts/new-project.sh" || {
   echo "ERROR: new-project.sh is not using the stopped-site-aware port allocator" >&2
   exit 1
 }
+
+# The Modules page uses the shared BASE constant and native fetch wrapper. A
+# previous implementation called a nonexistent api() helper and rendered only
+# "api is not defined" in the cockpit.
+grep -Fq 'fetch(`${BASE}/modules`, { cache:' "$ROOT/runtime/assets/cockpit.js" || {
+  echo "ERROR: Modules must load through the existing fetch wrapper" >&2
+  exit 1
+}
+if grep -Fq "api('/api/modules')" "$ROOT/runtime/assets/cockpit.js"; then
+  echo "ERROR: Modules calls the nonexistent api() helper" >&2
+  exit 1
+fi
 
 # GitHub issue #13: Mailpit was only wired up on the Development blueprint (it
 # rode along with devkit.php's debug-tools flag), so Clean/Demo sites silently

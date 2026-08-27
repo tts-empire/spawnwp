@@ -34,6 +34,8 @@ class ProvisionRequest(BaseModel):
     role: Literal["administrator", "editor", "author", "contributor", "subscriber"] = "administrator"
     group: str = Field(default="API", pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._\-]{0,31}$")
     name: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{0,30}$")
+    access_profile: Literal["standard", "restricted-admin"] = "standard"
+    credentials_mode: Literal["return", "managed"] = "return"
 
 
 def _initialize(db: sqlite3.Connection) -> None:
@@ -55,9 +57,18 @@ def _initialize(db: sqlite3.Connection) -> None:
             connection_id TEXT NOT NULL,
             status TEXT NOT NULL,
             expires_at INTEGER NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            username TEXT NOT NULL DEFAULT '',
+            credentials_mode TEXT NOT NULL DEFAULT 'return'
         );
     """)
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(provision_sites)")}
+    if "username" not in columns:
+        db.execute("ALTER TABLE provision_sites ADD COLUMN username TEXT NOT NULL DEFAULT ''")
+    if "credentials_mode" not in columns:
+        db.execute(
+            "ALTER TABLE provision_sites ADD COLUMN credentials_mode TEXT NOT NULL DEFAULT 'return'",
+        )
     db.commit()
 
 
@@ -154,9 +165,10 @@ def _reserve(db: sqlite3.Connection, connection_id: str, key: str,
             (connection_id, key, request_hash, "in_progress", project, now, now),
         )
         db.execute(
-            "INSERT INTO provision_sites(project,connection_id,status,expires_at,created_at) "
-            "VALUES (?,?,?,?,?)",
-            (project, connection_id, "provisioning", now + payload.expires_seconds, now),
+            "INSERT INTO provision_sites(project,connection_id,status,expires_at,created_at,"
+            "credentials_mode) VALUES (?,?,?,?,?,?)",
+            (project, connection_id, "provisioning", now + payload.expires_seconds, now,
+             payload.credentials_mode),
         )
         db.commit()
         return project, None
@@ -165,7 +177,8 @@ def _reserve(db: sqlite3.Connection, connection_id: str, key: str,
         raise
 
 
-def _finish(connection_id: str, key: str, project: str, response: dict) -> None:
+def _finish(connection_id: str, key: str, project: str, username: str,
+            response: dict) -> None:
     db = ingest._connect()
     try:
         _initialize(db)
@@ -176,8 +189,8 @@ def _finish(connection_id: str, key: str, project: str, response: dict) -> None:
             (json.dumps(response, separators=(",", ":")), now, connection_id, key),
         )
         db.execute(
-            "UPDATE provision_sites SET status='active',expires_at=? WHERE project=?",
-            (response["expires_at"], project),
+            "UPDATE provision_sites SET status='active',expires_at=?,username=? WHERE project=?",
+            (response["expires_at"], username, project),
         )
         db.commit()
     finally:
@@ -223,6 +236,13 @@ def _execute_reserved(connection_id: str, key: str, project: str,
             cockpit.WpUserCreate(role=payload.role),
         )
         proj = cockpit.resolve_project(project)
+        if payload.credentials_mode == "managed" and not cockpit._autologin_installed(proj):
+            cockpit.install_autologin(proj)
+        if payload.access_profile == "restricted-admin":
+            cockpit.install_restricted_admin(proj=proj)
+        # The customer receives the complete requested lifetime; image builds and
+        # post-create setup do not consume part of a managed demo's hour.
+        cockpit.set_project_lifetime(proj, payload.expires_seconds)
         env = cockpit._read_env(proj)
         expires_at = int(env.get("SPAWNWP_EXPIRES", "0"))
         response = {
@@ -230,13 +250,14 @@ def _execute_reserved(connection_id: str, key: str, project: str,
             "url": env.get("WP_HOME", ""),
             "expires_at": expires_at,
             "username": credentials["username"],
-            "password": credentials["password"],
         }
-        if cockpit._autologin_installed(proj):
+        if payload.credentials_mode == "return":
+            response["password"] = credentials["password"]
+        if payload.credentials_mode == "return" and cockpit._autologin_installed(proj):
             response["magic_link"] = cockpit.mint_magic_login(
                 proj, credentials["username"],
             )["url"]
-        _finish(connection_id, key, project, response)
+        _finish(connection_id, key, project, credentials["username"], response)
         return response
     except HTTPException as exc:
         cleaned = cockpit.cleanup_created_project(project)
@@ -308,6 +329,10 @@ async def provision_status(request: Request):
         db.close()
 
     quota = _connection_quota()
+    try:
+        catalog = cockpit.blueprint_catalog()
+    except HTTPException:
+        catalog = {"blueprints": []}
     return {
         "api_version": API_VERSION,
         "spawnwp_version": ingest.spawnwp_version(),
@@ -320,6 +345,8 @@ async def provision_status(request: Request):
             "expires_seconds": 3600,
             "role": "administrator",
             "group": "API",
+            "access_profile": "standard",
+            "credentials_mode": "return",
         },
         "limits": {
             "min_expires_seconds": 300,
@@ -329,7 +356,45 @@ async def provision_status(request: Request):
         },
         "active_sites": len(rows),
         "sites": [_site_summary(row) for row in rows],
+        "blueprints": [
+            {
+                "id": item.get("id", ""),
+                "name": item.get("name", item.get("id", "")),
+                "version": item.get("version", ""),
+                "source": item.get("source", ""),
+            }
+            for item in catalog.get("blueprints", [])
+        ],
     }
+
+
+@router.post("/api/provision/sites/{project}/magic-link")
+async def provision_magic_link(project: str, request: Request):
+    """Mint access only for an active site owned by the signed connection."""
+    db = ingest._connect()
+    try:
+        _initialize(db)
+        ingest._janitor(db)
+        connection, _ = await machine_auth.authorize(request, db, "provision")
+        _discard_missing_sites(db)
+        row = db.execute(
+            "SELECT project,status,expires_at,username,credentials_mode FROM provision_sites "
+            "WHERE project=? AND connection_id=?",
+            (project, connection["id"]),
+        ).fetchone()
+        db.commit()
+    finally:
+        db.close()
+    if not row or row["status"] != "active":
+        raise HTTPException(404, "Active provisioned site not found")
+    if row["expires_at"] <= int(time.time()):
+        raise HTTPException(410, "Provisioned site has expired")
+    if row["credentials_mode"] != "managed":
+        raise HTTPException(409, "Provisioned site does not use managed credentials")
+    if not row["username"]:
+        raise HTTPException(409, "Provisioned site has no managed user")
+    proj = cockpit.resolve_project(project)
+    return cockpit.mint_magic_login(proj, row["username"])
 
 
 @router.delete("/api/provision/connection")

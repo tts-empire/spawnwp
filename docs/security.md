@@ -58,6 +58,26 @@ through a public plugin directory and its release cadence.
 Set `SPAWNWP_ENABLE_AUTOLOGIN=0` in `/etc/spawnwp/config.env` to spawn sites without it.
 Existing sites are unaffected by that setting — turn them off individually in the cockpit.
 
+## Signed modules and public demos
+
+Optional modules are not loaded into the cockpit process. Their packages are verified against the
+module Ed25519 trust root, checked file-by-file and activated through a versioned symlink. A module
+may still install a loopback service, systemd units and nginx locations through a root hook, so the
+administrator must treat module installation as privileged code installation. Module routes that
+contain administration controls must use the cockpit's nginx `auth_request` gate.
+
+The Demo Launcher beta is a deliberately narrow mediator in front of the signed provisioning API;
+the core does not expose anonymous site creation. Its public GET page never provisions anything.
+The POST path requires double-submit CSRF, a Turnstile result bound to the configured hostname and
+action, an hourly keyed-IP limit, a campaign concurrency limit and a durable one-at-a-time worker.
+Managed provisioning stores no WordPress password, while admin entry is minted only on demand as a
+single-use, two-minute link for a site owned by the module's provisioning connection.
+
+The restricted administrator MU plugin is a guardrail for disposable product evaluation, not a
+tenant-security boundary. A WordPress administrator can exercise powerful application behavior,
+and vulnerable demo content may still be exploitable. Run public demos on a dedicated SpawnWP host,
+keep lifetimes short, capture no sensitive data and do not reuse the host for production workloads.
+
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
 application authentication.

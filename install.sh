@@ -196,7 +196,7 @@ mkdir -p /srv/wp-dev/.spawnwp
 touch /srv/wp-dev/.spawnwp/template-only
 
 log "Configuring TLS and nginx"
-install -d -m 0755 /var/www/letsencrypt /etc/nginx/snippets
+install -d -m 0755 /var/www/letsencrypt /etc/nginx/snippets /etc/nginx/spawnwp-modules
 install -m 0644 "$(src installer spawnwp-proxy.conf)" /etc/nginx/snippets/spawnwp-proxy.conf
 render "$(src installer nginx-http.conf.tpl)" /etc/nginx/sites-available/spawnwp
 ln -sfn /etc/nginx/sites-available/spawnwp /etc/nginx/sites-enabled/spawnwp

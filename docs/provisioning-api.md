@@ -86,6 +86,7 @@ login link.
 | `spawnwp-api pair CODE` | Create and store a provisioning connection |
 | `spawnwp-api status` | Show server version, quota, defaults, and active sites |
 | `spawnwp-api provision` | Create one temporary WordPress site |
+| `spawnwp-api magic-link PROJECT` | Mint two-minute access for an owned managed site |
 | `spawnwp-api revoke --yes` | Revoke the server connection and remove local credentials |
 
 ### Provisioning options
@@ -97,6 +98,8 @@ login link.
 | `--role ROLE` | `administrator` | Initial WordPress user role |
 | `--group NAME` | `API` | Cockpit group for the site |
 | `--name SLUG` | generated | Optional stable project name |
+| `--access-profile PROFILE` | `standard` | Use `restricted-admin` for a guarded evaluation site |
+| `--credentials-mode MODE` | `return` | Use `managed` to omit reusable credentials |
 | `--idempotency-key KEY` | generated | Stable key for retrying the same logical request |
 | `--timeout SECONDS` | `610` | Client-side HTTP timeout |
 | `--json` | off | Machine-readable output |
@@ -155,6 +158,7 @@ the request and response schemas. The base URL is the HTTPS cockpit origin.
 | --- | --- | --- |
 | `GET /api/provision/status` | Connection, defaults, quota, and active sites | no |
 | `POST /api/provision` | Create a temporary site | required |
+| `POST /api/provision/sites/{project}/magic-link` | Mint access to an owned managed site | no |
 | `DELETE /api/provision/connection` | Revoke the calling connection | no |
 
 ### Create request
@@ -167,7 +171,9 @@ Only `blueprint` is required:
   "expires_seconds": 3600,
   "role": "administrator",
   "group": "API",
-  "name": "customer-demo"
+  "name": "customer-demo",
+  "access_profile": "standard",
+  "credentials_mode": "return"
 }
 ```
 
@@ -180,6 +186,8 @@ Request fields are validated before any site is reserved:
 | `role` | no | `administrator`, `editor`, `author`, `contributor`, or `subscriber` |
 | `group` | no | 1–32 letters, digits, spaces, dots, underscores, or hyphens; defaults to `API` |
 | `name` | no | Project slug matching `^[a-z0-9][a-z0-9-]{0,30}$` |
+| `access_profile` | no | `standard` or `restricted-admin`; defaults to `standard` |
+| `credentials_mode` | no | `return` or `managed`; defaults to `return` |
 
 `name` is the project identifier used in the URL, not a display name. Omit it to receive a
 random name. Supplying an existing project name returns `409`. Optional fields must be omitted
@@ -202,6 +210,22 @@ The response contains credentials once provisioning finishes:
 Provisioning is synchronous. The application timeout is 300 seconds and the reverse proxy allows
 600 seconds for the application to return its result and cleanup status.
 
+### Managed demo access
+
+Public-facing integrations should request both `"access_profile":"restricted-admin"` and
+`"credentials_mode":"managed"`. The first installs a SpawnWP-owned must-use plugin that blocks
+plugin/theme installation, activation, deletion and editing, core updates, user management,
+import/export and theme switching. It intentionally leaves ordinary WordPress administration and
+product-specific capabilities available so a visitor can evaluate the selected theme or plugin.
+
+Managed mode returns the username for ownership bookkeeping but omits the password and initial
+magic link. It ensures the core auto-login MU plugin is present even when new sites normally have
+that optional capability disabled. When the visitor explicitly asks to enter wp-admin, sign
+`POST /api/provision/sites/{project}/magic-link`. The endpoint mints a single-use two-minute link
+only when the project is active and belongs to the calling provisioning connection. Treat the URL
+as a secret and redirect the intended browser immediately; never store it in a campaign database
+or log it.
+
 ### Status response
 
 `GET /api/provision/status` returns the connection, defaults, limits, and every site currently
@@ -210,7 +234,7 @@ counted against this connection:
 ```json
 {
   "api_version": 1,
-  "spawnwp_version": "0.5.30",
+  "spawnwp_version": "0.5.33",
   "connection": {
     "id": "0123456789abcdef",
     "label": "Demo integration",
@@ -219,7 +243,9 @@ counted against this connection:
   "defaults": {
     "expires_seconds": 3600,
     "role": "administrator",
-    "group": "API"
+    "group": "API",
+    "access_profile": "standard",
+    "credentials_mode": "return"
   },
   "limits": {
     "min_expires_seconds": 300,
@@ -236,6 +262,9 @@ counted against this connection:
       "expires_at": 1785402000,
       "created_at": 1785398400
     }
+  ],
+  "blueprints": [
+    {"id": "development", "name": "Development", "version": "1", "source": "built-in"}
   ]
 }
 ```

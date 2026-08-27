@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Modules · SpawnWP Cockpit</title>
+  <style>html,body{background:#000;color:#f8f8f8;color-scheme:dark}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}header{min-height:64px}main{min-height:420px}</style>
+  <link rel="stylesheet" href="/assets/cockpit.css?v=0.5.33">
+</head>
+<body data-page="modules">
+  <header>
+    <a class="brand" href="/manage" aria-label="SpawnWP Cockpit"><span class="brand-lockup"><span class="brand-name">Spawn<strong>WP</strong></span><span class="brand-context">Cockpit</span></span></a>
+    <nav class="main-nav" aria-label="Cockpit"><a href="/manage">Manage</a><a href="/deploy">Deploy</a><a href="/system">System</a><a href="/modules" aria-current="page">Modules</a><a href="/updates">Updates<span id="update-dot" class="update-dot" hidden></span></a></nav>
+    <time id="header-clock" title="Local time"></time>
+    <a class="header-docs" href="https://spawnwp.com/docs/" target="_blank" rel="noopener">Docs ↗</a>
+    <button class="header-logout" type="button" onclick="logoutCockpit()">Log out</button>
+  </header>
+  <main>
+    <section class="section system-panel module-install-panel">
+      <div class="modules-heading">
+        <div>
+          <div class="section-title">Install a module</div>
+          <p class="system-intro">Upload a signed extension package. SpawnWP verifies it before installation and activation.</p>
+        </div>
+        <button class="btn-primary" type="button" onclick="toggleModuleInstall()">Install module</button>
+      </div>
+      <form id="module-install-form" class="module-install" hidden>
+        <div class="section-title">Install signed package</div>
+        <p class="field-help">Select the archive and its matching manifest and signature. The package is verified before anything is installed.</p>
+        <label>Archive (.tar.gz)<input type="file" name="archive" accept=".tar.gz,application/gzip" required></label>
+        <label>Manifest (.manifest.json)<input type="file" name="manifest" accept="application/json,.json" required></label>
+        <label>Signature (.manifest.sig)<input type="file" name="signature" accept="application/octet-stream,.sig" required></label>
+        <div class="actions"><button class="btn-primary" type="submit">Upload and install</button><button class="btn-neutral" type="button" onclick="toggleModuleInstall(false)">Cancel</button></div>
+        <p class="field-help">Only install packages from a trusted publisher: module installation runs signed code with root privileges.</p>
+      </form>
+      <div class="update-command"><span>Command-line alternative</span><code>sudo spawnwp module install PACKAGE.tar.gz</code></div>
+    </section>
+    <section class="section module-list-section">
+      <div class="section-title">Installed modules</div>
+      <p class="system-intro">Manage the signed extensions installed on this server. Each module runs outside the root Cockpit process.</p>
+      <div id="modules-summary" class="modules-summary" aria-live="polite"></div>
+      <div id="modules-list" aria-busy="true"><div class="module-skeleton" aria-hidden="true"><span class="module-skeleton-line module-skeleton-title"></span><span class="module-skeleton-line"></span><span class="module-skeleton-line module-skeleton-short"></span></div></div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script src="/assets/cockpit.js?v=0.5.33"></script>
+</body>
+</html>

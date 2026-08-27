@@ -158,6 +158,125 @@ class ProvisionTests(unittest.TestCase):
     def test_default_role_is_administrator(self):
         payload = self.provision.ProvisionRequest(blueprint="development")
         self.assertEqual(payload.role, "administrator")
+        self.assertEqual(payload.access_profile, "standard")
+        self.assertEqual(payload.credentials_mode, "return")
+
+    def test_managed_restricted_provision_omits_secrets_and_installs_guard(self):
+        credentials = {
+            "username": "managed-demo",
+            "password": "must-not-be-persisted",
+        }
+        with mock.patch.object(
+            self.cockpit, "run_project_creation", side_effect=self.fake_creation,
+        ), mock.patch.object(
+            self.cockpit, "create_wp_user", return_value=credentials,
+        ), mock.patch.object(
+            self.cockpit, "install_restricted_admin",
+        ) as install_guard, mock.patch.object(
+            self.cockpit, "_autologin_installed", return_value=False,
+        ), mock.patch.object(
+            self.cockpit, "install_autologin",
+        ) as install_autologin, mock.patch.object(
+            self.cockpit, "mint_magic_login",
+        ) as mint:
+            response = self.signed({
+                "blueprint": "development",
+                "access_profile": "restricted-admin",
+                "credentials_mode": "managed",
+            })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["username"], "managed-demo")
+        self.assertNotIn("password", response.json())
+        self.assertNotIn("magic_link", response.json())
+        install_guard.assert_called_once()
+        install_autologin.assert_called_once()
+        mint.assert_not_called()
+        db = self.ingest._connect()
+        try:
+            stored = db.execute(
+                "SELECT response_json FROM provision_requests WHERE connection_id=?",
+                (self.connection_id,),
+            ).fetchone()[0]
+            username = db.execute(
+                "SELECT username FROM provision_sites WHERE project=?",
+                (response.json()["project"],),
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertNotIn("must-not-be-persisted", stored)
+        self.assertEqual(username, "managed-demo")
+
+    def test_owned_site_can_mint_managed_magic_link(self):
+        project = self.projects / "managed-site"
+        project.mkdir()
+        (project / "compose.yaml").write_text("services: {}\n")
+        (project / "Makefile").write_text(":\n")
+        now = int(time.time())
+        db = self.ingest._connect()
+        try:
+            db.execute(
+                "INSERT INTO provision_sites(project,connection_id,status,expires_at,created_at,"
+                "username,credentials_mode) VALUES (?,?,?,?,?,?,?)",
+                ("managed-site", self.connection_id, "active", now + 3600, now,
+                 "demo-user", "managed"),
+            )
+            db.commit()
+        finally:
+            db.close()
+        with mock.patch.object(
+            self.cockpit, "mint_magic_login",
+            return_value={"project": "managed-site", "url": "https://example.test/magic", "expires_in": 120},
+        ) as mint:
+            response = self.signed_request(
+                "POST", "/api/provision/sites/managed-site/magic-link",
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["expires_in"], 120)
+        mint.assert_called_once_with(project, "demo-user")
+
+    def test_connection_cannot_mint_link_for_another_owners_site(self):
+        project = self.projects / "foreign-site"
+        project.mkdir()
+        (project / "compose.yaml").write_text("services: {}\n")
+        (project / "Makefile").write_text(":\n")
+        now = int(time.time())
+        db = self.ingest._connect()
+        try:
+            db.execute(
+                "INSERT INTO provision_sites(project,connection_id,status,expires_at,created_at,"
+                "username,credentials_mode) VALUES (?,?,?,?,?,?,?)",
+                ("foreign-site", "another-connection", "active", now + 3600, now,
+                 "demo-user", "managed"),
+            )
+            db.commit()
+        finally:
+            db.close()
+        response = self.signed_request(
+            "POST", "/api/provision/sites/foreign-site/magic-link",
+        )
+        self.assertEqual(response.status_code, 404, response.text)
+
+    def test_magic_link_requires_managed_credentials_mode(self):
+        project = self.projects / "standard-site"
+        project.mkdir()
+        (project / "compose.yaml").write_text("services: {}\n")
+        (project / "Makefile").write_text(":\n")
+        now = int(time.time())
+        db = self.ingest._connect()
+        try:
+            db.execute(
+                "INSERT INTO provision_sites(project,connection_id,status,expires_at,created_at,"
+                "username,credentials_mode) VALUES (?,?,?,?,?,?,?)",
+                ("standard-site", self.connection_id, "active", now + 3600, now,
+                 "demo-user", "return"),
+            )
+            db.commit()
+        finally:
+            db.close()
+        response = self.signed_request(
+            "POST", "/api/provision/sites/standard-site/magic-link",
+        )
+        self.assertEqual(response.status_code, 409, response.text)
 
     def test_creation_failure_reports_error_before_rollback_notice(self):
         process = mock.Mock()

@@ -4,10 +4,12 @@
     "auth.py",
     "ingest.py",
     "machine_auth.py",
+    "module_api.py",
     "provision.py",
     "requirements.txt",
     "manage.html",
     "deploy.html",
+    "modules.html",
     "updates.html",
     "assets/cockpit.css",
     "assets/cockpit.js",
@@ -51,7 +53,8 @@
     "scripts/restore.sh",
     "scripts/snapshot.sh",
     "scripts/wait-for-wordpress.sh",
-    "mu-plugins/spawnwp-autologin.php"
+    "mu-plugins/spawnwp-autologin.php",
+    "mu-plugins/spawnwp-restricted-admin.php"
   ],
   "installer": [
     "docker-prune.service",
@@ -70,6 +73,7 @@
     "migrations/retime-site-expiry.py",
     "migrations/add-provision-nginx-location.py",
     "migrations/repair-duplicate-project-ports.py",
+    "migrations/add-module-include.py",
     "nginx-http.conf.tpl",
     "spawnwp-image-gc.service",
     "spawnwp-image-gc.timer",

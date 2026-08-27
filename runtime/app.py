@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -41,10 +41,11 @@ DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/up
                      "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings",
                      "/api/snapshots/delete"}
 FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir|unzip)$")
+MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|update))?$")
 
 
 def requires_recent_auth(path: str) -> bool:
-    return path in DESTRUCTIVE_PATHS or bool(FILE_WRITE_RE.match(path))
+    return path in DESTRUCTIVE_PATHS or bool(FILE_WRITE_RE.match(path)) or bool(MODULE_MUTATION_RE.match(path))
 
 
 @app.middleware("http")
@@ -77,7 +78,7 @@ async def application_authentication(request: Request, call_next):
             response = RedirectResponse("/login", status_code=303)
     elif active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not valid_csrf(request, active):
         response = JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
-    elif active and request.method == "POST" and requires_recent_auth(path) and int(__import__("time").time()) - active["recent_auth"] > 600:
+    elif active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and requires_recent_auth(path) and int(__import__("time").time()) - active["recent_auth"] > 600:
         response = JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     else:
         response = await call_next(request)
@@ -1181,6 +1182,8 @@ def wp_user_create(project: str, body: WpUserCreate):
 AUTOLOGIN_MU_PLUGIN = "wp-content/mu-plugins/spawnwp-autologin.php"
 AUTOLOGIN_SOURCE = PRIMARY_PROJECT / "mu-plugins" / "spawnwp-autologin.php"
 AUTOLOGIN_TTL_SECONDS = 120
+RESTRICTED_ADMIN_MU_PLUGIN = "wp-content/mu-plugins/spawnwp-restricted-admin.php"
+RESTRICTED_ADMIN_SOURCE = PRIMARY_PROJECT / "mu-plugins" / "spawnwp-restricted-admin.php"
 
 
 def _autologin_plugin_source() -> bytes:
@@ -1208,6 +1211,37 @@ def _autologin_installed(proj: Path) -> bool:
     return probe.returncode == 0
 
 
+def install_autologin(proj: Path) -> None:
+    target = jail_path(AUTOLOGIN_MU_PLUGIN)
+    mk = _php_exec(proj, ["mkdir", "-p", "--", jail_path("wp-content/mu-plugins")])
+    if mk.returncode != 0:
+        raise _exec_error(mk)
+    result = _php_exec(
+        proj, ["dd", "of=" + target, "status=none"],
+        input_bytes=_autologin_plugin_source(),
+    )
+    if result.returncode != 0:
+        raise _exec_error(result)
+
+
+def install_restricted_admin(proj: Path) -> None:
+    """Install the immutable capability guard used by managed demo access."""
+    try:
+        source = RESTRICTED_ADMIN_SOURCE.read_bytes()
+    except OSError as exc:
+        raise HTTPException(500, f"Restricted-admin plugin bundle missing: {exc}") from exc
+    mk = _php_exec(proj, ["mkdir", "-p", "--", jail_path("wp-content/mu-plugins")])
+    if mk.returncode != 0:
+        raise _exec_error(mk)
+    result = _php_exec(
+        proj,
+        ["dd", "of=" + jail_path(RESTRICTED_ADMIN_MU_PLUGIN), "status=none"],
+        input_bytes=source,
+    )
+    if result.returncode != 0:
+        raise _exec_error(result)
+
+
 @app.get("/api/wp/{project}/autologin")
 def autologin_status(project: str):
     proj = resolve_project(project)
@@ -1224,11 +1258,8 @@ def autologin_toggle(project: str, body: AutologinToggle):
     guard_not_busy()
     target = jail_path(AUTOLOGIN_MU_PLUGIN)
     if body.enabled:
-        mk = _php_exec(proj, ["mkdir", "-p", "--", jail_path("wp-content/mu-plugins")])
-        if mk.returncode != 0:
-            raise _exec_error(mk)
-        result = _php_exec(proj, ["dd", "of=" + target, "status=none"],
-                           input_bytes=_autologin_plugin_source())
+        install_autologin(proj)
+        return {"project": proj.name, "enabled": True}
     else:
         result = _php_exec(proj, ["rm", "-f", "--", target])
     if result.returncode != 0:
@@ -1454,6 +1485,24 @@ class SiteExpiry(BaseModel):
     lifetime_seconds: int | None = None
 
 
+def set_project_lifetime(proj: Path, lifetime_seconds: int | None,
+                         lifetime_days: int = 0) -> int | None:
+    """Set a deadline from now and return its Unix timestamp."""
+    import time as _time
+    env_file = proj / ".env"
+    lines = [line for line in env_file.read_text().splitlines()
+             if not line.startswith("SPAWNWP_EXPIRES=")]
+    expires_at = None
+    if lifetime_seconds is not None:
+        expires_at = int(_time.time()) + lifetime_seconds
+        lines.append(f"SPAWNWP_EXPIRES={expires_at}")
+    elif lifetime_days:
+        expires_at = int(_time.time()) + lifetime_days * 86400
+        lines.append(f"SPAWNWP_EXPIRES={expires_at}")
+    env_file.write_text("\n".join(lines) + "\n")
+    return expires_at
+
+
 @app.post("/api/expiry/{project}")
 def set_expiry(project: str, body: SiteExpiry):
     proj = resolve_project(project)
@@ -1463,15 +1512,7 @@ def set_expiry(project: str, body: SiteExpiry):
         raise HTTPException(400, "lifetime_days must be between 0 and 365")
     if body.lifetime_seconds is not None and not 300 <= body.lifetime_seconds <= 365 * 86400:
         raise HTTPException(400, "lifetime_seconds must be between 300 and 31536000")
-    env_file = proj / ".env"
-    lines = [l for l in env_file.read_text().splitlines() if not l.startswith("SPAWNWP_EXPIRES=")]
-    if body.lifetime_seconds is not None:
-        import time as _time
-        lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_seconds}")
-    elif body.lifetime_days:
-        import time as _time
-        lines.append(f"SPAWNWP_EXPIRES={int(_time.time()) + body.lifetime_days * 86400}")
-    env_file.write_text("\n".join(lines) + "\n")
+    set_project_lifetime(proj, body.lifetime_seconds, body.lifetime_days)
     return {
         "project": proj.name,
         "lifetime_days": body.lifetime_days,
@@ -2121,6 +2162,250 @@ app.include_router(provision_router)
 # ── Cockpit pages and shared assets ───────────────────────────────────────────
 
 STATIC_DIR = Path(os.environ.get("SPAWNWP_STATIC_DIR", "/srv/wp-cockpit/static"))
+MODULES_ROOT = Path(os.environ.get("SPAWNWP_MODULES_ROOT", "/opt/spawnwp/modules"))
+MODULE_STATE_ROOT = Path(os.environ.get("SPAWNWP_MODULE_STATE_ROOT", "/var/lib/spawnwp/modules"))
+MODULE_OPERATIONS_ROOT = MODULE_STATE_ROOT / "operations"
+MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
+
+
+def _module_state(module_id: str) -> dict:
+    try:
+        value = json.loads((MODULE_STATE_ROOT / module_id / "install.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        value = {}
+    return value if isinstance(value, dict) else {}
+
+
+def _module_capabilities(release: Path) -> dict[str, bool]:
+    return {
+        "activate": (release / "activate.py").is_file(),
+        "deactivate": (release / "deactivate.py").is_file(),
+        "update": True,
+        "uninstall": True,
+    }
+
+
+def _module_pending_operation(module_id: str) -> str:
+    for path in MODULE_OPERATIONS_ROOT.glob("*.json"):
+        try:
+            operation = _refresh_module_operation(json.loads(path.read_text()))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if operation.get("module_id") == module_id and operation.get("state") in {"queued", "running"}:
+            return str(operation.get("operation_id", operation.get("id", "")))
+    return ""
+
+
+def _write_module_operation(operation: dict) -> None:
+    MODULE_OPERATIONS_ROOT.mkdir(parents=True, exist_ok=True)
+    path = MODULE_OPERATIONS_ROOT / f"{operation['id']}.json"
+    temporary = path.with_name(f".{path.name}.new")
+    temporary.write_text(json.dumps(operation, indent=2, sort_keys=True) + "\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+
+def _read_module_operation(operation_id: str) -> dict:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", operation_id):
+        raise HTTPException(404, "Operation not found")
+    try:
+        return json.loads((MODULE_OPERATIONS_ROOT / f"{operation_id}.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(404, "Operation not found")
+
+
+def _refresh_module_operation(operation: dict) -> dict:
+    if operation.get("state") not in {"queued", "running"}:
+        return operation
+    pid = int(operation.get("pid", 0) or 0)
+    if not pid:
+        return operation
+    try:
+        waited, status = os.waitpid(pid, os.WNOHANG)
+    except ChildProcessError:
+        waited, status = (0, 0) if Path(f"/proc/{pid}").exists() else (pid, 1)
+    if waited == 0:
+        return operation
+    code = os.waitstatus_to_exitcode(status)
+    output_path = Path(str(operation.get("output", "")))
+    output = output_path.read_text(errors="replace")[-8000:] if output_path.is_file() else ""
+    operation["state"] = "succeeded" if code == 0 else "failed"
+    operation["exit_code"] = code
+    operation["finished_at"] = int(__import__("time").time())
+    operation["message"] = output.splitlines()[-1][:500] if output.splitlines() else operation["state"].title()
+    if code != 0:
+        operation["error"] = output[-1000:] or "Module operation failed"
+    cleanup = operation.get("cleanup")
+    if cleanup:
+        shutil.rmtree(str(cleanup), ignore_errors=True)
+    _write_module_operation(operation)
+    return operation
+
+
+def _start_module_operation(action: str, module_id: str | None, command: list[str], *, workdir: Path | None = None, cleanup: Path | None = None) -> dict:
+    if not SPAWNWP_CLI.is_file():
+        raise HTTPException(503, "Module manager is not installed")
+    MODULE_OPERATIONS_ROOT.mkdir(parents=True, exist_ok=True)
+    for path in MODULE_OPERATIONS_ROOT.glob("*.json"):
+        try:
+            pending = _refresh_module_operation(json.loads(path.read_text()))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if pending.get("state") in {"queued", "running"} and module_id and pending.get("module_id") == module_id:
+            raise HTTPException(409, f"A module operation is already running for '{module_id}'")
+        if pending.get("state") in {"queued", "running"} and action == "install" and pending.get("action") == "install":
+            raise HTTPException(409, "A module installation is already running")
+    operation_id = secrets.token_urlsafe(18).replace("-", "_")
+    output = MODULE_OPERATIONS_ROOT / f"{operation_id}.log"
+    record = {
+        "id": operation_id, "operation_id": operation_id, "action": action, "module_id": module_id or "",
+        "state": "queued", "created_at": int(__import__("time").time()),
+        "output": str(output), "message": "Queued",
+    }
+    if cleanup:
+        record["cleanup"] = str(cleanup)
+    with output.open("w") as stream:
+        try:
+            process = subprocess.Popen(
+                command, cwd=str(workdir) if workdir else None,
+                stdout=stream, stderr=subprocess.STDOUT, start_new_session=True,
+            )
+        except OSError as exc:
+            raise HTTPException(503, f"Unable to start module operation: {exc}") from exc
+    record.update(state="running", pid=process.pid, started_at=int(__import__("time").time()), message="Running")
+    _write_module_operation(record)
+    return record
+
+
+def installed_modules() -> list[dict]:
+    """Read display-only metadata from module releases verified at installation."""
+    modules = []
+    for root in sorted(MODULES_ROOT.glob("*")):
+        manifest = root / "current" / "module.json"
+        try:
+            item = json.loads(manifest.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        module_id = str(item.get("id", ""))
+        admin_path = str(item.get("admin_path", ""))
+        if not re.fullmatch(r"[a-z][a-z0-9-]{1,40}", module_id):
+            continue
+        if admin_path and not admin_path.startswith(f"/modules/{module_id}/"):
+            continue
+        state = _module_state(module_id)
+        release = root / "current"
+        recorded_source = str(state.get("source", ""))
+        modules.append({
+            "id": module_id,
+            "name": str(item.get("name", module_id))[:80],
+            "version": str(item.get("version", "unknown"))[:32],
+            "description": str(item.get("description", ""))[:240],
+            "admin_path": admin_path,
+            "core_api_scope": str(item.get("core_api_scope", ""))[:32],
+            "status": str(state.get("status", "active")),
+            "last_error": str(state.get("last_error", ""))[:500],
+            "updated_at": state.get("updated_at"),
+            "source_url": recorded_source if recorded_source.startswith("https://") else "",
+            "operation_id": _module_pending_operation(module_id),
+            "capabilities": _module_capabilities(release),
+        })
+    return modules
+
+
+@app.get("/api/modules")
+def modules_api():
+    return {"modules": installed_modules()}
+
+
+@app.post("/api/modules/install", status_code=202)
+async def modules_install(request: Request):
+    """Accept a signed package as multipart fields: archive, manifest, signature."""
+    try:
+        form = await request.form()
+    except AssertionError as exc:
+        raise HTTPException(503, "Multipart upload support is not installed") from exc
+    operation_id = secrets.token_urlsafe(18).replace("-", "_")
+    upload_dir = MODULE_OPERATIONS_ROOT / operation_id
+    upload_dir.mkdir(parents=True, exist_ok=False)
+    files = {name: form.get(name) for name in ("archive", "manifest", "signature")}
+    if any(value is None or not hasattr(value, "read") for value in files.values()):
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        raise HTTPException(400, "Upload archive, manifest and signature files together")
+    limits = {"archive": 512 * 1024 * 1024, "manifest": 1024 * 1024, "signature": 1024 * 1024}
+    uploaded_paths = {}
+    for name, upload in files.items():
+        filename = Path(str(getattr(upload, "filename", ""))).name
+        if name == "archive" and not filename.endswith(".tar.gz"):
+            shutil.rmtree(upload_dir, ignore_errors=True)
+            raise HTTPException(400, "Archive must be a .tar.gz file")
+        target = upload_dir / (filename or name)
+        uploaded_paths[name] = target
+        total = 0
+        with target.open("wb") as stream:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > limits[name]:
+                    shutil.rmtree(upload_dir, ignore_errors=True)
+                    raise HTTPException(413, f"{name.title()} exceeds the upload limit")
+                stream.write(chunk)
+    archive = next(upload_dir.glob("*.tar.gz"), None)
+    if archive is None:
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        raise HTTPException(400, "Archive filename is invalid")
+    stem = archive.name[:-7]
+    manifest = upload_dir / f"{stem}.manifest.json"
+    signature = upload_dir / f"{stem}.manifest.sig"
+    if uploaded_paths["manifest"] != manifest:
+        shutil.move(uploaded_paths["manifest"], manifest)
+    if uploaded_paths["signature"] != signature:
+        shutil.move(uploaded_paths["signature"], signature)
+    return _start_module_operation("install", None, [str(SPAWNWP_CLI), "module", "install", str(archive)], cleanup=upload_dir)
+
+
+def _validate_module_id(module_id: str) -> str:
+    if not MODULE_ID_RE.fullmatch(module_id):
+        raise HTTPException(400, "Invalid module id")
+    return module_id
+
+
+@app.post("/api/modules/{module_id}/enable", status_code=202)
+def modules_enable(module_id: str):
+    module_id = _validate_module_id(module_id)
+    return _start_module_operation("enable", module_id, [str(SPAWNWP_CLI), "module", "enable", module_id])
+
+
+@app.post("/api/modules/{module_id}/disable", status_code=202)
+def modules_disable(module_id: str):
+    module_id = _validate_module_id(module_id)
+    return _start_module_operation("disable", module_id, [str(SPAWNWP_CLI), "module", "disable", module_id])
+
+
+@app.post("/api/modules/{module_id}/update", status_code=202)
+def modules_update(module_id: str, source: str | None = Query(default=None)):
+    module_id = _validate_module_id(module_id)
+    command = [str(SPAWNWP_CLI), "module", "update", module_id]
+    if source:
+        if not source.startswith("https://"):
+            raise HTTPException(400, "Update source must use HTTPS")
+        command.extend(["--source", source])
+    return _start_module_operation("update", module_id, command)
+
+
+@app.delete("/api/modules/{module_id}", status_code=202)
+def modules_remove(module_id: str, force: bool = Query(default=False)):
+    module_id = _validate_module_id(module_id)
+    command = [str(SPAWNWP_CLI), "module", "remove", module_id]
+    if force:
+        command.append("--force")
+    return _start_module_operation("uninstall", module_id, command)
+
+
+@app.get("/api/modules/operations/{operation_id}")
+def module_operation(operation_id: str):
+    return _refresh_module_operation(_read_module_operation(operation_id))
 
 
 @app.get("/", include_in_schema=False)
@@ -2131,6 +2416,11 @@ def cockpit_root():
 @app.get("/login", include_in_schema=False)
 def cockpit_login():
     return login_page()
+
+
+@app.get("/modules", include_in_schema=False)
+def modules_page():
+    return FileResponse(STATIC_DIR / "modules.html")
 
 
 @app.get("/manage", include_in_schema=False)

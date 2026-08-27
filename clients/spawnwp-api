@@ -9,6 +9,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -21,7 +22,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 DEFAULT_CONFIG = Path(
     os.environ.get(
         "SPAWNWP_API_CONFIG",
@@ -342,6 +343,8 @@ def command_provision(args) -> dict:
         "expires_seconds": args.expires,
         "role": args.role,
         "group": args.group,
+        "access_profile": args.access_profile,
+        "credentials_mode": args.credentials_mode,
     }
     if args.name:
         payload["name"] = args.name
@@ -352,6 +355,15 @@ def command_provision(args) -> dict:
         payload=payload,
         headers={"Idempotency-Key": args.idempotency_key or secrets.token_urlsafe(18)},
         timeout=args.timeout,
+    )
+
+
+def command_magic_link(args) -> dict:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,30}", args.project):
+        raise ClientError("Project must be a lowercase SpawnWP slug")
+    config = load_config(args.config.expanduser())
+    return signed_request(
+        config, "POST", f"/api/provision/sites/{args.project}/magic-link",
     )
 
 
@@ -392,9 +404,14 @@ def print_human(command: str, result: dict) -> None:
         print(f"URL:          {result['url']}")
         print(f"Expires:      {iso_time(result['expires_at'])}")
         print(f"Username:     {result['username']}")
-        print(f"Password:     {result['password']}")
+        if result.get("password"):
+            print(f"Password:     {result['password']}")
         if result.get("magic_link"):
             print(f"Magic link:   {result['magic_link']}")
+    elif command == "magic-link":
+        print(f"Project:      {result['project']}")
+        print(f"Magic link:   {result['url']}")
+        print(f"Expires in:   {result['expires_in']} seconds")
     elif command == "revoke":
         print("Connection revoked.")
         print(f"Active sites preserved: {result['active_sites']}")
@@ -436,10 +453,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     provision.add_argument("--group", default="API")
     provision.add_argument("--name")
+    provision.add_argument(
+        "--access-profile", choices=["standard", "restricted-admin"], default="standard",
+    )
+    provision.add_argument(
+        "--credentials-mode", choices=["return", "managed"], default="return",
+    )
     provision.add_argument("--idempotency-key")
     provision.add_argument("--timeout", type=int, default=610)
     provision.add_argument("--json", action="store_true")
     provision.set_defaults(handler=command_provision)
+
+    magic = subparsers.add_parser(
+        "magic-link", help="mint managed admin access for an owned site",
+    )
+    magic.add_argument("project")
+    magic.add_argument("--json", action="store_true")
+    magic.set_defaults(handler=command_magic_link)
 
     revoke = subparsers.add_parser("revoke", help="revoke this API connection")
     revoke.add_argument("--yes", action="store_true", help="confirm permanent revocation")

@@ -4,6 +4,29 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.33
+
+- **Signed optional modules.** SpawnWP now verifies module signatures, archive and per-file
+  checksums, core compatibility and lifecycle hooks, then activates releases atomically. The
+  Cockpit includes a dedicated Modules page with install, enable, disable, update and uninstall
+  controls, operation status and consistent navigation styling.
+- **Least-privilege local modules.** A signed module can declare one `core_api_scope`; SpawnWP
+  provisions a root-only credential, exposes it only through systemd, routes the module through
+  the enabled Cockpit virtual host and revokes the credential on removal.
+- **Managed demo provisioning.** The provisioning API supports restricted-admin sites, on-demand
+  single-use admin links, blueprint discovery and lifetimes that begin after post-create setup.
+  The separately signed Demo Launcher beta adds Turnstile, CSRF protection, privacy-preserving
+  limits, campaign capacity, durable queueing, expiring public URLs and campaign management.
+- **Telemetry reliability and reporting.** Telemetry reports now distinguish observed, confirmed,
+  provisional and anomalous installations; suspicious one-shot bursts are quarantined and the
+  email report and dashboard use the same aggregates.
+- **Core reliability.** Includes the duplicate-port repair migration, updater/version fallback
+  fixes, bounded and redacted provisioning errors, permanent-site expiry handling and the
+  associated API, installer and migration tests.
+- **Documentation and distribution.** Refreshed provisioning/security documentation, OpenAPI
+  examples, public-site comparison content and the SpawnWP Deploy 0.3.6 listing are included in
+  this consolidated release.
+
 ## 0.5.32
 
 - **Stopped sites now keep ownership of their host ports.** Port allocation reserves the

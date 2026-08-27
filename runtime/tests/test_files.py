@@ -88,6 +88,15 @@ class FileManagerTests(unittest.TestCase):
         self.assertTrue(self.app.requires_recent_auth("/api/snapshots/delete"))
         self.assertFalse(self.app.requires_recent_auth("/api/snapshots/label"))
 
+    def test_step_up_covers_module_lifecycle_mutations(self):
+        for path in (
+            "/api/modules/install", "/api/modules/demo-launcher/enable",
+            "/api/modules/demo-launcher/disable", "/api/modules/demo-launcher/update",
+            "/api/modules/demo-launcher",
+        ):
+            self.assertTrue(self.app.requires_recent_auth(path))
+        self.assertFalse(self.app.requires_recent_auth("/api/modules/operations/abc12345"))
+
 
 class CapacityGuardTests(unittest.TestCase):
     @classmethod

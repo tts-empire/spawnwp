@@ -112,6 +112,8 @@ class ClientApiIntegrationTests(unittest.TestCase):
             role="administrator",
             group="API",
             name="integration-site",
+            access_profile="standard",
+            credentials_mode="return",
             idempotency_key="integration-request-0001",
             timeout=610,
         )

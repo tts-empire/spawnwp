@@ -45,7 +45,7 @@ paths:
               $ref: "#/components/schemas/ProvisionRequest"
       responses:
         "200":
-          description: The site and its one-time credentials
+          description: The site and access metadata; credentials when requested
           headers:
             Idempotent-Replayed:
               description: Present and true when returning a stored result.
@@ -93,6 +93,33 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/WrongScope"
+  /api/provision/sites/{project}/magic-link:
+    post:
+      summary: Mint a short-lived admin link for an owned managed site
+      operationId: mintProvisionedSiteMagicLink
+      parameters:
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A single-use link expiring after two minutes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MagicLinkResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/WrongScope"
+        "404":
+          description: The active site does not belong to this connection
+        "409":
+          description: The site does not use managed credentials or has no managed user
+        "410":
+          description: The site has expired
 components:
   securitySchemes:
     SpawnWPSignature:
@@ -130,9 +157,19 @@ components:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
           description: Optional project and URL slug. Omit it to generate a random name.
+        access_profile:
+          type: string
+          enum: [standard, restricted-admin]
+          default: standard
+          description: restricted-admin installs a capability guard suitable for product demos.
+        credentials_mode:
+          type: string
+          enum: [return, managed]
+          default: return
+          description: managed omits reusable credentials and the initial magic link.
     ProvisionResult:
       type: object
-      required: [project, url, expires_at, username, password]
+      required: [project, url, expires_at, username]
       properties:
         project:
           type: string
@@ -147,9 +184,35 @@ components:
         password:
           type: string
           format: password
+          description: Present only when credentials_mode is return.
         magic_link:
           type: string
           format: uri
+          description: May be present only when credentials_mode is return.
+    MagicLinkResult:
+      type: object
+      required: [project, url, expires_in]
+      properties:
+        project:
+          type: string
+        url:
+          type: string
+          format: uri
+        expires_in:
+          type: integer
+          const: 120
+    BlueprintSummary:
+      type: object
+      required: [id, name, version, source]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        source:
+          type: string
     ProvisionSite:
       type: object
       required: [project, url, status, expires_at, created_at]
@@ -174,6 +237,7 @@ components:
         - limits
         - active_sites
         - sites
+        - blueprints
       properties:
         api_version:
           type: integer
@@ -200,6 +264,14 @@ components:
               type: string
             group:
               type: string
+            access_profile:
+              type: string
+              enum: [standard, restricted-admin]
+              default: standard
+            credentials_mode:
+              type: string
+              enum: [return, managed]
+              default: return
         limits:
           type: object
           properties:
@@ -217,6 +289,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProvisionSite"
+        blueprints:
+          type: array
+          description: Blueprints currently available to the paired integration.
+          items:
+            $ref: "#/components/schemas/BlueprintSummary"
     Error:
       type: object
       required: [detail]

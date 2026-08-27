@@ -5,3 +5,4 @@ argon2-cffi==25.1.0
 pyotp==2.10.0
 cryptography==49.0.0
 qrcode==8.2
+python-multipart==0.0.20

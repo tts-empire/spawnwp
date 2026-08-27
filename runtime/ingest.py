@@ -114,6 +114,8 @@ def _connect() -> sqlite3.Connection:
             private_key TEXT NOT NULL DEFAULT '', pair_token_hash TEXT NOT NULL DEFAULT '',
             pair_expires INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
             scope TEXT NOT NULL DEFAULT 'ingest',
+            connection_kind TEXT NOT NULL DEFAULT 'remote',
+            module_id TEXT NOT NULL DEFAULT '',
             created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS jobs(
             id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, state TEXT NOT NULL,
@@ -129,7 +131,11 @@ def _connect() -> sqlite3.Connection:
     columns = {row["name"] for row in db.execute("PRAGMA table_info(connections)")}
     if "scope" not in columns:
         db.execute("ALTER TABLE connections ADD COLUMN scope TEXT NOT NULL DEFAULT 'ingest'")
-        db.commit()
+    if "connection_kind" not in columns:
+        db.execute("ALTER TABLE connections ADD COLUMN connection_kind TEXT NOT NULL DEFAULT 'remote'")
+    if "module_id" not in columns:
+        db.execute("ALTER TABLE connections ADD COLUMN module_id TEXT NOT NULL DEFAULT ''")
+    db.commit()
     if fresh:
         try:
             os.chmod(path, 0o600)
@@ -243,7 +249,8 @@ def list_pairings():
     db = _connect()
     try:
         _janitor(db)
-        rows = db.execute("SELECT id, label, remote_host, status, scope, pair_expires, created_at "
+        rows = db.execute("SELECT id, label, remote_host, status, scope, connection_kind, "
+                          "module_id, pair_expires, created_at "
                           "FROM connections WHERE status IN ('pending','active') "
                           "ORDER BY created_at DESC").fetchall()
         return {"connections": [dict(row) for row in rows]}

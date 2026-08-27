@@ -48,6 +48,7 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 64M;
+    include /etc/nginx/spawnwp-modules/*.conf;
     location = /_spawnwp_auth {
         internal;
         proxy_pass http://127.0.0.1:9393/api/auth/check;

@@ -149,4 +149,6 @@ include:
 
 These are planned product directions, not delivery commitments or guaranteed dates.
 SpawnWP will remain focused on controlled, disposable development environments rather
-than anonymous public provisioning, WaaS, or production staging synchronization.
+than exposing anonymous provisioning from the core, becoming a WaaS, or synchronizing
+production staging. Advanced public-demo workflows can be installed explicitly as signed,
+separately distributed modules.

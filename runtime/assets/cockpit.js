@@ -2385,7 +2385,10 @@ async function loadBlueprintCapture() {
       const status = connection.status === 'active'
         ? '<span class="badge badge-green">connected</span>'
         : `<span class="badge badge-yellow">pending · expires ${new Date(connection.pair_expires * 1000).toLocaleTimeString()}</span>`;
-      return `<tr><td>${esc(connection.remote_host || connection.label || connection.id.slice(0, 8))}</td><td><span class="badge badge-gray">${esc(connection.scope || 'ingest')}</span></td><td>${status}</td>
+      const client = connection.connection_kind === 'local_module'
+        ? `${esc(connection.label || connection.module_id)} <span class="badge badge-gray">local module</span>`
+        : esc(connection.remote_host || connection.label || connection.id.slice(0, 8));
+      return `<tr><td>${client}</td><td><span class="badge badge-gray">${esc(connection.scope || 'ingest')}</span></td><td>${status}</td>
         <td>${new Date(connection.created_at * 1000).toLocaleDateString()}</td>
         <td><button class="btn-neutral btn-sm" onclick="revokeBlueprintConnection('${esc(connection.id)}')">Revoke</button></td></tr>`;
     }).join('');
@@ -2461,6 +2464,143 @@ if (document.body.dataset.page === 'manage') {
   checkPasskeyNudge();
 }
 if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCapture(); }
+
+let MODULE_OPERATION_TIMER = null;
+const MODULE_SOURCE_BY_ID = {};
+
+function toggleModuleInstall(force) {
+  const form = document.getElementById('module-install-form');
+  if (!form) return;
+  form.hidden = force === undefined ? !form.hidden : !force;
+  if (!form.hidden) form.querySelector('input')?.focus();
+}
+
+function moduleStatusBadge(status) {
+  const map = { active: ['Active', 'badge-green'], disabled: ['Disabled', 'badge-gray'], error: ['Error', 'badge-red'], updating: ['Updating', 'badge-yellow'] };
+  const item = map[status] || ['Installed', 'badge-gray'];
+  return `<span class="badge ${item[1]}"><span class="dot"></span>${item[0]}</span>`;
+}
+
+function moduleActionLabel(action) {
+  return ({ enable: 'Enable', disable: 'Disable', update: 'Update', uninstall: 'Uninstall' })[action] || action;
+}
+
+async function runModuleAction(id, action, recordedSource) {
+  if (action === 'disable' && !confirm('Disable this module? Its services and routes will stop, but installed files and existing core-managed sites will remain.')) return;
+  const forceUninstall = action === 'force-uninstall';
+  if ((action === 'uninstall' || forceUninstall) && !confirm(forceUninstall
+    ? 'Force uninstall this module? This bypasses its active-resource safety check and removes its integration.'
+    : 'Uninstall this module? Its code, routes, services and module credentials will be removed. Active resources may block the operation.')) return;
+  if (action === 'update' && !recordedSource) recordedSource = MODULE_SOURCE_BY_ID[id] || '';
+  if (action === 'update' && !recordedSource) {
+    recordedSource = prompt('Enter the HTTPS URL of the signed .tar.gz package (including matching manifest and signature):', 'https://');
+    if (!recordedSource) return;
+  }
+  const method = (action === 'uninstall' || forceUninstall) ? 'DELETE' : 'POST';
+  let endpoint = (action === 'uninstall' || forceUninstall) ? `${BASE}/modules/${encodeURIComponent(id)}` : `${BASE}/modules/${encodeURIComponent(id)}/${action}`;
+  if (forceUninstall) endpoint += '?force=true';
+  if (action === 'update' && recordedSource) endpoint += `?source=${encodeURIComponent(recordedSource)}`;
+  try {
+    const response = await sensitiveFetch(endpoint, { method });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText || `Unable to ${action} module`);
+    showToast(`${moduleActionLabel(forceUninstall ? 'uninstall' : action)} started`);
+    watchModuleOperation(payload.id);
+  } catch (error) { showToast(error.message, true); }
+}
+
+async function watchModuleOperation(id) {
+  if (!id) return;
+  if (MODULE_OPERATION_TIMER) clearTimeout(MODULE_OPERATION_TIMER);
+  const poll = async () => {
+    try {
+      const response = await fetch(`${BASE}/modules/operations/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      const operation = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(operation.detail || response.statusText);
+      const root = document.getElementById('modules-list');
+      if (root && operation.state === 'failed') {
+        const error = document.createElement('div');
+        error.className = 'module-operation error';
+        error.textContent = operation.error || 'Module operation failed';
+        if (operation.action === 'uninstall' && /active|force|work/i.test(operation.error || '')) {
+          const force = document.createElement('button');
+          force.className = 'btn-danger btn-sm'; force.type = 'button'; force.textContent = 'Force uninstall';
+          force.onclick = () => runModuleAction(operation.module_id, 'force-uninstall');
+          error.appendChild(document.createTextNode(' ')); error.appendChild(force);
+        }
+        root.prepend(error);
+      }
+      if (operation.state === 'succeeded') { showToast(operation.message || 'Module operation completed'); loadModules(); return; }
+      if (operation.state === 'failed') { showToast(operation.error || 'Module operation failed', true); setTimeout(loadModules, 4000); return; }
+      if (root) {
+        const existing = root.querySelector('.module-operation:not(.error)');
+        if (existing) existing.textContent = operation.message || 'Module operation in progress…';
+        else { const info = document.createElement('div'); info.className = 'module-operation'; info.textContent = operation.message || 'Module operation in progress…'; root.prepend(info); }
+      }
+      MODULE_OPERATION_TIMER = setTimeout(poll, 900);
+    } catch (error) { showToast(error.message, true); }
+  };
+  poll();
+}
+
+async function submitModuleInstall(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  const button = form.querySelector('button[type=submit]');
+  button.disabled = true; button.textContent = 'Uploading…';
+  try {
+    const response = await sensitiveFetch(`${BASE}/modules/install`, { method: 'POST', body: data });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to install module');
+    form.reset(); toggleModuleInstall(false); showToast('Module installation started'); watchModuleOperation(payload.id);
+  } catch (error) { showToast(error.message, true); }
+  finally { button.disabled = false; button.textContent = 'Upload and install'; }
+}
+
+async function loadModules() {
+  const root = document.getElementById('modules-list');
+  if (!root) return;
+  root.setAttribute('aria-busy', 'true');
+  root.innerHTML = '<div class="module-skeleton" aria-hidden="true"><span class="module-skeleton-line module-skeleton-title"></span><span class="module-skeleton-line"></span><span class="module-skeleton-line module-skeleton-short"></span></div>';
+  const summary = document.getElementById('modules-summary');
+  if (summary) summary.innerHTML = '';
+  try {
+    const response = await fetch(`${BASE}/modules`, { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to load modules');
+    const modules = payload.modules || [];
+    Object.keys(MODULE_SOURCE_BY_ID).forEach(key => delete MODULE_SOURCE_BY_ID[key]);
+    modules.forEach(item => { MODULE_SOURCE_BY_ID[item.id] = item.source_url || ''; });
+    if (summary) {
+      const counts = modules.reduce((result, item) => { result[item.status || 'active'] = (result[item.status || 'active'] || 0) + 1; return result; }, {});
+      summary.innerHTML = `<span class="badge badge-gray">${modules.length} installed</span><span class="badge badge-green">${counts.active || 0} active</span><span class="badge badge-gray">${counts.disabled || 0} disabled</span>${counts.error ? `<span class="badge badge-red">${counts.error} error</span>` : ''}`;
+    }
+    root.innerHTML = modules.length ? modules.map(item => {
+      const id = esc(item.id);
+      const caps = item.capabilities || {};
+      const actionButtons = [
+        item.admin_path ? `<a class="btn-primary btn-sm" href="${esc(item.admin_path)}">Manage</a>` : '',
+        caps.activate && item.status !== 'active' ? `<button class="btn-success btn-sm" type="button" onclick="runModuleAction('${id}', 'enable')">Enable</button>` : '',
+        caps.deactivate && item.status === 'active' ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'disable')">Disable</button>` : '',
+        caps.update ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'update')">Update</button>` : '',
+        caps.uninstall ? `<button class="btn-danger btn-sm" type="button" onclick="runModuleAction('${id}', 'uninstall')">Uninstall</button>` : '',
+      ].join('');
+      return `<article class="module-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} ${moduleStatusBadge(item.status)} <span class="module-card-id">${id}</span></div><p>${esc(item.description || 'SpawnWP module')}</p><div class="module-card-meta">Version ${esc(item.version || 'unknown')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}${item.last_error ? ` · ${esc(item.last_error)}` : ''}</div></div><div class="module-card-actions">${actionButtons || '<span class="field-help">No management actions available</span>'}</div></article>`;
+    }).join('') : '<p class="field-help">No optional modules are installed. Install a signed package to get started.</p>';
+    root.removeAttribute('aria-busy');
+    const pending = modules.find(item => item.operation_id);
+    if (pending) watchModuleOperation(pending.operation_id);
+  } catch (error) {
+    root.innerHTML = `<div class="inline-alert">${esc(error.message || 'Unable to load modules')}</div>`;
+    root.removeAttribute('aria-busy');
+  }
+}
+
+if (document.body.dataset.page === 'modules') {
+  loadModules();
+  document.getElementById('module-install-form')?.addEventListener('submit', submitModuleInstall);
+}
 if (document.body.dataset.page !== 'updates') pollMetrics();
 loadUpdateStatus();
 loadTelemetryStatus();

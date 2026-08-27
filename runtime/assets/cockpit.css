@@ -379,6 +379,35 @@
   .telemetry-card p { color: var(--muted); margin: 7px 0; font-size: 13px; line-height: 1.55; }
   .telemetry-card .telemetry-exclusions { font-size: var(--font-small); }
   .telemetry-card a { color: var(--accent); }
+  /* Keep action links readable when they also sit inside a telemetry card.
+     The more-specific card link rule must not repaint a primary button's
+     dark label with the accent colour on an accent background. */
+  .telemetry-card a.btn-primary { display: inline-block; color: #0d0d10; border-radius: 4px; text-decoration: none; }
+  .telemetry-card a.btn-primary:hover { filter: brightness(1.12); }
+  .modules-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:16px; }
+  .modules-summary { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .modules-summary .badge { font-variant-numeric:tabular-nums; }
+  .module-list-section { margin-top: 30px; }
+  .module-list-section > .section-title { color: var(--text); margin-bottom: 8px; }
+  #modules-list { display:grid; gap:12px; margin-top:16px; }
+  .module-skeleton { min-height:132px; padding:20px; box-sizing:border-box; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+  .module-skeleton-line { display:block; width:72%; height:12px; margin:12px 0; border-radius:3px; background:var(--surface3); }
+  .module-skeleton-title { width:40%; height:18px; margin-top:0; }
+  .module-skeleton-short { width:48%; }
+  .module-card { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; padding:20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 12px 32px rgba(0,0,0,.16); }
+  .module-card:hover { border-color:var(--border-strong); }
+  .module-card-main { min-width:0; flex:1; }
+  .module-card-title { display:flex; align-items:center; flex-wrap:wrap; gap:9px; font-size:16px; font-weight:650; }
+  .module-card-id { color:var(--muted); font:12px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .module-card p { color:var(--muted); margin:7px 0; font-size:13px; line-height:1.55; }
+  .module-card-meta { color:var(--muted); font-size:12px; }
+  .module-card-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; min-width:220px; }
+  .module-install { margin:16px 0 18px; padding:16px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); }
+  .module-install label { display:block; color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; margin:12px 0; }
+  .module-install input[type=file] { display:block; width:100%; margin-top:6px; padding:8px; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:4px; font-size:12px; }
+  .module-operation { grid-column:1 / -1; margin:0; padding:10px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); color:var(--muted); font-size:12px; }
+  .module-operation.error { border-color:var(--red); background:#241111; color:var(--red); white-space:pre-wrap; }
+  .module-card-actions .btn-danger { margin-left:5px; }
   #telemetry-state { display: block; margin-top: 12px; color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; }
   .toggle { display: grid; grid-template-columns: 42px max-content; align-items: center; gap: 10px; cursor: pointer; }
   .toggle input { position: absolute; opacity: 0; pointer-events: none; }
@@ -430,7 +459,7 @@
   .gc-setting input[type="number"] { width: 76px; min-height: 34px; background: #050506; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: var(--font-control); }
   .gc-setting small { flex-basis: 100%; color: var(--muted); font-size: var(--font-small); }
   .docker-disk .field-help { display: block; margin-top: 8px; }
-  @media (max-width: 760px) { .system-panel { padding: 18px; } }
+  @media (max-width: 760px) { .system-panel { padding: 18px; } .modules-heading { align-items:stretch; flex-direction:column; } .modules-heading .btn-primary { width:100%; } .module-card { flex-direction:column; gap:14px; } .module-card-actions { justify-content:flex-start; min-width:0; } }
   @media (max-width: 440px) {
     .system-panel { padding: 16px; }
     .system-primary-action .btn-primary { width: 100%; }

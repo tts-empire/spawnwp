@@ -11,6 +11,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   deliberate purge starts from a clean configuration. Modules can reject purging while resources
   are still active.
 
+## 0.5.40
+
+- **Purge packaging correction.** The explicit module-data purge controls were packaged and
+  published, including the signed Demo Launcher 0.2.11 package and the updated marketplace
+  catalog. This release contains the finalized changes from the unpublished 0.5.39 development
+  tag.
+
 ## 0.5.38
 
 - **Reliable sensitive-action confirmation.** WebAuthn descriptors now preserve registered

@@ -4,6 +4,11 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.36
+
+- **Marketplace packaging correction.** The catalog verifier is now placed at the Cockpit module
+  root by the release builder, allowing service restarts and fresh installations to import it.
+
 ## 0.5.35
 
 - **Marketplace packaging fix.** Include the signed-catalog verifier in the managed Cockpit

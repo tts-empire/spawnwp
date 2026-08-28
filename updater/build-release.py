@@ -89,7 +89,7 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "module_api.py", "provision.py", "requirements.txt"}
+            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "module_api.py", "module_catalog.py", "provision.py", "requirements.txt"}
                       else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:

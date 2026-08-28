@@ -4,7 +4,7 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
-## 0.5.39
+## 0.5.40
 
 - **Explicit module data purge.** Module uninstall now has a separate `--purge` mode and the
   Cockpit exposes “Uninstall and delete data”, so a normal reinstall can preserve state while a

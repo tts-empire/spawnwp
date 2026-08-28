@@ -2467,6 +2467,8 @@ if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCa
 
 let MODULE_OPERATION_TIMER = null;
 const MODULE_SOURCE_BY_ID = {};
+let MARKETPLACE_MODULES = [];
+let MARKETPLACE_INSTALLED = [];
 
 function toggleModuleInstall(force) {
   const form = document.getElementById('module-install-form');
@@ -2530,8 +2532,8 @@ async function watchModuleOperation(id) {
         }
         root.prepend(error);
       }
-      if (operation.state === 'succeeded') { showToast(operation.message || 'Module operation completed'); loadModules(); return; }
-      if (operation.state === 'failed') { showToast(operation.error || 'Module operation failed', true); setTimeout(loadModules, 4000); return; }
+      if (operation.state === 'succeeded') { showToast(operation.message || 'Module operation completed'); loadModules(); loadMarketplace(); return; }
+      if (operation.state === 'failed') { showToast(operation.error || 'Module operation failed', true); setTimeout(() => { loadModules(); loadMarketplace(); }, 4000); return; }
       if (root) {
         const existing = root.querySelector('.module-operation:not(.error)');
         if (existing) existing.textContent = operation.message || 'Module operation in progress…';
@@ -2597,8 +2599,53 @@ async function loadModules() {
   }
 }
 
+async function installMarketplaceModule(id, version) {
+  const item = MARKETPLACE_MODULES.find(entry => entry.id === id);
+  if (!item) return;
+  const installed = MARKETPLACE_INSTALLED.find(entry => entry.id === id);
+  const prompt = installed ? `Install ${item.name} ${item.version} as an update?` : `Install ${item.name} ${item.version}?`;
+  if (!confirm(prompt)) return;
+  try {
+    const response = await sensitiveFetch(`${BASE}/modules/catalog/install`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id, version}),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to install module');
+    showToast('Module installation started');
+    watchModuleOperation(payload.id);
+  } catch (error) { showToast(error.message, true); }
+}
+
+async function loadMarketplace() {
+  const root = document.getElementById('marketplace-list');
+  if (!root) return;
+  root.setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch(`${BASE}/modules/catalog`, {cache: 'no-store'});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to load marketplace');
+    MARKETPLACE_MODULES = payload.modules || [];
+    MARKETPLACE_INSTALLED = payload.installed || [];
+    const summary = document.getElementById('marketplace-summary');
+    if (summary) summary.innerHTML = `<span class="badge badge-gray">${MARKETPLACE_MODULES.length} available</span><span class="badge badge-green">Free · signed catalog</span>`;
+    root.innerHTML = MARKETPLACE_MODULES.length ? MARKETPLACE_MODULES.map(item => {
+      const installed = MARKETPLACE_INSTALLED.find(entry => entry.id === item.id);
+      const same = installed && installed.version === item.version;
+      const action = same ? '<span class="badge badge-green">Installed</span>' : `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">${installed ? 'Install update' : 'Install'}</button>`;
+      const tags = Array.isArray(item.tags) ? item.tags.map(tag => `<span class="module-tag">${esc(tag)}</span>`).join('') : '';
+      return `<article class="module-card marketplace-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} <span class="badge badge-gray">Free</span><span class="module-card-id">v${esc(item.version)}</span></div><p>${esc(item.description)}</p><div class="module-card-meta">Requires SpawnWP ${esc(item.min_core_version || '0.0.0')}–${esc(item.max_core_version || 'latest')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}</div>${tags ? `<div class="module-tags">${tags}</div>` : ''}</div><div class="module-card-actions">${item.docs_url ? `<a class="btn-neutral btn-sm" href="${esc(item.docs_url)}" target="_blank" rel="noopener">Docs ↗</a>` : ''}${action}</div></article>`;
+    }).join('') : '<p class="field-help">No free modules are currently available.</p>';
+    root.removeAttribute('aria-busy');
+  } catch (error) {
+    root.innerHTML = `<div class="inline-alert">${esc(error.message || 'Unable to load marketplace')}</div>`;
+    root.removeAttribute('aria-busy');
+  }
+}
+
 if (document.body.dataset.page === 'modules') {
   loadModules();
+  loadMarketplace();
   document.getElementById('module-install-form')?.addEventListener('submit', submitModuleInstall);
 }
 if (document.body.dataset.page !== 'updates') pollMetrics();

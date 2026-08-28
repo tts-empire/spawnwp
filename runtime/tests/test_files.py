@@ -92,7 +92,7 @@ class FileManagerTests(unittest.TestCase):
         for path in (
             "/api/modules/install", "/api/modules/demo-launcher/enable",
             "/api/modules/demo-launcher/disable", "/api/modules/demo-launcher/update",
-            "/api/modules/demo-launcher",
+            "/api/modules/demo-launcher", "/api/modules/catalog/install",
         ):
             self.assertTrue(self.app.requires_recent_auth(path))
         self.assertFalse(self.app.requires_recent_auth("/api/modules/operations/abc12345"))

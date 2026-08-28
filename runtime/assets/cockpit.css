@@ -408,6 +408,12 @@
   .module-operation { grid-column:1 / -1; margin:0; padding:10px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); color:var(--muted); font-size:12px; }
   .module-operation.error { border-color:var(--red); background:#241111; color:var(--red); white-space:pre-wrap; }
   .module-card-actions .btn-danger { margin-left:5px; }
+  .marketplace-section { margin-top: 30px; }
+  #marketplace-list { display:grid; gap:12px; margin-top:16px; }
+  .marketplace-card { border-left: 3px solid var(--accent); }
+  .module-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:11px; }
+  .module-tag { border:1px solid var(--border); border-radius:999px; padding:3px 8px; color:var(--muted); font-size:11px; }
+  .marketplace-card .module-card-actions { min-width:180px; }
   #telemetry-state { display: block; margin-top: 12px; color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; }
   .toggle { display: grid; grid-template-columns: 42px max-content; align-items: center; gap: 10px; cursor: pointer; }
   .toggle input { position: absolute; opacity: 0; pointer-events: none; }

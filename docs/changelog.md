@@ -4,6 +4,15 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.34
+
+- **Free module marketplace.** The Cockpit now displays a SpawnWP-curated, signed catalog of free
+  modules and installs entries through a server-side allowlist. Catalog and package signatures,
+  HTTPS-only URLs, semantic-version compatibility and archive limits are validated before code is
+  executed; the manual upload and CLI workflows remain available as fallbacks.
+- **Marketplace documentation and cache busting.** Added catalog hosting/signing guidance,
+  release notes and the 0.5.34 asset version across Cockpit pages.
+
 ## 0.5.33
 
 - **Signed optional modules.** SpawnWP now verifies module signatures, archive and per-file

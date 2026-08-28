@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from auth import initialize as initialize_auth
 from auth import is_enrolled, login_page, rate_limit, router as auth_router, session as auth_session, valid_csrf
 from ingest import router as ingest_router, spawnwp_version
+from module_catalog import CatalogError, load as load_module_catalog
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -41,7 +42,7 @@ DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/up
                      "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings",
                      "/api/snapshots/delete"}
 FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir|unzip)$")
-MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|update))?$")
+MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|update))?$|^/api/modules/catalog/install$")
 
 
 def requires_recent_auth(path: str) -> bool:
@@ -2315,6 +2316,43 @@ def installed_modules() -> list[dict]:
 @app.get("/api/modules")
 def modules_api():
     return {"modules": installed_modules()}
+
+
+@app.get("/api/modules/catalog")
+def modules_catalog_api():
+    try:
+        catalog = load_module_catalog(spawnwp_version())
+    except CatalogError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    installed = installed_modules()
+    return {
+        "catalog_version": catalog["catalog_version"],
+        "publisher": catalog["publisher"],
+        "modules": catalog["modules"],
+        "installed": installed,
+    }
+
+
+class CatalogInstallRequest(BaseModel):
+    id: str
+    version: str | None = None
+
+
+@app.post("/api/modules/catalog/install", status_code=202)
+def modules_catalog_install(body: CatalogInstallRequest):
+    try:
+        catalog = load_module_catalog(spawnwp_version())
+    except CatalogError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    item = next((entry for entry in catalog["modules"] if entry["id"] == body.id), None)
+    if item is None:
+        raise HTTPException(404, "Module is not available in the signed catalog")
+    if body.version and body.version != item["version"]:
+        raise HTTPException(409, "Requested module version is not the catalog version")
+    return _start_module_operation(
+        "install", item["id"],
+        [str(SPAWNWP_CLI), "module", "install", item["archive_url"]],
+    )
 
 
 @app.post("/api/modules/install", status_code=202)

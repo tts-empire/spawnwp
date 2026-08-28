@@ -60,6 +60,20 @@ Cockpit lifecycle operations run asynchronously. Their progress is available fro
 `/api/modules/operations/{operation_id}` and all mutating requests require session, CSRF and
 recent passkey authentication.
 
+## Free marketplace
+
+The Cockpit Marketplace reads a small, signed catalog from
+`https://spawnwp.com/modules/catalog.json` (signature:
+`catalog.sig.b64`). The catalog is curated by SpawnWP and currently contains free modules only.
+Each entry points to a GitHub Release `.tar.gz`; the matching signed manifest and signature are
+downloaded automatically and verified by the same module trust key before installation. The
+browser never submits an arbitrary package URL: the server resolves the selected module from the
+verified catalog and starts the normal asynchronous module install operation.
+
+The catalog is optional. If it is unavailable or its signature is invalid, installed modules and
+the manual upload/CLI workflow remain available. Operators can override the catalog endpoint with
+`SPAWNWP_MODULE_CATALOG_URL` and `SPAWNWP_MODULE_CATALOG_SIGNATURE_URL` when testing a mirror.
+
 ## Demo Launcher beta
 
 Demo Launcher is the first optional, separately developed module. It turns a captured blueprint

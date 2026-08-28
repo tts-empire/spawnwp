@@ -114,7 +114,7 @@ mv -Tf "$next_link" "$PUBLIC_LINK"
 flipped=1
 
 base="https://$HOST"
-for path in / /wordpress-sandbox/ /alternatives/ /alternatives/instawp/ /alternatives/localwp/ /alternatives/tastewp/ /use-cases/ /use-cases/plugin-development/ /guides/ /guides/test-wordpress-multiple-php-versions/ /guides/wordpress-sandbox-vs-staging/ /docs/ /downloads/spawnwp-api /downloads/spawnwp-api.sha256 /sitemap.xml /sitemap-pages.xml; do
+for path in / /wordpress-sandbox/ /alternatives/ /alternatives/instawp/ /alternatives/localwp/ /alternatives/tastewp/ /use-cases/ /use-cases/plugin-development/ /use-cases/wordpress-product-demos/ /guides/ /guides/test-wordpress-multiple-php-versions/ /guides/wordpress-sandbox-vs-staging/ /docs/ /downloads/spawnwp-api /downloads/spawnwp-api.sha256 /sitemap.xml /sitemap-pages.xml; do
   curl --resolve "$HOST:443:127.0.0.1" -fsS -o /dev/null "$base$path"
 done
 

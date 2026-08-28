@@ -47,6 +47,7 @@ Old `-dev` packages are retained for audit under
 | /alternatives/localwp/ | LocalWP alternative for remote development | published |
 | /alternatives/tastewp/ | self-hosted TasteWP alternative | published |
 | /use-cases/plugin-development/ | WordPress plugin development environment | published |
+| /use-cases/wordpress-product-demos/ | WordPress product demos for themes and plugins | published |
 | /guides/test-wordpress-multiple-php-versions/ | test WordPress plugin multiple PHP versions | published |
 | /guides/wordpress-sandbox-vs-staging/ | WordPress sandbox vs staging | published |
 | /alternatives/wordpress-playground/ | WordPress Playground comparison | backlog |
@@ -84,7 +85,9 @@ triggers include pricing, free-tier, expiry, hosting, export or self-hosting cha
 Matomo site 6 is the operational analytics source. The shared script records page views,
 **SEO Funnel** events for requirements, installation, GitHub and command-copy actions, and
 **SEO Navigation** events for movement between comparison and category pages. The event
-name is the page where the action happened.
+name is the page where the action happened. Product-demo pages additionally emit
+`visit_product_demos` and `visit_demo_module_docs` so adoption can be separated from general
+documentation traffic.
 
 The `sc-domain:spawnwp.com` Search Console property is verified through DNS. Read-only OAuth
 credentials power the private SEO snapshots and reports; keep them outside the repository,

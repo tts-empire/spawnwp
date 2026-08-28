@@ -83,6 +83,9 @@ the manual upload/CLI workflow remain available. Operators can override the cata
 Demo Launcher is the first optional, separately developed module. It turns a captured blueprint
 into a campaign URL suitable for a theme or plugin product page:
 
+For the product-page workflow and its operational boundaries, see the [WordPress product demos
+use case](https://spawnwp.com/use-cases/wordpress-product-demos/).
+
 1. a visitor opens the URL without creating a site;
 2. an explicit request passes CSRF and Cloudflare Turnstile checks;
 3. per-source and per-campaign limits admit the request to a durable queue;

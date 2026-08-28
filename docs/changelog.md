@@ -4,6 +4,11 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.35
+
+- **Marketplace packaging fix.** Include the signed-catalog verifier in the managed Cockpit
+  payload so fresh installations and service restarts can load the Marketplace API correctly.
+
 ## 0.5.34
 
 - **Free module marketplace.** The Cockpit now displays a SpawnWP-curated, signed catalog of free

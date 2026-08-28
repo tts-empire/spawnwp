@@ -5,6 +5,7 @@
     "ingest.py",
     "machine_auth.py",
     "module_api.py",
+    "module_catalog.py",
     "provision.py",
     "requirements.txt",
     "manage.html",

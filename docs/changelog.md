@@ -4,6 +4,12 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.38
+
+- **Reliable sensitive-action confirmation.** WebAuthn descriptors now preserve registered
+  authenticator transports, and Cockpit offers an in-place password plus TOTP/recovery-code
+  fallback for destructive actions when the current device cannot access the passkey.
+
 ## 0.5.37
 
 - **Stable Cockpit first paint.** All Cockpit pages now use a shared early bootstrap that holds

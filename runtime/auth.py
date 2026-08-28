@@ -29,6 +29,7 @@ from webauthn import (
     verify_registration_response,
 )
 from webauthn.helpers.structs import (
+    AuthenticatorTransport,
     AuthenticatorSelectionCriteria,
     PublicKeyCredentialDescriptor,
     ResidentKeyRequirement,
@@ -292,6 +293,28 @@ class FallbackLogin(BaseModel):
     second_factor: str = Field(min_length=6, max_length=64)
 
 
+class ReauthFallback(BaseModel):
+    password: str = Field(min_length=1, max_length=512)
+    second_factor: str = Field(min_length=6, max_length=64)
+
+
+def _credential_descriptors(rows):
+    descriptors = []
+    for row in rows:
+        try:
+            values = json.loads(row["transports"] or "[]")
+        except (TypeError, json.JSONDecodeError):
+            values = []
+        transports = []
+        for value in values if isinstance(values, list) else []:
+            try:
+                transports.append(AuthenticatorTransport(value))
+            except ValueError:
+                continue
+        descriptors.append(PublicKeyCredentialDescriptor(id=row["credential_id"], transports=transports or None))
+    return descriptors
+
+
 @router.get("/state")
 def auth_state(request: Request):
     active = session(request)
@@ -392,12 +415,12 @@ def setup_finish(body: CeremonyFinish, request: Request, response: Response):
 @router.post("/passkey/start")
 def passkey_start(request: Request):
     with db() as connection:
-        rows = connection.execute("SELECT credential_id FROM passkeys").fetchall()
+        rows = connection.execute("SELECT credential_id,transports FROM passkeys").fetchall()
     if not rows:
         raise HTTPException(400, "No passkeys enrolled")
     rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
     options = generate_authentication_options(
-        rp_id=rp_id, allow_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in rows],
+        rp_id=rp_id, allow_credentials=_credential_descriptors(rows),
         user_verification=UserVerificationRequirement.REQUIRED, timeout=180000,
     )
     return {"ceremony": _challenge("login", options.challenge, {}),
@@ -438,14 +461,14 @@ def reauth_start(request: Request):
         raise HTTPException(401, "Authentication required")
     with db() as connection:
         rows = connection.execute(
-            "SELECT credential_id FROM passkeys WHERE admin_id=?", (active["admin_id"],)
+            "SELECT credential_id,transports FROM passkeys WHERE admin_id=?", (active["admin_id"],)
         ).fetchall()
     if not rows:
         raise HTTPException(400, "No passkey is registered for this administrator")
     rp_id = _config().get("COCKPIT_DOMAIN", request.url.hostname or "localhost")
     options = generate_authentication_options(
         rp_id=rp_id,
-        allow_credentials=[PublicKeyCredentialDescriptor(id=row[0]) for row in rows],
+        allow_credentials=_credential_descriptors(rows),
         user_verification=UserVerificationRequirement.REQUIRED, timeout=180000,
     )
     token = request.cookies.get(COOKIE, "")
@@ -454,6 +477,52 @@ def reauth_start(request: Request):
         "ceremony": _challenge("reauth", options.challenge, payload),
         "publicKey": json.loads(options_to_json(options)),
     }
+
+
+@router.post("/reauth/fallback")
+def reauth_fallback(body: ReauthFallback, request: Request):
+    active = session(request, touch=False)
+    if not active:
+        raise HTTPException(401, "Authentication required")
+    with db(immediate=True) as connection:
+        _rate_limit(connection, request, "reauth_fallback")
+        admin = connection.execute("SELECT * FROM admins WHERE id=?", (active["admin_id"],)).fetchone()
+        valid_password = False
+        if admin:
+            try:
+                valid_password = PASSWORD_HASHER.verify(admin["password_hash"], body.password)
+            except VerifyMismatchError:
+                pass
+        if not admin or not valid_password:
+            _audit(connection, "reauth_rejected", request, "fallback password")
+            raise HTTPException(400, "Authentication failed")
+        accepted = False
+        if body.second_factor.isdigit() and len(body.second_factor) == 6:
+            totp = pyotp.TOTP(_decrypt(admin["totp_secret"]), digest=hashlib.sha256)
+            import datetime
+            now_dt = datetime.datetime.now()
+            for offset in (-2, -1, 0, 1, 2):
+                step = totp.timecode(now_dt) + offset
+                if step > (admin["last_totp_step"] or -1) and hmac.compare_digest(totp.at(now_dt, offset), body.second_factor):
+                    connection.execute("UPDATE admins SET last_totp_step=? WHERE id=?", (step, admin["id"]))
+                    accepted = True
+                    break
+        else:
+            code = connection.execute(
+                "SELECT id FROM recovery_codes WHERE admin_id=? AND code_hash=? AND used_at IS NULL",
+                (admin["id"], _digest(body.second_factor)),
+            ).fetchone()
+            if code:
+                connection.execute("UPDATE recovery_codes SET used_at=? WHERE id=?", (int(time.time()), code["id"]))
+                accepted = True
+        if not accepted:
+            _audit(connection, "reauth_rejected", request, "fallback second factor")
+            raise HTTPException(400, "Authentication failed")
+        now = int(time.time())
+        token = request.cookies.get(COOKIE, "")
+        connection.execute("UPDATE sessions SET recent_auth=? WHERE id_hash=?", (now, _digest(token)))
+        _audit(connection, "reauth_success", request, "fallback")
+    return {"ok": True, "recent_auth": now}
 
 
 @router.post("/reauth/finish")

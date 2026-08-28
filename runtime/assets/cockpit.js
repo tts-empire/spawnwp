@@ -410,7 +410,7 @@ function reauthDialog() {
   if (dialog) return dialog;
   dialog = document.createElement('dialog');
   dialog.id = 'reauth-dialog';
-  dialog.innerHTML = `<div class="reauth-card"><div class="section-title">Security confirmation</div><h2>Confirm your identity</h2><p>This sensitive action requires a recent sign-in. Confirm with your Passkey; the action will resume automatically.</p><p class="reauth-error" id="reauth-error" aria-live="polite"></p><div class="reauth-actions"><button class="btn-primary" id="reauth-passkey" type="button">Confirm with Passkey</button><button class="btn-neutral" id="reauth-cancel" type="button">Cancel</button></div><button class="reauth-login" id="reauth-login" type="button">Sign out and use password + authenticator</button></div>`;
+  dialog.innerHTML = `<div class="reauth-card"><div class="section-title">Security confirmation</div><h2>Confirm your identity</h2><p>This sensitive action requires a recent sign-in. Use your Passkey or confirm with the password and authenticator code used for cockpit access.</p><p class="reauth-error" id="reauth-error" aria-live="polite"></p><div class="reauth-actions"><button class="btn-primary" id="reauth-passkey" type="button">Confirm with Passkey</button><button class="btn-neutral" id="reauth-cancel" type="button">Cancel</button></div><div class="reauth-fallback"><label>Password<input id="reauth-password" type="password" autocomplete="current-password"></label><label>Authenticator code or recovery code<input id="reauth-second" inputmode="numeric" autocomplete="one-time-code"></label><button class="btn-neutral" id="reauth-fallback-submit" type="button">Confirm with password</button></div></div>`;
   document.body.appendChild(dialog);
   return dialog;
 }
@@ -430,7 +430,20 @@ function requestRecentAuthentication() {
     passkey.disabled = false;
     passkey.textContent = 'Confirm with Passkey';
     document.getElementById('reauth-cancel').onclick = () => finish(new Error('Action cancelled'));
-    document.getElementById('reauth-login').onclick = async () => { await logoutCockpit(); };
+    const fallbackButton = document.getElementById('reauth-fallback-submit');
+    fallbackButton.onclick = async () => {
+      const password = document.getElementById('reauth-password').value;
+      const secondFactor = document.getElementById('reauth-second').value;
+      if (!password || !secondFactor) { error.textContent = 'Enter your password and authenticator or recovery code.'; return; }
+      fallbackButton.disabled = true; fallbackButton.textContent = 'Confirming…';
+      try {
+        const response = await fetch(`${BASE}/auth/reauth/fallback`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password, second_factor: secondFactor}) });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.detail || 'Identity confirmation failed');
+        finish();
+      } catch (failure) { error.textContent = failure.message || String(failure); }
+      finally { fallbackButton.disabled = false; fallbackButton.textContent = 'Confirm with password'; }
+    };
     passkey.onclick = async () => {
       if (!window.PublicKeyCredential) {
         error.textContent = 'This browser cannot use Passkeys. Sign out and use password + authenticator.';

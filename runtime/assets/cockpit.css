@@ -233,7 +233,10 @@
   .reauth-card p { color:var(--muted); font-size:var(--font-body); line-height:1.55; }
   .reauth-card .reauth-error { min-height:20px; margin-top:12px; color:var(--red); }
   .reauth-actions { display:flex; gap:8px; margin-top:10px; }
-  .reauth-login { margin-top:14px; padding:2px 0; border:0; background:transparent; color:var(--muted); font-size:var(--font-small); text-decoration:underline; }
+  .reauth-fallback { margin-top:18px; padding-top:16px; border-top:1px solid var(--border); display:grid; gap:10px; }
+  .reauth-fallback label { display:block; color:var(--muted); font-size:var(--font-label); font-weight:700; text-transform:uppercase; }
+  .reauth-fallback input { display:block; width:100%; margin-top:5px; padding:9px 10px; background:#050506; color:var(--text); border:1px solid var(--border); border-radius:4px; }
+  .reauth-fallback input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
   @keyframes reauth-in { from { opacity:0; transform:translateY(-8px) scale(.985); } to { opacity:1; transform:none; } }
   /* Guardrail: banner + disabling sensitive actions under load */
   .sys-banner { display: none; align-items: center; gap: 8px; background: #251f10;

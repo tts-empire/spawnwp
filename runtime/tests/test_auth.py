@@ -168,6 +168,12 @@ class AuthenticationTests(unittest.TestCase):
                 self.auth.reauth_finish(body, request)
         self.assertEqual(400, reused.exception.status_code)
 
+    def test_credential_descriptors_preserve_registered_transports(self):
+        descriptors = self.auth._credential_descriptors([{
+            "credential_id": b"credential", "transports": '["internal", "hybrid", "unknown"]',
+        }])
+        self.assertEqual({item.value for item in descriptors[0].transports}, {"internal", "hybrid"})
+
     def test_reauthentication_rejects_challenge_from_another_session(self):
         admin_id, _token, request = self.reauth_fixture()
         ceremony = "wrong-session"

@@ -41,6 +41,7 @@ sudo spawnwp module install ./demo-launcher-0.1.0.tar.gz
 sudo spawnwp module status
 sudo spawnwp module update demo-launcher --source ./demo-launcher-0.1.1.tar.gz
 sudo spawnwp module remove demo-launcher
+sudo spawnwp module remove demo-launcher --purge
 sudo spawnwp module enable demo-launcher
 sudo spawnwp module disable demo-launcher
 ```
@@ -48,7 +49,10 @@ sudo spawnwp module disable demo-launcher
 An update reuses the recorded HTTPS package URL when possible. A module originally installed from
 a local file needs a new `--source`. Removal runs the module's uninstall hook and deactivates its
 release; module-owned state is preserved unless that module documents otherwise. `--force` is
-available for a module that refuses normal removal while work is active.
+available for a module that refuses normal removal while work is active. Modules may also expose
+an explicit purge mode: `--purge` asks the module to permanently remove its own configuration and
+database as part of uninstall. Purge is deliberately separate from normal removal and may be
+blocked while active resources still exist.
 
 Modules may provide signed `activate.py` and `deactivate.py` hooks. When present, the Cockpit
 shows Enable and Disable controls in addition to Manage, Update and Uninstall. Disable leaves the

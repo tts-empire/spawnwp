@@ -400,6 +400,8 @@ def main() -> int:
     module_remove = module_sub.add_parser("remove")
     module_remove.add_argument("module_id")
     module_remove.add_argument("--force", action="store_true")
+    module_remove.add_argument("--purge", action="store_true",
+                               help="also delete module-owned configuration and state")
     args = parser.parse_args()
     try:
         if args.command == "version":
@@ -493,7 +495,7 @@ def main() -> int:
                     result = manager.disable(args.module_id)
                     print(f"Disabled {result['id']}")
                 else:
-                    manager.remove(args.module_id, force=args.force)
+                    manager.remove(args.module_id, force=args.force, purge=args.purge)
                     print(f"Removed {args.module_id}")
                 return 0
             except manager.ModuleError as exc:

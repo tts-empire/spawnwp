@@ -2433,11 +2433,13 @@ def modules_update(module_id: str, source: str | None = Query(default=None)):
 
 
 @app.delete("/api/modules/{module_id}", status_code=202)
-def modules_remove(module_id: str, force: bool = Query(default=False)):
+def modules_remove(module_id: str, force: bool = Query(default=False), purge: bool = Query(default=False)):
     module_id = _validate_module_id(module_id)
     command = [str(SPAWNWP_CLI), "module", "remove", module_id]
     if force:
         command.append("--force")
+    if purge:
+        command.append("--purge")
     return _start_module_operation("uninstall", module_id, command)
 
 

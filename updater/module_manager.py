@@ -211,13 +211,15 @@ def _artifact_paths(source: str, temporary: Path) -> tuple[Path, Path, Path, str
     return archive, manifest, signature, str(archive)
 
 
-def _run_hook(release: Path, name: str, *, force: bool = False) -> None:
+def _run_hook(release: Path, name: str, *, force: bool = False, purge: bool = False) -> None:
     hook = release / name
     if not hook.is_file():
         return
     env = {**os.environ, "SPAWNWP_MODULE_ROOT": str(release)}
     if force:
         env["SPAWNWP_MODULE_FORCE"] = "1"
+    if purge:
+        env["SPAWNWP_MODULE_PURGE"] = "1"
     result = subprocess.run([str(hook)], env=env, capture_output=True, text=True)
     if result.returncode != 0:
         raise ModuleError((result.stderr or result.stdout or f"Module hook failed: {name}").strip())
@@ -409,7 +411,7 @@ def disable(module_id: str) -> dict:
     return state
 
 
-def remove(module_id: str, *, force: bool = False) -> None:
+def remove(module_id: str, *, force: bool = False, purge: bool = False) -> None:
     if not MODULE_ID_RE.fullmatch(module_id):
         raise ModuleError("Invalid module id")
     root = MODULES_ROOT / module_id
@@ -422,7 +424,7 @@ def remove(module_id: str, *, force: bool = False) -> None:
     state = _read_state(module_id)
     if state.get("status") == "active" and (active_release / "deactivate.py").is_file():
         _run_hook(active_release, "deactivate.py", force=force)
-    _run_hook(active_release, "uninstall.py", force=force)
+    _run_hook(active_release, "uninstall.py", force=force, purge=purge)
     if scope:
         _manage_credential("revoke", module_id)
     release.unlink(missing_ok=True)

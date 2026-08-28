@@ -4,6 +4,13 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.39
+
+- **Explicit module data purge.** Module uninstall now has a separate `--purge` mode and the
+  Cockpit exposes “Uninstall and delete data”, so a normal reinstall can preserve state while a
+  deliberate purge starts from a clean configuration. Modules can reject purging while resources
+  are still active.
+
 ## 0.5.38
 
 - **Reliable sensitive-action confirmation.** WebAuthn descriptors now preserve registered

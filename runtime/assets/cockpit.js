@@ -2497,23 +2497,28 @@ function moduleStatusBadge(status) {
 }
 
 function moduleActionLabel(action) {
-  return ({ enable: 'Enable', disable: 'Disable', update: 'Update', uninstall: 'Uninstall' })[action] || action;
+  return ({ enable: 'Enable', disable: 'Disable', update: 'Update', uninstall: 'Uninstall', 'purge-uninstall': 'Purge uninstall' })[action] || action;
 }
 
 async function runModuleAction(id, action, recordedSource) {
   if (action === 'disable' && !confirm('Disable this module? Its services and routes will stop, but installed files and existing core-managed sites will remain.')) return;
   const forceUninstall = action === 'force-uninstall';
-  if ((action === 'uninstall' || forceUninstall) && !confirm(forceUninstall
-    ? 'Force uninstall this module? This bypasses its active-resource safety check and removes its integration.'
-    : 'Uninstall this module? Its code, routes, services and module credentials will be removed. Active resources may block the operation.')) return;
+  const purgeUninstall = action === 'purge-uninstall';
+  if ((action === 'uninstall' || forceUninstall || purgeUninstall) && !confirm(
+    purgeUninstall
+      ? 'Purge uninstall this module? This permanently deletes its campaigns, settings and database. Existing active demos must expire first. This cannot be undone.'
+      : forceUninstall
+        ? 'Force uninstall this module? This bypasses its active-resource safety check and removes its integration.'
+        : 'Uninstall this module? Its code, routes, services and module credentials will be removed, while campaigns and settings are kept for a future reinstall.')) return;
   if (action === 'update' && !recordedSource) recordedSource = MODULE_SOURCE_BY_ID[id] || '';
   if (action === 'update' && !recordedSource) {
     recordedSource = prompt('Enter the HTTPS URL of the signed .tar.gz package (including matching manifest and signature):', 'https://');
     if (!recordedSource) return;
   }
-  const method = (action === 'uninstall' || forceUninstall) ? 'DELETE' : 'POST';
-  let endpoint = (action === 'uninstall' || forceUninstall) ? `${BASE}/modules/${encodeURIComponent(id)}` : `${BASE}/modules/${encodeURIComponent(id)}/${action}`;
+  const method = (action === 'uninstall' || forceUninstall || purgeUninstall) ? 'DELETE' : 'POST';
+  let endpoint = (action === 'uninstall' || forceUninstall || purgeUninstall) ? `${BASE}/modules/${encodeURIComponent(id)}` : `${BASE}/modules/${encodeURIComponent(id)}/${action}`;
   if (forceUninstall) endpoint += '?force=true';
+  if (purgeUninstall) endpoint += '?purge=true';
   if (action === 'update' && recordedSource) endpoint += `?source=${encodeURIComponent(recordedSource)}`;
   try {
     const response = await sensitiveFetch(endpoint, { method });
@@ -2600,6 +2605,7 @@ async function loadModules() {
         caps.deactivate && item.status === 'active' ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'disable')">Disable</button>` : '',
         caps.update ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'update')">Update</button>` : '',
         caps.uninstall ? `<button class="btn-danger btn-sm" type="button" onclick="runModuleAction('${id}', 'uninstall')">Uninstall</button>` : '',
+        caps.uninstall ? `<button class="btn-danger btn-sm" type="button" onclick="runModuleAction('${id}', 'purge-uninstall')">Uninstall and delete data</button>` : '',
       ].join('');
       return `<article class="module-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} ${moduleStatusBadge(item.status)} <span class="module-card-id">${id}</span></div><p>${esc(item.description || 'SpawnWP module')}</p><div class="module-card-meta">Version ${esc(item.version || 'unknown')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}${item.last_error ? ` · ${esc(item.last_error)}` : ''}</div></div><div class="module-card-actions">${actionButtons || '<span class="field-help">No management actions available</span>'}</div></article>`;
     }).join('') : '<p class="field-help">No optional modules are installed. Install a signed package to get started.</p>';

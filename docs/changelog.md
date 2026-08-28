@@ -4,6 +4,12 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.37
+
+- **Stable Cockpit first paint.** All Cockpit pages now use a shared early bootstrap that holds
+  the shell until the authenticated stylesheet is ready, with an error and timeout fallback to
+  prevent blank pages during asset failures.
+
 ## 0.5.36
 
 - **Marketplace packaging correction.** The catalog verifier is now placed at the Cockpit module

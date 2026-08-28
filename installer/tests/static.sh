@@ -42,7 +42,7 @@ fi
 grep -q 'class="section system-panel"' "$ROOT/runtime/system.html"
 grep -q 'class="btn-primary sensitive" type="button" id="bp-pair-generate"' "$ROOT/runtime/system.html"
 grep -Fq '.telemetry-card a.btn-primary { display: inline-block; color: #0d0d10;' "$ROOT/runtime/assets/cockpit.css"
-grep -q 'cockpit.js?v=0.5.36' "$ROOT/runtime/modules.html"
+grep -q 'cockpit.js?v=0.5.37' "$ROOT/runtime/modules.html"
 grep -q '#reauth-dialog { position:fixed; inset:0;' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'prefers-reduced-motion: reduce' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'input,button{width:100%;min-height:44px' "$ROOT/runtime/auth.py"
@@ -207,6 +207,21 @@ for page in manage deploy modules updates system; do
     exit 1
   fi
 done
+
+for page in manage deploy modules updates system; do
+  grep -q 'cockpit-boot.js' "$ROOT/runtime/${page}.html" || {
+    echo "runtime/${page}.html is missing the early Cockpit bootstrap" >&2
+    exit 1
+  }
+  grep -q 'id="cockpit-css"' "$ROOT/runtime/${page}.html" || {
+    echo "runtime/${page}.html is missing the identified Cockpit stylesheet" >&2
+    exit 1
+  }
+done
+grep -q 'assets/cockpit-boot.js' "$ROOT/updater/managed-files.json" || {
+  echo "Cockpit bootstrap is missing from managed-files.json" >&2
+  exit 1
+}
 
 # Optional modules need all three integration points in every signed release:
 # the restricted demo guard, updater/runtime manager, and existing-install nginx migration.

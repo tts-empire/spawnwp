@@ -13,6 +13,7 @@
     "modules.html",
     "updates.html",
     "assets/cockpit.css",
+    "assets/cockpit-boot.js",
     "assets/cockpit.js",
     "system.html"
   ],

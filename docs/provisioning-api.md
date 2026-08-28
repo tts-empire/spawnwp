@@ -234,7 +234,7 @@ counted against this connection:
 ```json
 {
   "api_version": 1,
-  "spawnwp_version": "0.5.36",
+  "spawnwp_version": "0.5.37",
   "connection": {
     "id": "0123456789abcdef",
     "label": "Demo integration",

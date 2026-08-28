@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 620" role="img" aria-labelledby="title desc">
+  <title id="title">Turnstile request flow for SpawnWP Demo Launcher</title>
+  <desc id="desc">A diagram showing a visitor passing a Turnstile challenge before Demo Launcher asks SpawnWP Core to provision an expiring site.</desc>
+  <rect width="1440" height="620" fill="#0b0b0e"/>
+  <text x="720" y="70" text-anchor="middle" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="700">Protected demo request flow</text>
+  <text x="720" y="105" text-anchor="middle" fill="#a4a4af" font-family="Inter,Arial,sans-serif" font-size="16">The site key is public; the secret key stays inside the module service.</text>
+  <g font-family="Inter,Arial,sans-serif">
+    <rect x="70" y="220" width="240" height="150" rx="12" fill="#15151b" stroke="#4b4b58"/>
+    <text x="190" y="270" text-anchor="middle" fill="#f5b56d" font-size="22" font-weight="700">Visitor</text>
+    <text x="190" y="305" text-anchor="middle" fill="#c7c7d0" font-size="15">opens Request demo</text>
+    <text x="190" y="330" text-anchor="middle" fill="#888894" font-size="14">on the public URL</text>
+    <rect x="410" y="180" width="280" height="230" rx="12" fill="#17171e" stroke="#5f4f3a"/>
+    <text x="550" y="230" text-anchor="middle" fill="#f5b56d" font-size="22" font-weight="700">Turnstile</text>
+    <text x="550" y="270" text-anchor="middle" fill="#c7c7d0" font-size="15">browser widget</text>
+    <text x="550" y="312" text-anchor="middle" fill="#8bd49c" font-size="14">site key: visible</text>
+    <text x="550" y="340" text-anchor="middle" fill="#f0a1a1" font-size="14">secret key: server-only</text>
+    <text x="550" y="382" text-anchor="middle" fill="#888894" font-size="14">action: spawnwp_demo_request</text>
+    <rect x="790" y="220" width="250" height="150" rx="12" fill="#15151b" stroke="#4b4b58"/>
+    <text x="915" y="270" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">Demo Launcher</text>
+    <text x="915" y="305" text-anchor="middle" fill="#c7c7d0" font-size="15">checks token, CSRF</text>
+    <text x="915" y="330" text-anchor="middle" fill="#888894" font-size="14">and rate limits</text>
+    <rect x="1140" y="220" width="240" height="150" rx="12" fill="#15151b" stroke="#4b4b58"/>
+    <text x="1260" y="270" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">SpawnWP Core</text>
+    <text x="1260" y="305" text-anchor="middle" fill="#c7c7d0" font-size="15">provisions an isolated</text>
+    <text x="1260" y="330" text-anchor="middle" fill="#c7c7d0" font-size="15">expiring WordPress site</text>
+  </g>
+  <g stroke="#f5b56d" stroke-width="4" fill="none">
+    <path d="M310 295h95"/><path d="M690 295h95"/><path d="M1040 295h95"/>
+  </g>
+  <g fill="#f5b56d"><path d="M405 295l-18-10v20z"/><path d="M785 295l-18-10v20z"/><path d="M1135 295l-18-10v20z"/></g>
+  <text x="720" y="520" text-anchor="middle" fill="#777783" font-family="Inter,Arial,sans-serif" font-size="14">Example flow only — no production hostname, token or credential is shown.</text>
+</svg>

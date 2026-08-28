@@ -78,6 +78,9 @@ tenant-security boundary. A WordPress administrator can exercise powerful applic
 and vulnerable demo content may still be exploitable. Run public demos on a dedicated SpawnWP host,
 keep lifetimes short, capture no sensitive data and do not reuse the host for production workloads.
 
+See [Configure Cloudflare Turnstile](configuring-turnstile.md) for the distinction between an
+unconfigured installation, the official test pair and production widget keys.
+
 SpawnWP is a self-hosted development lab, not a production hosting control panel. The
 security model keeps services private, encrypts browser traffic and requires strong
 application authentication.

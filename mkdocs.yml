@@ -76,6 +76,7 @@ nav:
       - CLI reference: cli-reference.md
       - Provisioning API: provisioning-api.md
       - Optional modules: modules.md
+      - Configure Turnstile: configuring-turnstile.md
   - Reference:
       - Architecture: architecture.md
       - Security: security.md

@@ -83,6 +83,13 @@ the manual upload/CLI workflow remain available. Operators can override the cata
 Demo Launcher is the first optional, separately developed module. It turns a captured blueprint
 into a campaign URL suitable for a theme or plugin product page:
 
+The core installer does not install this module or configure Turnstile. After installing the
+module, open **Modules → Demo Launcher** and save a key pair before creating a campaign. The form
+starts with Cloudflare's official always-pass test pair for local testing, but those values are
+not saved automatically and must be replaced before a public launch. Follow the complete
+[Turnstile configuration guide](configuring-turnstile.md) for the test workflow, Cloudflare widget
+setup, hostname requirements and troubleshooting.
+
 For the product-page workflow and its operational boundaries, see the [WordPress product demos
 use case](https://spawnwp.com/use-cases/wordpress-product-demos/).
 

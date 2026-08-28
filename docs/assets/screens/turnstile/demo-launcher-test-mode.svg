@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Demo Launcher test mode warning</title>
+  <desc id="desc">An anonymized SpawnWP Cockpit campaign list with a visible warning that the official Turnstile test keys are active.</desc>
+  <rect width="1440" height="900" fill="#0b0b0e"/>
+  <rect x="0" y="0" width="1440" height="72" fill="#121217"/>
+  <text x="48" y="45" fill="#f5b56d" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700">Spawn<tspan fill="#fff">WP</tspan></text>
+  <text x="48" y="126" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700">Demo Launcher</text>
+  <text x="48" y="160" fill="#9999a5" font-family="Inter,Arial,sans-serif" font-size="16">Protected, expiring WordPress demos from your blueprints.</text>
+  <rect x="48" y="204" width="1344" height="104" rx="10" fill="#2b2118" stroke="#9b6b39"/>
+  <circle cx="88" cy="256" r="15" fill="#f5b56d"/>
+  <text x="83" y="262" fill="#171217" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">!</text>
+  <text x="120" y="250" fill="#f5b56d" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700">TEST MODE: Turnstile always passes</text>
+  <text x="120" y="278" fill="#e2d0bd" font-family="Inter,Arial,sans-serif" font-size="15">Replace the official test pair before publishing a campaign.</text>
+  <text x="48" y="378" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700">Demo configurations</text>
+  <rect x="48" y="410" width="1344" height="170" rx="10" fill="#15151b" stroke="#34343e"/>
+  <text x="80" y="454" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700">Theme showcase</text>
+  <rect x="80" y="478" width="92" height="28" rx="14" fill="#2c2c36"/>
+  <text x="101" y="497" fill="#c8c8d0" font-family="Inter,Arial,sans-serif" font-size="13">theme</text>
+  <rect x="186" y="478" width="106" height="28" rx="14" fill="#2c2c36"/>
+  <text x="207" y="497" fill="#c8c8d0" font-family="Inter,Arial,sans-serif" font-size="13">ecommerce</text>
+  <text x="80" y="544" fill="#f5b56d" font-family="ui-monospace,Menlo,monospace" font-size="14">https://cockpit.example.test/demo/example-token</text>
+  <text x="1010" y="454" fill="#aaaab5" font-family="Inter,Arial,sans-serif" font-size="14">60 min · 3 slots · enabled</text>
+  <rect x="1010" y="480" width="96" height="36" rx="5" fill="#25252d" stroke="#555561"/>
+  <text x="1032" y="504" fill="#eee" font-family="Inter,Arial,sans-serif" font-size="13">Disable</text>
+  <rect x="1120" y="480" width="124" height="36" rx="5" fill="#25252d" stroke="#555561"/>
+  <text x="1140" y="504" fill="#eee" font-family="Inter,Arial,sans-serif" font-size="13">Rotate URL</text>
+  <rect x="1258" y="480" width="86" height="36" rx="5" fill="#25252d" stroke="#555561"/>
+  <text x="1280" y="504" fill="#eee" font-family="Inter,Arial,sans-serif" font-size="13">Edit</text>
+  <text x="48" y="690" fill="#777783" font-family="Inter,Arial,sans-serif" font-size="14">Illustration uses synthetic campaign data and the example hostname cockpit.example.test.</text>
+</svg>

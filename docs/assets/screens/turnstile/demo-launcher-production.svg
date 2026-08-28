@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Demo Launcher production configuration</title>
+  <desc id="desc">An anonymized SpawnWP Cockpit production configuration with a masked secret key and no test-mode warning.</desc>
+  <rect width="1440" height="900" fill="#0b0b0e"/>
+  <rect x="0" y="0" width="1440" height="72" fill="#121217"/>
+  <text x="48" y="45" fill="#f5b56d" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700">Spawn<tspan fill="#fff">WP</tspan></text>
+  <text x="48" y="126" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700">Demo Launcher</text>
+  <text x="48" y="160" fill="#9999a5" font-family="Inter,Arial,sans-serif" font-size="16">Production Turnstile configuration.</text>
+  <rect x="48" y="204" width="1344" height="250" rx="12" fill="#15151b" stroke="#34343e"/>
+  <text x="82" y="250" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="700">Configure Turnstile</text>
+  <text x="82" y="282" fill="#aaaab5" font-family="Inter,Arial,sans-serif" font-size="15">Production widget for cockpit.example.test · action spawnwp_demo_request</text>
+  <text x="82" y="334" fill="#d8d8df" font-family="Inter,Arial,sans-serif" font-size="14">Site key</text>
+  <rect x="82" y="346" width="520" height="44" rx="5" fill="#1c1c24" stroke="#5a5a68"/>
+  <text x="101" y="375" fill="#f5b56d" font-family="ui-monospace,Menlo,monospace" font-size="15">0xSITEKEY_EXAMPLE_123456</text>
+  <text x="634" y="334" fill="#d8d8df" font-family="Inter,Arial,sans-serif" font-size="14">Secret key</text>
+  <rect x="634" y="346" width="520" height="44" rx="5" fill="#1c1c24" stroke="#5a5a68"/>
+  <text x="653" y="375" fill="#b8b8c2" font-family="ui-monospace,Menlo,monospace" font-size="16">••••••••••••••••••••••••</text>
+  <rect x="1178" y="346" width="130" height="44" rx="5" fill="#f5b56d"/>
+  <text x="1211" y="375" fill="#171217" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Save</text>
+  <rect x="48" y="510" width="1344" height="96" rx="10" fill="#142119" stroke="#3f7952"/>
+  <circle cx="88" cy="558" r="15" fill="#8bd49c"/>
+  <text x="81" y="564" fill="#142119" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">✓</text>
+  <text x="120" y="553" fill="#a7e0b2" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700">Production mode</text>
+  <text x="120" y="580" fill="#c9ddce" font-family="Inter,Arial,sans-serif" font-size="15">Turnstile hostname and action checks are active.</text>
+  <text x="48" y="690" fill="#777783" font-family="Inter,Arial,sans-serif" font-size="14">Illustration uses synthetic keys. The secret is never shown in clear text.</text>
+</svg>

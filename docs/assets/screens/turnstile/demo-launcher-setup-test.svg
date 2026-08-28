@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Demo Launcher Turnstile setup form in test mode</title>
+  <desc id="desc">An anonymized SpawnWP Cockpit screen showing the Demo Launcher setup form with Cloudflare's official test keys prefilled.</desc>
+  <rect width="1440" height="900" fill="#0b0b0e"/>
+  <rect x="0" y="0" width="1440" height="72" fill="#121217"/>
+  <text x="48" y="45" fill="#f5b56d" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700">Spawn<tspan fill="#fff">WP</tspan></text>
+  <text x="48" y="126" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700">Modules</text>
+  <text x="48" y="160" fill="#9999a5" font-family="Inter,Arial,sans-serif" font-size="16">Manage signed extensions installed on this server.</text>
+  <rect x="48" y="204" width="1344" height="560" rx="12" fill="#15151b" stroke="#34343e"/>
+  <text x="82" y="252" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="700">Demo Launcher</text>
+  <text x="82" y="286" fill="#aaaab5" font-family="Inter,Arial,sans-serif" font-size="16">Create protected, temporary demo sites from captured blueprints.</text>
+  <rect x="82" y="326" width="1276" height="190" rx="8" fill="#101014" stroke="#3b3b48"/>
+  <text x="112" y="370" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="700">Configure Turnstile</text>
+  <text x="112" y="402" fill="#aaaab5" font-family="Inter,Arial,sans-serif" font-size="15">The test credentials are public and always pass. Save only for local testing.</text>
+  <text x="112" y="448" fill="#d8d8df" font-family="Inter,Arial,sans-serif" font-size="14">Site key</text>
+  <rect x="112" y="460" width="530" height="44" rx="5" fill="#1c1c24" stroke="#5a5a68"/>
+  <text x="130" y="489" fill="#f5b56d" font-family="ui-monospace,Menlo,monospace" font-size="15">1x00000000000000000000AA</text>
+  <text x="674" y="448" fill="#d8d8df" font-family="Inter,Arial,sans-serif" font-size="14">Secret key</text>
+  <rect x="674" y="460" width="530" height="44" rx="5" fill="#1c1c24" stroke="#5a5a68"/>
+  <text x="694" y="489" fill="#f5b56d" font-family="ui-monospace,Menlo,monospace" font-size="15">1x0000000000000000000000000000000AA</text>
+  <rect x="1218" y="460" width="110" height="44" rx="5" fill="#f5b56d"/>
+  <text x="1250" y="489" fill="#171217" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Save</text>
+  <rect x="82" y="554" width="1276" height="150" rx="8" fill="#19161a" stroke="#674727"/>
+  <circle cx="116" cy="603" r="14" fill="#f5b56d"/>
+  <text x="111" y="609" fill="#171217" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">!</text>
+  <text x="148" y="601" fill="#f5b56d" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700">TEST MODE</text>
+  <text x="148" y="632" fill="#d6c6b7" font-family="Inter,Arial,sans-serif" font-size="15">Turnstile always passes. Replace these values before sharing a campaign publicly.</text>
+  <text x="82" y="820" fill="#777783" font-family="Inter,Arial,sans-serif" font-size="14">Illustration uses synthetic values and the example hostname cockpit.example.test.</text>
+</svg>

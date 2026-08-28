@@ -18,8 +18,8 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   catalog. This release contains the finalized changes from the unpublished 0.5.39 development
   tag.
 
-> **Nota sulla versione 0.5.39:** era un tag di sviluppo interno, mai pubblicato come release
-> ufficiale; le modifiche sono confluite nella 0.5.40.
+> **Note on version 0.5.39:** this was an internal development tag and was never published as an
+> official release; its changes were folded into 0.5.40.
 
 ## 0.5.38
 

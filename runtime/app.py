@@ -124,10 +124,16 @@ def get_projects() -> list[Path]:
 
 
 def blueprint_catalog() -> dict:
-    result = subprocess.run(
-        ["python3", str(BLUEPRINT_TOOL), "list"],
-        capture_output=True, text=True, cwd=PRIMARY_PROJECT,
-    )
+    try:
+        result = subprocess.run(
+            ["python3", str(BLUEPRINT_TOOL), "list"],
+            capture_output=True, text=True, cwd=PRIMARY_PROJECT,
+        )
+    except OSError as exc:
+        # A fresh CI/test checkout (or a partially recovered host) may not have
+        # the primary project yet. Return the same controlled API error used for
+        # a failed blueprint command instead of leaking FileNotFoundError.
+        raise HTTPException(500, "Primary SpawnWP project is unavailable") from exc
     if result.returncode != 0:
         raise HTTPException(500, result.stderr.strip() or "Unable to load blueprints")
     try:

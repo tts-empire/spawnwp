@@ -18,6 +18,9 @@ description: Review SpawnWP release history, product changes, fixes and compatib
   catalog. This release contains the finalized changes from the unpublished 0.5.39 development
   tag.
 
+> **Nota sulla versione 0.5.39:** era un tag di sviluppo interno, mai pubblicato come release
+> ufficiale; le modifiche sono confluite nella 0.5.40.
+
 ## 0.5.38
 
 - **Reliable sensitive-action confirmation.** WebAuthn descriptors now preserve registered

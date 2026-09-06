@@ -48,7 +48,7 @@ FTP_RI=$(docker run --rm --entrypoint php "$IMAGE" --ri ftp 2>/dev/null)
 grep -q 'FTP support => enabled' <<<"$FTP_RI"
 check $? "FTP support enabled"
 
-# FTPS works on every version we build (7.4/8.2/8.3/8.4) — the opt-in flag is just
+# FTPS works on every version we build (7.4/8.2/8.3/8.4/8.5) — the opt-in flag is just
 # spelled differently before and after 8.4. See the Dockerfile comment.
 grep -q 'FTPS support => enabled' <<<"$FTP_RI"
 check $? "FTPS support enabled"
@@ -57,6 +57,22 @@ docker run --rm --entrypoint php "$IMAGE" -r 'exit(function_exists("ftp_connect"
 check $? "ftp_connect() is callable"
 docker run --rm --entrypoint php "$IMAGE" -r 'exit(function_exists("ftp_ssl_connect") ? 0 : 1);'
 check $? "ftp_ssl_connect() is callable"
+
+# Exercise the official entrypoint on an empty disposable docroot. Checksums alone
+# cannot detect a missing Docker config template after replacing a pinned core.
+docker run --rm --entrypoint bash \
+  -e WORDPRESS_DB_HOST=spawnwp-test-db:3306 \
+  -e WORDPRESS_DB_NAME=spawnwp_test \
+  -e WORDPRESS_DB_USER=spawnwp_test \
+  -e WORDPRESS_DB_PASSWORD=disposable-test-password \
+  -e WORDPRESS_CONFIG_EXTRA="define('SPAWNWP_IMAGE_BOOT_TEST', true);" \
+  "$IMAGE" -ec '
+    docker-entrypoint.sh php-fpm -t
+    test -s wp-config.php
+    test "$(wp config get DB_HOST --allow-root)" = "spawnwp-test-db:3306"
+    grep -q WORDPRESS_CONFIG_EXTRA wp-config.php
+  '
+check $? "first boot creates Docker-aware wp-config.php and validates PHP-FPM"
 
 echo
 if [ "$failures" -ne 0 ]; then

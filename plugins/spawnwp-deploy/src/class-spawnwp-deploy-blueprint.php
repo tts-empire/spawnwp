@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class SpawnWP_Deploy_Blueprint {
 	const SUPPORTED_INGEST_FORMAT = 1;
 	const PLACEHOLDER_URL         = 'https://blueprint.spawnwp.invalid';
-	const PHP_CHOICES             = array( '7.4', '8.2', '8.3', '8.4' );
+	const PHP_CHOICES             = array( '7.4', '8.2', '8.3', '8.4', '8.5' );
 
 	public static function init(): void {
 		add_action( 'wp_ajax_spawnwp_blueprint_step', array( __CLASS__, 'ajax_step' ) );

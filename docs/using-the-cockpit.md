@@ -95,7 +95,7 @@ Each site card has:
 | **🔑 WP credentials** | Reveal the WordPress admin user/password (with copy) |
 | **📂 Files** | Open the [file browser](#the-file-browser) for this site |
 | **⌨ WP-CLI** | Open the [WP-CLI console](#the-wp-cli-console) for this site |
-| **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4); a Down site remains Down |
+| **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4 / 8.5); a Down site remains Down |
 | **🗑 Destroy** | Permanently delete the site (enabled only when it's Down) |
 
 ### Container status and controls

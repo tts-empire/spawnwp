@@ -3,7 +3,7 @@ Contributors: wpvoicer
 Tags: deployment, migration, staging, development, blueprint
 Requires at least: 6.8
 Tested up to: 7.0
-Stable tag: 0.3.6
+Stable tag: 0.3.7
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -122,6 +122,10 @@ expiry. Rollback data is retained for up to seven days.
 
 == Changelog ==
 
+= 0.3.7 =
+
+* Added PHP 8.5 to the runtime choices stored in captured SpawnWP blueprints.
+
 = 0.3.6 =
 
 * Rewrote the plugin listing title and short description for discoverability. No functional changes.
@@ -137,6 +141,10 @@ expiry. Rollback data is retained for up to seven days.
 * Prepared the plugin for WordPress.org distribution and validation.
 
 == Upgrade Notice ==
+
+= 0.3.7 =
+
+Update when capturing blueprints that should support PHP 8.5.
 
 = 0.3.5 =
 

@@ -97,7 +97,7 @@ For a repeatable compatibility matrix, follow
 
 ## PHP extensions
 
-Every site gets the same set on **every** PHP version (7.4, 8.2, 8.3, 8.4), so switching
+Every site gets the same set on **every** PHP version (7.4, 8.2, 8.3, 8.4, 8.5), so switching
 version never changes what your code can call.
 
 | Area | Extensions |

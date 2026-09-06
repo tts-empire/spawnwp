@@ -1146,6 +1146,7 @@ function renderTop(p) {
         <option value="8.2">→ PHP 8.2</option>
         <option value="8.3">→ PHP 8.3</option>
         <option value="8.4">→ PHP 8.4</option>
+        <option value="8.5">→ PHP 8.5</option>
       </select>
       ${destroyBtn}
     </div>`;

@@ -4,7 +4,7 @@
   "name": "Clean",
   "version": "1.0.0",
   "description": "Minimal empty WordPress without development plugins, sample content or debug mode.",
-  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4"]},
+  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4", "8.5"]},
   "wordpress": "latest",
   "debug": false,
   "plugins": [],

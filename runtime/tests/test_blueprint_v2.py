@@ -70,6 +70,7 @@ class BlueprintV2Tests(unittest.TestCase):
         found, errors = blueprint.discover()
         self.assertEqual(errors, [])
         self.assertEqual({item["schema_version"] for item in found.values()}, {1})
+        self.assertTrue(all("8.5" in item["php"]["allowed"] for item in found.values()))
 
     def test_valid_v2_discovered(self):
         self.install(v2_manifest())

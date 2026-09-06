@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 PREFIX = "::spawnwp-event::"
-ALLOWED = {"7.4", "8.2", "8.3", "8.4"}
+ALLOWED = {"7.4", "8.2", "8.3", "8.4", "8.5"}
 
 
 def emit(kind: str, **values) -> None:

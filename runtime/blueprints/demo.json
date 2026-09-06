@@ -4,7 +4,7 @@
   "name": "Demo",
   "version": "1.0.0",
   "description": "Presentable starter site with a static home page, supporting pages and navigation.",
-  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4"]},
+  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4", "8.5"]},
   "wordpress": "latest",
   "debug": false,
   "plugins": [],

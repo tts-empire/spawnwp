@@ -42,7 +42,7 @@ fi
 grep -q 'class="section system-panel"' "$ROOT/runtime/system.html"
 grep -q 'class="btn-primary sensitive" type="button" id="bp-pair-generate"' "$ROOT/runtime/system.html"
 grep -Fq '.telemetry-card a.btn-primary { display: inline-block; color: #0d0d10;' "$ROOT/runtime/assets/cockpit.css"
-grep -q 'cockpit.js?v=0.5.42' "$ROOT/runtime/modules.html"
+grep -q 'cockpit.js?v=0.5.43' "$ROOT/runtime/modules.html"
 grep -q '#reauth-dialog { position:fixed; inset:0;' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'prefers-reduced-motion: reduce' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'input,button{width:100%;min-height:44px' "$ROOT/runtime/auth.py"
@@ -57,6 +57,26 @@ grep -q 'libssl-dev' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-ftp-ssl' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-openssl-dir' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q 'pdo_mysql' "$ROOT/runtime/docker/php/Dockerfile"
+grep -Fq 'https://wordpress.org/wordpress-${WORDPRESS_VERSION}.zip' "$ROOT/runtime/docker/php/Dockerfile" || {
+  echo "ERROR: pinned WordPress builds must use the long-path-safe official ZIP" >&2
+  exit 1
+}
+grep -Fq 'find /usr/src/wordpress -mindepth 1 -maxdepth 1 ! -name wp-config-docker.php -exec rm -rf -- {} +' "$ROOT/runtime/docker/php/Dockerfile" || {
+  echo "PHP image must clear the bundled core before installing an exact WordPress version" >&2
+  exit 1
+}
+grep -Fq '"7.4", "8.2", "8.3", "8.4", "8.5"' "$ROOT/runtime/scripts/blueprint.py" || {
+  echo "ERROR: PHP 8.5 is missing from blueprint validation" >&2
+  exit 1
+}
+grep -Fq '"7.4", "8.2", "8.3", "8.4", "8.5"' "$ROOT/runtime/scripts/php-switch-progress.py" || {
+  echo "ERROR: PHP 8.5 is missing from PHP switching" >&2
+  exit 1
+}
+grep -Fq '<option value="8.5">→ PHP 8.5</option>' "$ROOT/runtime/assets/cockpit.js" || {
+  echo "ERROR: PHP 8.5 is missing from Cockpit" >&2
+  exit 1
+}
 
 # Every extension the image installs must be documented. A hand-kept list rots the
 # first time someone adds an extension and forgets the page — and a docs page that

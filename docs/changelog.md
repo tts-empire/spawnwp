@@ -4,6 +4,20 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.43
+
+- **PHP 8.5 support.** New sites, captured blueprints and existing projects can select PHP 8.5
+  from Cockpit or the CLI. PHP 8.3 remains the default, and the PHP 8.5 image keeps the same
+  WordPress development extensions and tools as the other supported runtimes.
+- **Current compatibility documentation.** The PHP testing guide, use cases, Cockpit guide and
+  comparison pages now include PHP 8.5 in the supported matrix.
+- **SpawnWP Deploy 0.3.7.** Blueprint capture now offers PHP 8.5 as an allowed runtime, keeping
+  captured-product workflows aligned with Cockpit.
+- **Reliable pinned WordPress images.** Image builds now ask WP-CLI to use the official ZIP
+  archive explicitly, preventing long paths introduced in recent WordPress cores from being
+  truncated by the default archive extractor. Builds remove files from the bundled core before
+  downloading the requested version, preserving Docker's configuration template for first boot.
+
 ## 0.5.42
 
 - **State-aware RAM admission control.** SpawnWP now budgets the actual cgroup limits of running

@@ -43,7 +43,7 @@ blueprint ID, for example `plugin-review.json`:
   "name": "Plugin review",
   "version": "1.0.0",
   "description": "A focused environment for reviewing a WordPress.org plugin.",
-  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4"]},
+  "php": {"default": "8.3", "allowed": ["7.4", "8.2", "8.3", "8.4", "8.5"]},
   "wordpress": "latest",
   "debug": true,
   "plugins": ["plugin-check", "query-monitor"],

@@ -20,7 +20,7 @@ WP_PIN = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 CREATED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 PAYLOAD_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-PHP_VERSIONS = {"7.4", "8.2", "8.3", "8.4"}
+PHP_VERSIONS = {"7.4", "8.2", "8.3", "8.4", "8.5"}
 MAX_PAYLOAD_BYTES = 2 * 1024**3
 FIELDS = {
     "schema_version", "id", "name", "version", "description", "php",

@@ -25,6 +25,9 @@ class FakeProcess:
 
 
 class PhpSwitchProgressTests(unittest.TestCase):
+    def test_php_85_is_supported(self):
+        self.assertIn("8.5", progress.ALLOWED)
+
     def project(self, root: Path) -> Path:
         project = root / "site"
         project.mkdir()

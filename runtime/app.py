@@ -763,7 +763,7 @@ class PhpSwitch(BaseModel):
 
 @app.post("/api/php-switch")
 def php_switch(body: PhpSwitch):
-    if body.version not in ("7.4", "8.2", "8.3", "8.4"):
+    if body.version not in ("7.4", "8.2", "8.3", "8.4", "8.5"):
         raise HTTPException(400, "Invalid PHP version")
     guard_not_busy()
     proj = resolve_project(body.project)

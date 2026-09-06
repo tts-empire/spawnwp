@@ -75,9 +75,17 @@ RUN curl -sS https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cl
 # Seed the exact requested WordPress core into the image so spawned sites mirror
 # the captured origin. Runs when a specific version is pinned (any PHP), and also
 # for PHP 7.4 whose base image ships a frozen, obsolete core that must be refreshed
-# to the current release when "latest" is requested.
+# to the current release when "latest" is requested. Pass the official ZIP URL
+# explicitly: WP-CLI's default tar extraction can truncate paths longer than 100
+# characters (present in WordPress 7.0.1), while URL downloads remain hash-verified.
 RUN if [ "$WORDPRESS_VERSION" != "latest" ] || [ "$PHP_VERSION" = "7.4" ]; then \
-        php -d memory_limit=-1 /usr/local/bin/wp core download --allow-root --force --path=/usr/src/wordpress --version="$WORDPRESS_VERSION"; \
+        find /usr/src/wordpress -mindepth 1 -maxdepth 1 ! -name wp-config-docker.php -exec rm -rf -- {} +; \
+        if [ "$WORDPRESS_VERSION" = "latest" ]; then \
+            wp_url="https://wordpress.org/latest.zip"; \
+        else \
+            wp_url="https://wordpress.org/wordpress-${WORDPRESS_VERSION}.zip"; \
+        fi; \
+        php -d memory_limit=-1 /usr/local/bin/wp core download "$wp_url" --allow-root --force --path=/usr/src/wordpress; \
     fi
 
 # Composer 2

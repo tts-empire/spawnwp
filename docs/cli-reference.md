@@ -39,7 +39,7 @@ plain Docker Compose project with a `Makefile`. Run these from the site director
 
 | Command | Description |
 |---|---|
-| `make php-switch VER=8.2` | Switch PHP version (`7.4` legacy, `8.2`, `8.3`, `8.4`); cached versions are instant |
+| `make php-switch VER=8.2` | Switch PHP version (`7.4` legacy, `8.2`, `8.3`, `8.4`, `8.5`); cached versions are instant |
 
 ## Development
 

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Manage · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}html.cockpit-preload body{visibility:hidden}</style>
-  <script src="/assets/cockpit-boot.js?v=0.5.41" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
-  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.41">
+  <script src="/assets/cockpit-boot.js?v=0.5.42" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
+  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.42">
 </head>
 <body data-page="manage">
   <header>
@@ -31,6 +31,10 @@
       <div class="resource-ring" id="kpi-load"><div class="ring"><div class="ring-core"><strong id="host-load-pct">0%</strong></div></div><div><span>Load</span><small id="host-load">Loading</small></div></div>
       <div class="uptime-kpi"><span>Uptime</span><strong id="host-uptime">—</strong><small>since last boot</small></div>
     </section>
+    <section class="capacity-summary" id="capacity-summary" aria-label="Container RAM capacity">
+      <div><span>Container capacity</span><strong id="capacity-value">Loading</strong></div>
+      <small id="capacity-detail">Only running SpawnWP containers count; Down sites reserve no RAM.</small>
+    </section>
     <section class="section">
       <div class="sites-toolbar">
         <div class="section-title">Active sites</div>
@@ -51,6 +55,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.41"></script>
+  <script src="/assets/cockpit.js?v=0.5.42"></script>
 </body>
 </html>

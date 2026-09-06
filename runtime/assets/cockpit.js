@@ -1104,7 +1104,7 @@ function renderTop(p) {
 
   const table = p.containers.length ? `<table class="svc-table">
       <thead><tr><th>Service</th><th>Status</th><th>CPU</th><th>Memory</th><th></th></tr></thead>
-      <tbody>${rows}</tbody></table>` : '<p class="card-meta" style="margin-top:12px">No running containers</p>';
+      <tbody>${rows}</tbody></table>` : '<p class="card-meta" style="margin-top:12px">No running containers · 0 MiB counted toward container capacity</p>';
 
   const urlHtml = p.url
     ? `<a href="${esc(p.url)}/" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none" title="Open the site">${esc(p.url)} ↗</a>
@@ -1192,6 +1192,28 @@ function applyHost(h) {
   document.getElementById('host-load').textContent = `${load.join(' · ')} / ${cores} cores`;
   const uh = h.uptime_h || 0;
   document.getElementById('host-uptime').textContent = uh >= 24 ? `${(uh/24).toFixed(1)} d` : `${uh} h`;
+
+  const capacity = h.capacity || {};
+  const capacityBox = document.getElementById('capacity-summary');
+  const capacityValue = document.getElementById('capacity-value');
+  const capacityDetail = document.getElementById('capacity-detail');
+  if (capacityBox && capacityValue && capacityDetail) {
+    if (capacity.error) {
+      capacityBox.className = 'capacity-summary crit';
+      capacityValue.textContent = 'Unavailable';
+      capacityDetail.textContent = capacity.error;
+    } else {
+      const committed = capacity.committed_mb || 0;
+      const allocatable = capacity.allocatable_mb || 0;
+      const available = capacity.available_mb || 0;
+      const ratio = allocatable ? committed / allocatable : 1;
+      capacityBox.className = `capacity-summary${capacity.overcommitted || ratio >= .9 ? ' crit' : ratio >= .7 ? ' warn' : ''}`;
+      capacityValue.textContent = `${(committed / 1024).toFixed(1)} / ${(allocatable / 1024).toFixed(1)} GiB reserved`;
+      capacityDetail.textContent = capacity.overcommitted
+        ? `Overcommitted · new starts and memory increases are blocked · system reserve ${(capacity.system_reserve_mb / 1024).toFixed(1)} GiB`
+        : `${(available / 1024).toFixed(1)} GiB available · ${capacity.running_containers || 0} running containers · Down sites count zero`;
+    }
+  }
 
   // Guardrail: banner + disabling sensitive actions
   const st = h.status || {};
@@ -1668,7 +1690,8 @@ async function showPhpIni(name) {
       <label class="php-advanced-check"><input id="pi-errors-${name}" type="checkbox" ${s.display_errors ? 'checked' : ''}><span>display_errors</span></label>`;
     const apply = document.createElement('button');
     apply.className = 'icon-btn sensitive';
-    apply.textContent = 'Apply (restarts php, ~2s)';
+    apply.textContent = data.running ? 'Apply (recreates php, ~2s)' : 'Save settings (site stays Down)';
+    apply.dataset.running = data.running ? '1' : '0';
     apply.onclick = () => applyPhpIni(name, apply);
     body.appendChild(form);
     body.appendChild(apply);
@@ -1700,12 +1723,14 @@ async function applyPhpIni(name, btn) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || res.statusText);
-    showToast(`PHP settings applied to "${name}"`);
+    showToast(btn.dataset.running === '1'
+      ? `PHP settings applied to "${name}"`
+      : `PHP settings saved; "${name}" remains Down`);
     closeBox(`out-${name}`);
   } catch (e) {
     showToast(e.message, true);
     btn.disabled = false;
-    btn.textContent = 'Apply (restarts php, ~2s)';
+    btn.textContent = btn.dataset.running === '1' ? 'Apply (recreates php, ~2s)' : 'Save settings (site stays Down)';
   }
 }
 

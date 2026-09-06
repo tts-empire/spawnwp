@@ -13,17 +13,27 @@ from starlette.requests import Request
 
 RUNTIME = Path(__file__).parents[1]
 sys.path.insert(0, str(RUNTIME))
-IMPORT_TEMP = tempfile.TemporaryDirectory()
-STATIC = Path(IMPORT_TEMP.name)
-(STATIC / "assets").mkdir()
-os.environ["SPAWNWP_STATIC_DIR"] = str(STATIC)
-
-cockpit = importlib.import_module("app")
-provision = importlib.import_module("provision")
-ingest = importlib.import_module("ingest")
+cockpit = provision = ingest = None
 
 
 class ProvisionPrimitiveTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Do not freeze app/auth configuration during unittest discovery.
+        # test_auth binds its isolated database before this class runs.
+        global cockpit, provision, ingest
+        cls.import_temp = tempfile.TemporaryDirectory()
+        static = Path(cls.import_temp.name)
+        (static / "assets").mkdir()
+        os.environ["SPAWNWP_STATIC_DIR"] = str(static)
+        cockpit = importlib.import_module("app")
+        provision = importlib.import_module("provision")
+        ingest = importlib.import_module("ingest")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.import_temp.cleanup()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)

@@ -128,6 +128,15 @@
   .projects-notice { color: var(--muted); }
   .projects-notice-err { color: var(--red); }
 
+  .capacity-summary { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:-16px 0 30px; padding:11px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+  .capacity-summary > div { display:flex; align-items:baseline; gap:10px; }
+  .capacity-summary span { color:var(--muted); font-size:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .capacity-summary strong { font-size:var(--font-control); color:var(--green); }
+  .capacity-summary small { color:var(--muted); text-align:right; }
+  .capacity-summary.warn strong { color:var(--yellow); }
+  .capacity-summary.crit strong { color:var(--red); }
+  @media (max-width: 640px) { .capacity-summary { align-items:flex-start; flex-direction:column; gap:4px; } .capacity-summary small { text-align:left; } }
+
   .badge { display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 8px; border: 1px solid currentColor; border-radius: 4px; font-size: 11px; font-weight: 650; }
   .badge-green { background: #101d16; color: var(--green); }
   .badge-red   { background: #241111; color: var(--red); }

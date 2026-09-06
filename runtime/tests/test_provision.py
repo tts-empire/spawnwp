@@ -290,7 +290,7 @@ class ProvisionTests(unittest.TestCase):
         stderr = StringIO()
         with mock.patch.object(
             self.cockpit, "prepare_new_project",
-            return_value=("broken-site", ["false"], None),
+            return_value=("broken-site", ["false"], None, None),
         ), mock.patch.object(
             self.cockpit.subprocess, "Popen", return_value=process,
         ), redirect_stderr(stderr), self.assertRaises(HTTPException) as raised:

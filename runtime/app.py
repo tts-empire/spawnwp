@@ -24,6 +24,11 @@ from auth import initialize as initialize_auth
 from auth import is_enrolled, login_page, rate_limit, router as auth_router, session as auth_session, valid_csrf
 from ingest import router as ingest_router, spawnwp_version
 from module_catalog import CatalogError, load as load_module_catalog
+from capacity import (
+    CapacityError, CapacityExceeded, format_compose_memory, php_container_memory_bytes,
+    public_snapshot as public_capacity_snapshot, release_reservation,
+    reserve_new_project, reserve_php_resize, reserve_project_start,
+)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -187,35 +192,49 @@ def run(cmd: list[str], cwd: Path) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     return (result.stdout + result.stderr).strip()
 
-async def stream_command(cmd: list[str], cwd: Path, env: dict | None = None) -> AsyncIterator[str]:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        cwd=cwd,
-        env={**os.environ, **env} if env else None,
-    )
+async def stream_command(cmd: list[str], cwd: Path, env: dict | None = None,
+                         reservation: str | None = None) -> AsyncIterator[str]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=cwd,
+            env={**os.environ, **env} if env else None,
+        )
+    except Exception:
+        release_reservation(reservation)
+        raise
+    wait_task = asyncio.create_task(proc.wait())
     assert proc.stdout
-    while True:
-        line = await proc.stdout.readline()
-        if not line:
-            break
-        decoded = line.decode(errors="replace").rstrip()
-        if decoded.startswith("::spawnwp-event::"):
-            try:
-                event = json.loads(decoded.removeprefix("::spawnwp-event::"))
-            except json.JSONDecodeError:
-                event = {"type": "log", "line": decoded}
-            yield f"data: {json.dumps(event)}\n\n"
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            decoded = line.decode(errors="replace").rstrip()
+            if decoded.startswith("::spawnwp-event::"):
+                try:
+                    event = json.loads(decoded.removeprefix("::spawnwp-event::"))
+                except json.JSONDecodeError:
+                    event = {"type": "log", "line": decoded}
+                yield f"data: {json.dumps(event)}\n\n"
+            else:
+                yield f"data: {json.dumps(decoded)}\n\n"
+        await wait_task
+        yield f"data: {json.dumps(f'__EXIT__{proc.returncode}')}\n\n"
+    finally:
+        # A disconnected browser must not release capacity while its command is
+        # still running. The child keeps the reservation until it really exits.
+        if wait_task.done():
+            release_reservation(reservation)
         else:
-            yield f"data: {json.dumps(decoded)}\n\n"
-    await proc.wait()
-    rc = proc.returncode
-    yield f"data: {json.dumps(f'__EXIT__{rc}')}\n\n"
+            wait_task.add_done_callback(lambda _task: release_reservation(reservation))
 
-def sse_response(cmd: list[str], cwd: Path, env: dict | None = None) -> StreamingResponse:
+def sse_response(cmd: list[str], cwd: Path, env: dict | None = None,
+                 reservation: str | None = None) -> StreamingResponse:
     return StreamingResponse(
-        stream_command(cmd, cwd, env),
+        stream_command(cmd, cwd, env, reservation),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -328,6 +347,27 @@ def guard_capacity() -> None:
             409,
             f"Site capacity reached: SPAWNWP_MAX_SITES is {max_sites}",
         )
+
+
+def reserve_start(proj: Path, env: dict | None = None) -> str | None:
+    """Reserve a stack's missing cgroup limits, converting policy errors to 409."""
+    try:
+        token, _requested = reserve_project_start(PROJECTS_ROOT, proj, env)
+        return token
+    except CapacityExceeded as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CapacityError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+def reserve_new_stack(env: dict | None = None) -> str | None:
+    try:
+        token, _requested = reserve_new_project(PROJECTS_ROOT, PRIMARY_PROJECT, env)
+        return token
+    except CapacityExceeded as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CapacityError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 def random_project_name(prefix: str = "site", attempts: int = 5) -> str:
@@ -572,7 +612,8 @@ def run_action(body: ProjectAction):
     else:
         cmd = ["make", "-s", body.action]
 
-    return sse_response(cmd, proj)
+    reservation = reserve_start(proj) if body.action == "up" and not service else None
+    return sse_response(cmd, proj, reservation=reservation)
 
 
 SNAP_LABEL_MAX = 80
@@ -830,6 +871,7 @@ class PhpIniSettings(BaseModel):
         return self
 
     def as_env(self) -> dict:
+        container_memory = format_compose_memory(php_container_memory_bytes(self.memory_limit))
         return {
             "SPAWNWP_PHP_MEMORY_LIMIT": self.memory_limit,
             "SPAWNWP_PHP_UPLOAD_MAX_FILESIZE": self.upload_max_filesize,
@@ -838,6 +880,7 @@ class PhpIniSettings(BaseModel):
             "SPAWNWP_PHP_MAX_INPUT_VARS": str(self.max_input_vars),
             "SPAWNWP_PHP_MAX_INPUT_TIME": str(self.max_input_time),
             "SPAWNWP_PHP_DISPLAY_ERRORS": "On" if self.display_errors else "Off",
+            "SPAWNWP_PHP_CONTAINER_MEMORY": container_memory,
         }
 
 
@@ -854,7 +897,7 @@ class NewProject(BaseModel):
     group: str = ""   # optional Manage-dashboard group label
 
 
-def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None]:
+def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, str | None]:
     """Validate one create request and return its stable name, command and env."""
     name = body.name or random_project_name()
     if not SLUG_RE.match(name):
@@ -874,7 +917,12 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None]:
     if group and not GROUP_RE.match(group):
         raise HTTPException(400, "Invalid group: use letters, digits, spaces, dots, hyphens "
                                  "or underscores (max 32 characters)")
-    env = body.php_settings.validated().as_env() if body.php_settings else {}
+    settings = body.php_settings.validated() if body.php_settings else PhpIniSettings()
+    env = body.php_settings.as_env() if body.php_settings else {
+        "SPAWNWP_PHP_CONTAINER_MEMORY": format_compose_memory(
+            php_container_memory_bytes(settings.memory_limit)
+        ),
+    }
     if group:
         env["SPAWNWP_GROUP"] = group
     if body.lifetime_seconds is not None:
@@ -889,7 +937,8 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None]:
         "bash", str(PRIMARY_PROJECT / "scripts" / "new-project.sh"),
         name, body.blueprint, body.php_version or "", body.wordpress_version or "",
     ]
-    return name, command, env or None
+    reservation = reserve_new_stack(env)
+    return name, command, env or None, reservation
 
 
 CREATION_SECRET_RE = re.compile(
@@ -912,36 +961,39 @@ def creation_failure_detail(output: str) -> str:
 
 def run_project_creation(body: NewProject, timeout: int = 300) -> str:
     """Run site creation to completion for machine callers."""
-    name, command, env = prepare_new_project(body)
-    proc = subprocess.Popen(
-        command,
-        cwd=PRIMARY_PROJECT,
-        env={**os.environ, **env} if env else None,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        start_new_session=True,
-    )
+    name, command, env, reservation = prepare_new_project(body)
     try:
-        output, _ = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
-        os.killpg(proc.pid, signal.SIGTERM)
-        try:
-            proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
-            proc.communicate()
-        raise HTTPException(504, f"Site creation exceeded the {timeout}-second timeout") from exc
-    if proc.returncode != 0:
-        detail = creation_failure_detail(output)
-        print(
-            f"[provision] project={name} rc={proc.returncode} error={detail}",
-            file=sys.stderr,
-            flush=True,
+        proc = subprocess.Popen(
+            command,
+            cwd=PRIMARY_PROJECT,
+            env={**os.environ, **env} if env else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            start_new_session=True,
         )
-        status = 409 if "another site operation" in output.lower() else 500
-        raise HTTPException(status, detail)
-    return name
+        try:
+            output, _ = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                proc.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+            raise HTTPException(504, f"Site creation exceeded the {timeout}-second timeout") from exc
+        if proc.returncode != 0:
+            detail = creation_failure_detail(output)
+            print(
+                f"[provision] project={name} rc={proc.returncode} error={detail}",
+                file=sys.stderr,
+                flush=True,
+            )
+            status = 409 if "another site operation" in output.lower() else 500
+            raise HTTPException(status, detail)
+        return name
+    finally:
+        release_reservation(reservation)
 
 
 def cleanup_created_project(name: str) -> bool:
@@ -965,8 +1017,8 @@ def cleanup_created_project(name: str) -> bool:
 
 @app.post("/api/new-project")
 def new_project(body: NewProject):
-    _, command, env = prepare_new_project(body)
-    return sse_response(command, PRIMARY_PROJECT, env)
+    _, command, env, reservation = prepare_new_project(body)
+    return sse_response(command, PRIMARY_PROJECT, env, reservation)
 
 
 def _running_count(proj: Path) -> int:
@@ -1048,6 +1100,11 @@ def host():
     except (OSError, ValueError):
         up_seconds = 0
 
+    try:
+        capacity = public_capacity_snapshot(PROJECTS_ROOT)
+    except CapacityError as exc:
+        capacity = {"error": str(exc)}
+
     return {
         "ram": {
             "used_mb": used_kb // 1024,
@@ -1062,6 +1119,7 @@ def host():
         "load": load,
         "uptime_h": round(up_seconds / 3600, 1),
         "status": system_status(),
+        "capacity": capacity,
     }
 
 
@@ -1615,7 +1673,12 @@ def get_php_ini(project: str):
                     pass
             else:
                 values[key] = raw
-    return {"project": proj.name, "supported": supported, "settings": values}
+    return {
+        "project": proj.name,
+        "supported": supported,
+        "running": _running_count(proj) > 0,
+        "settings": values,
+    }
 
 
 @app.post("/api/php-ini/{project}")
@@ -1628,11 +1691,21 @@ def set_php_ini(project: str, body: PhpIniSettings):
                                  "per-site PHP overrides mount. Recreate it to use PHP settings.")
     guard_not_busy()
     env = body.validated().as_env()
-    result = subprocess.run(
-        ["bash", str(PHP_INI_APPLY_TOOL), proj.name],
-        capture_output=True, text=True, cwd=PRIMARY_PROJECT,
-        env={**os.environ, **env}, timeout=120,
-    )
+    new_limit = php_container_memory_bytes(body.memory_limit)
+    try:
+        reservation, _requested = reserve_php_resize(PROJECTS_ROOT, proj, new_limit)
+    except CapacityExceeded as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CapacityError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    try:
+        result = subprocess.run(
+            ["bash", str(PHP_INI_APPLY_TOOL), proj.name],
+            capture_output=True, text=True, cwd=PRIMARY_PROJECT,
+            env={**os.environ, **env}, timeout=120,
+        )
+    finally:
+        release_reservation(reservation)
     output = (result.stdout + result.stderr).strip()
     if result.returncode != 0:
         raise HTTPException(500, output.splitlines()[-1] if output else "Failed to apply PHP settings")

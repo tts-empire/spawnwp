@@ -42,7 +42,7 @@ fi
 grep -q 'class="section system-panel"' "$ROOT/runtime/system.html"
 grep -q 'class="btn-primary sensitive" type="button" id="bp-pair-generate"' "$ROOT/runtime/system.html"
 grep -Fq '.telemetry-card a.btn-primary { display: inline-block; color: #0d0d10;' "$ROOT/runtime/assets/cockpit.css"
-grep -q 'cockpit.js?v=0.5.41' "$ROOT/runtime/modules.html"
+grep -q 'cockpit.js?v=0.5.42' "$ROOT/runtime/modules.html"
 grep -q '#reauth-dialog { position:fixed; inset:0;' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'prefers-reduced-motion: reduce' "$ROOT/runtime/assets/cockpit.css"
 grep -q 'input,button{width:100%;min-height:44px' "$ROOT/runtime/auth.py"
@@ -264,6 +264,26 @@ if deploy_plugin_version_newer 0.3.4-dev 0.3.4; then
   exit 1
 fi
 grep -q 'DEPLOY_PLUGIN_SOURCE="WordPress.org mirror (verified)"' "$ROOT/runtime/scripts/new-project.sh"
+
+# GitHub issue #16: PHP memory_limit may be raised to 1 GiB, so the php
+# container cannot retain its old fixed 512 MiB cgroup cap. Admission control,
+# the per-site derived cap and the no-restart migration must all ship together.
+grep -Fq 'memory: ${SPAWNWP_PHP_CONTAINER_MEMORY:-512M}' "$ROOT/runtime/compose.yaml" || {
+  echo "ERROR: the PHP container memory cap is not derived per site" >&2
+  exit 1
+}
+grep -q 'capacity.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: RAM admission control is missing from the Cockpit payload" >&2
+  exit 1
+}
+grep -q 'migrations/add-ram-admission-limits.py' "$ROOT/updater/managed-files.json" || {
+  echo "ERROR: the RAM admission migration is missing from managed-files.json" >&2
+  exit 1
+}
+grep -q 'installer/migrations/add-ram-admission-limits.py' "$ROOT/updater/build-release.py" || {
+  echo "ERROR: the RAM admission migration is missing from the release manifest" >&2
+  exit 1
+}
 
 # GitHub issue #13: the edge nginx proxying to a WordPress site had no explicit
 # proxy_read_timeout/proxy_send_timeout, so it fell back to nginx's compiled-in

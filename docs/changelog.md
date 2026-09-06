@@ -4,6 +4,23 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.42
+
+- **State-aware RAM admission control.** SpawnWP now budgets the actual cgroup limits of running
+  SpawnWP containers against host RAM while keeping a bounded operating-system reserve. Down sites
+  count as zero, in-flight starts are reserved atomically, and unsafe creates, starts or PHP-memory
+  increases return a clear capacity breakdown instead of risking an out-of-memory host.
+- **PHP `memory_limit` and container memory now scale together.** The PHP container keeps at least
+  256 MiB of headroom above `memory_limit` (with a 512 MiB floor), so the existing 1 GiB PHP limit
+  is usable rather than being constrained by the old fixed 512 MiB Docker cap. Existing site
+  configurations are migrated without starting or restarting them.
+- **Stopped-site lifecycle is preserved.** PHP settings and PHP-version changes can be saved for a
+  Down site without bringing it online. Cockpit now exposes allocatable, committed and available
+  container capacity and explicitly explains that Down sites consume no RAM budget.
+- **Reproducible Cockpit dependency resolution.** Starlette and AnyIO are pinned to their
+  production-tested versions so fresh installs and CI do not silently resolve an incompatible
+  test/runtime layer.
+
 ## 0.5.41
 
 - **Explicit module data purge.** Module uninstall now has a separate `--purge` mode and the

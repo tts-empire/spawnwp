@@ -89,7 +89,7 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = (relative if relative in {"app.py", "auth.py", "ingest.py", "machine_auth.py", "module_api.py", "module_catalog.py", "provision.py", "requirements.txt"}
+            target = (relative if relative in {"app.py", "auth.py", "capacity.py", "ingest.py", "machine_auth.py", "module_api.py", "module_catalog.py", "provision.py", "requirements.txt"}
                       else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
@@ -112,6 +112,7 @@ def main() -> int:
                 "migrations/add-provision-nginx-location.py",
                 "migrations/repair-duplicate-project-ports.py",
                 "migrations/add-module-include.py",
+                "migrations/add-ram-admission-limits.py",
                 "port_allocator.py",
                 "telemetry.py",
             } else "0644"
@@ -170,6 +171,7 @@ def main() -> int:
                 "installer/migrations/add-provision-nginx-location.py",
                 "installer/migrations/repair-duplicate-project-ports.py",
                 "installer/migrations/add-module-include.py",
+                "installer/migrations/add-ram-admission-limits.py",
             ],
             "files": entries,
         }

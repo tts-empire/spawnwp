@@ -1,6 +1,7 @@
 {
   "cockpit": [
     "app.py",
+    "capacity.py",
     "auth.py",
     "ingest.py",
     "machine_auth.py",
@@ -76,6 +77,7 @@
     "migrations/add-provision-nginx-location.py",
     "migrations/repair-duplicate-project-ports.py",
     "migrations/add-module-include.py",
+    "migrations/add-ram-admission-limits.py",
     "nginx-http.conf.tpl",
     "spawnwp-image-gc.service",
     "spawnwp-image-gc.timer",

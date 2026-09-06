@@ -179,6 +179,13 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
 
         original = env_path.read_text()
         previous = env_value(original, "PHP_VERSION", "8.3")
+        running_services = subprocess.run(
+            ["docker", "compose", "ps", "--services", "--filter", "status=running"],
+            cwd=project, capture_output=True, text=True,
+        )
+        php_was_running = (
+            running_services.returncode == 0 and "php" in running_services.stdout.split()
+        )
         # The site keeps its WordPress version across a PHP switch, but the image
         # tag encodes it, so the target tag has to be derived from both.
         wp_version = env_value(original, "WP_VERSION", "latest") or "latest"
@@ -204,6 +211,13 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
                 emit("progress", phase="download", percent=None, message=f"First use of PHP {version}: downloading and compiling the image", indeterminate=True)
                 if command(["docker", "compose", "--progress", "json", "build", "php"], project, structured=True) != 0:
                     raise RuntimeError("The PHP image build failed")
+            if not php_was_running:
+                metric_incr("php_switches")
+                emit(
+                    "complete", phase="complete", percent=100,
+                    message=f"PHP {version} is selected; the site remains Down",
+                )
+                return 0
             emit("progress", phase="start", percent=88, message="Restarting the PHP service", indeterminate=False)
             started = True
             if run_simple(["docker", "compose", "up", "-d", "php"], project) != 0:
@@ -217,7 +231,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
         except Exception as exc:
             write_atomic(env_path, original)
             emit("log", line=f"Restored PHP_VERSION={previous}")
-            if started:
+            if started and php_was_running:
                 run_simple(["docker", "compose", "up", "-d", "php"], project)
             emit("error", message=str(exc), previous=previous)
             return 1

@@ -26,6 +26,12 @@ main interface.
 A cloud VM or VPS, a dedicated server, or bare-metal hardware all work. ARM servers
 are supported as long as the operating system and architecture requirements above are met.
 
+SpawnWP keeps host memory safe by budgeting the Docker limits of running SpawnWP containers. It
+reserves 20% of physical RAM for the operating system (at least 512 MiB, at most 1 GiB); a stopped
+site uses no container budget. A default running site reserves about 1.1 GiB, so a 2 GB server is
+appropriate for one running site at a time. You may keep additional sites Down and start them when
+needed. Cockpit shows the current committed and available capacity on Manage and Deploy.
+
 ## Network
 
 - **Ports 80 and 443** reachable from the internet (80 is required for Let's Encrypt

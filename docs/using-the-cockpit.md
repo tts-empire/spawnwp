@@ -20,6 +20,8 @@ plus numeric uptime.
 ## The dashboard
 
 - **Resource summary** — host RAM, disk, load average and uptime, refreshed live.
+- **Container capacity** — allocatable, committed and available RAM based on running containers'
+  Docker limits. Down sites count as zero; pending starts are included.
 - **Active sites** — one card per site with status, live per-container CPU/RAM, and
   action buttons.
 
@@ -72,7 +74,10 @@ Leave it untouched for the defaults (256M / 64M / 64M / 120s / 3000 / -1 / Off).
 the upload sizes automatically aligns the nginx limits (site and proxy) so large uploads
 actually work, up to 512M. The values live in a per-site override file mounted into the
 php container, so they never rebuild the shared image — and they can be changed later
-from **Manage → ⚙️ PHP settings** (applies in ~2 seconds with a php restart). Sites
+from **Manage → ⚙️ PHP settings**. The PHP container limit is derived automatically as at least
+512 MiB and always 256 MiB above `memory_limit`; a 1 GiB PHP limit therefore receives a 1.25 GiB
+container. On a running site the change recreates PHP in about two seconds. On a Down site it is
+saved without starting anything and takes effect on the next **Up**. Sites
 created before 0.3.14 don't have the override mount; recreate them to use this feature.
 
 ## Per-site actions
@@ -90,7 +95,7 @@ Each site card has:
 | **🔑 WP credentials** | Reveal the WordPress admin user/password (with copy) |
 | **📂 Files** | Open the [file browser](#the-file-browser) for this site |
 | **⌨ WP-CLI** | Open the [WP-CLI console](#the-wp-cli-console) for this site |
-| **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4) |
+| **PHP ▾** | Switch this site's PHP version (7.4 legacy / 8.2 / 8.3 / 8.4); a Down site remains Down |
 | **🗑 Destroy** | Permanently delete the site (enabled only when it's Down) |
 
 ### Container status and controls
@@ -107,6 +112,11 @@ icon buttons at the end of each row act only on that container:
 Use these controls to restart PHP after a configuration change, inspect a failing
 database health check, or read Mailpit/nginx errors. The larger **Up**, **Down** and
 **Restart** buttons below the table act on the site's entire container stack.
+
+Before **Up**, SpawnWP checks the missing containers against the host capacity budget. If the
+stack does not fit, Cockpit reports the host total, system reserve, current commitments, requested
+amount and available memory. Bring another site Down or lower a running site's PHP
+`memory_limit`; SpawnWP never chooses a site to stop automatically.
 
 The first switch to a PHP version downloads and compiles its image and can take several
 minutes. The cockpit shows structured progress and keeps the verbose BuildKit log under

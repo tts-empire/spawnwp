@@ -71,6 +71,21 @@ class PhpSwitchProgressTests(unittest.TestCase):
             self.assertIn("PHP_VERSION=8.4", (project / ".env").read_text())
             self.assertIn('"type":"complete"', output.getvalue())
 
+    def test_switching_a_down_site_does_not_start_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = self.project(root)
+            output = StringIO()
+            with mock.patch.object(progress.subprocess, "run",
+                                   return_value=SimpleNamespace(returncode=0, stdout="")), \
+                 mock.patch.object(progress, "run_simple") as run_simple, \
+                 mock.patch.object(progress, "healthy") as healthy, redirect_stdout(output):
+                result = progress.switch(project, "8.4", root / "locks")
+            self.assertEqual(0, result)
+            run_simple.assert_not_called()
+            healthy.assert_not_called()
+            self.assertIn("site remains Down", output.getvalue())
+
     def test_switch_stamps_the_context_hash_and_the_image_suffix(self):
         """A switch must build with SPAWNWP_CONTEXT_HASH set.
 

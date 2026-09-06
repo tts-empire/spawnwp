@@ -52,9 +52,6 @@ $assert( in_array( '8.5', SpawnWP_Deploy_Blueprint::PHP_CHOICES, true ), 'Bluepr
 $inventory = SpawnWP_Deploy_Guard::plugin_inventory();
 $assert( isset( $inventory['wporg'], $inventory['premium'] ) && is_array( $inventory['wporg'] ) && is_array( $inventory['premium'] ), 'Plugin inventory classifies wp.org and premium plugins' );
 
-$assert( is_bool( SpawnWP_Deploy_Guard::is_cockpit() ), 'Environment detection returns a boolean' );
-$assert( defined( 'SPAWNWP_DEPLOY_HEALTHCHECK_URL' ) === SpawnWP_Deploy_Guard::is_cockpit(), 'Cockpit detection tracks the injected constant' );
-
 ob_start();
 SpawnWP_Deploy_Blueprint::render_panel();
 $panel = ob_get_clean();

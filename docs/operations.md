@@ -73,6 +73,25 @@ make up
 
 New sites always build a fresh image, so they get the latest WordPress automatically.
 
+## Long-term hardening checklist
+
+SpawnWP sites are permanent by default, while sites with an explicit lifetime are removed by
+the expiry timer. If a site will stay online for months, use the following operating baseline:
+
+1. Keep the host's automatic security updates enabled, or patch the host on a documented schedule.
+2. Keep SpawnWP updated and review release notes before installing a control-plane update.
+3. Take a named snapshot before WordPress, plugin, theme or image updates.
+4. Copy important snapshots and the credentials report off the server; local snapshots are for
+   quick rollback, not disaster recovery.
+5. Check `certbot certificates`, disk usage and service logs regularly.
+6. Review cockpit authentication events and remove credentials or recovery material that is no
+   longer needed.
+7. Periodically restore a snapshot on a disposable copy so the recovery process is known to work.
+
+Long-term operation still follows the security boundaries in [Security](security.md): SpawnWP
+does not provide managed hosting, DNS or email, and the host should not contain unrelated
+production workloads.
+
 ## TLS certificate
 
 certbot renews the SAN certificate (covering `DOMAIN` and `COCKPIT_DOMAIN`) automatically

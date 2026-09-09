@@ -135,3 +135,24 @@ production workloads.
 SpawnWP deliberately does not provide email hosting, DNS management, tenant isolation or
 managed-hosting guarantees. WordPress environments are intended to be disposable and
 must not be treated as the only copy of valuable data.
+
+## Long-running environments
+
+**Disposable** describes how an environment can be reset, rebuilt or destroyed. It does not
+mean that every site has a short lifetime. Sites are permanent by default; an optional lifetime
+can be assigned when a site should expire automatically. A permanent SpawnWP site can remain
+online for months or longer when you operate it like any other self-hosted WordPress server.
+
+For a long-running site:
+
+- keep the host on a supported release and apply OS security updates regularly;
+- keep the SpawnWP control plane updated through its signed updater;
+- protect the cockpit with a passkey or strong password plus TOTP, and review recovery material;
+- restrict the provider firewall to ports 80/443 and trusted administrative SSH sources;
+- snapshot before WordPress, plugin, theme or image changes, and keep independent off-server backups;
+- monitor disk space, TLS renewal, service health and authentication logs.
+
+This does not turn SpawnWP into managed hosting. You remain responsible for the VPS, DNS,
+backups, WordPress updates, application security and the decision to use a separate production
+hosting workflow. Do not place unrelated production workloads on the same host: the cockpit
+orchestrates Docker and Nginx as root, so a cockpit compromise is equivalent to host compromise.

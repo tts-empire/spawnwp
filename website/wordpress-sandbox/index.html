@@ -22,7 +22,7 @@
       <article><h3>Start from a blueprint</h3><p>Use Development, Clean or Demo, add an administrator-authored manifest, or capture a configured WordPress site as a reusable blueprint on your server.</p></article>
       <article><h3>Switch PHP deliberately</h3><p>Create or switch sites across PHP 7.4, 8.2, 8.3, 8.4 and 8.5. PHP 7.4 is present only for legacy compatibility work, not as a recommended runtime.</p></article>
       <article><h3>Inspect without sending</h3><p>Mailpit captures outgoing WordPress email, Adminer exposes the isolated database behind cockpit authentication, and the development blueprint includes QA and debugging tools.</p></article>
-    </div></section>
+    </div><p><a href="/guides/running-spawnwp-long-term/">Planning to keep a site online for months? Read the long-term hardening and operations guide →</a></p></section>
     <section class="editorial"><div class="editorial-heading"><div class="eyebrow">Under the hood</div><h2>Isolation is enforced per site, not assumed.</h2></div><div class="prose-grid">
       <article><h3>Dropped capabilities by default</h3><p>Every container starts with <code>cap_drop: [ALL]</code>, then only the specific Linux capabilities that one service needs are added back — PHP-FPM gets CHOWN/SETUID/SETGID/DAC_OVERRIDE, Nginx gets CHOWN/SETUID/SETGID/NET_BIND_SERVICE, nothing gets more than it requires.</p></article>
       <article><h3>No privilege escalation</h3><p><code>security_opt: no-new-privileges</code> is set on every service, so a compromised process inside one site's container cannot escalate privileges even if a setuid binary is reachable.</p></article>

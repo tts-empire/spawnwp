@@ -4,6 +4,17 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.44
+
+- **Optional advisory RAM admission.** Root operators on a single-tenant development or test host
+  can set `SPAWNWP_RAM_ADMISSION=advisory` to allow site creation, starts and running-site PHP
+  memory increases beyond the calculated physical-RAM budget.
+- **Safe default preserved.** The default remains enforcing; advisory mode keeps Docker cgroup
+  limits, disk limits and site quotas, reports overcommit in Cockpit, and warns about swap pressure
+  and OOM risk. Swap is not treated as guaranteed capacity.
+- **Contributor feedback addressed.** This restores deliberate overcommit workflows without
+  weakening the default protection for shared or production hosts.
+
 ## 0.5.43
 
 - **PHP 8.5 support.** New sites, captured blueprints and existing projects can select PHP 8.5
@@ -774,7 +785,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.3.11...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.5.44...HEAD
+[0.5.44]: https://github.com/tts-empire/spawnwp/compare/v0.5.43...v0.5.44
 [0.3.11]: https://github.com/tts-empire/spawnwp/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/tts-empire/spawnwp/compare/v0.3.8...v0.3.9

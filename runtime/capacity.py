@@ -19,11 +19,14 @@ from pathlib import Path
 
 MIB = 1024 ** 2
 GIB = 1024 ** 3
+CONFIG_ENV = Path(os.environ.get("SPAWNWP_CONFIG_ENV", "/etc/spawnwp/config.env"))
 MIN_SYSTEM_RESERVE = 512 * MIB
 MAX_SYSTEM_RESERVE = 1 * GIB
 SYSTEM_RESERVE_RATIO = 0.20
 PHP_MIN_CONTAINER_MEMORY = 512 * MIB
 PHP_HEADROOM = 256 * MIB
+ADMISSION_ENFORCE = "enforce"
+ADMISSION_ADVISORY = "advisory"
 
 _lock = threading.RLock()
 _reservations: dict[str, int] = {}
@@ -35,6 +38,30 @@ class CapacityError(RuntimeError):
 
 class CapacityExceeded(CapacityError):
     """The requested allocation is valid but does not fit the current budget."""
+
+
+def admission_policy() -> str:
+    """Read the host-wide RAM admission policy.
+
+    The file is intentionally read for each operation so a root-only config
+    change takes effect without restarting the Cockpit. Invalid values fail
+    closed instead of silently weakening the safety guard.
+    """
+    raw = ""
+    try:
+        if CONFIG_ENV.is_file():
+            for line in CONFIG_ENV.read_text().splitlines():
+                if line.startswith("SPAWNWP_RAM_ADMISSION="):
+                    raw = line.partition("=")[2].strip().lower()
+                    break
+    except OSError as exc:
+        raise CapacityError("Unable to read SpawnWP configuration") from exc
+    policy = raw or ADMISSION_ENFORCE
+    if policy not in {ADMISSION_ENFORCE, ADMISSION_ADVISORY}:
+        raise CapacityError(
+            "Invalid SPAWNWP_RAM_ADMISSION configuration: use 'enforce' or 'advisory'"
+        )
+    return policy
 
 
 def parse_memory_bytes(value: object) -> int:
@@ -179,6 +206,7 @@ def configured_service_limits(project: Path, extra_env: dict | None = None) -> d
 
 
 def _snapshot_unlocked(projects_root: Path, records: list[dict] | None = None) -> dict:
+    policy = admission_policy()
     total = host_total_bytes()
     reserve = system_reserve_bytes(total)
     allocatable = max(total - reserve, 0)
@@ -196,6 +224,7 @@ def _snapshot_unlocked(projects_root: Path, records: list[dict] | None = None) -
         "committed_bytes": committed,
         "available_bytes": available,
         "overcommitted": committed > allocatable,
+        "admission_policy": policy,
         "running_containers": len(records),
         "records": records,
     }
@@ -228,7 +257,8 @@ def _reserve_unlocked(snapshot: dict, requested: int) -> str | None:
     requested = max(int(requested), 0)
     if requested == 0:
         return None
-    if requested > snapshot["available_bytes"]:
+    if (requested > snapshot["available_bytes"]
+            and snapshot["admission_policy"] == ADMISSION_ENFORCE):
         raise _rejection(snapshot, requested)
     token = secrets.token_urlsafe(18)
     _reservations[token] = requested
@@ -289,6 +319,7 @@ def public_snapshot(projects_root: Path) -> dict:
     payload = {key.removesuffix("_bytes") + "_mb": snapshot[key] // MIB for key in keys}
     payload.update(
         overcommitted=snapshot["overcommitted"],
+        admission_policy=snapshot["admission_policy"],
         running_containers=snapshot["running_containers"],
         policy="running-container-limits",
     )

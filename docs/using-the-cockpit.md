@@ -118,6 +118,14 @@ stack does not fit, Cockpit reports the host total, system reserve, current comm
 amount and available memory. Bring another site Down or lower a running site's PHP
 `memory_limit`; SpawnWP never chooses a site to stop automatically.
 
+By default this is an enforcing guard. A root operator on a single-tenant development or test host
+may deliberately opt into advisory admission by setting `SPAWNWP_RAM_ADMISSION=advisory` in
+`/etc/spawnwp/config.env`. In that mode create, **Up** and PHP memory increases can exceed the
+calculated budget; Cockpit marks the host as advisory/overcommitted and warns about swap pressure
+and OOM risk. The per-container cgroup limits remain in place, and swap is not counted as guaranteed
+capacity. The setting is host-wide, affects provisioning API operations too, and takes effect on the
+next operation without a service restart.
+
 The first switch to a PHP version downloads and compiles its image and can take several
 minutes. The cockpit shows structured progress and keeps the verbose BuildKit log under
 **Show technical details**. Cached PHP versions switch substantially faster. The same

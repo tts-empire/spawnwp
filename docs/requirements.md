@@ -32,6 +32,19 @@ site uses no container budget. A default running site reserves about 1.1 GiB, so
 appropriate for one running site at a time. You may keep additional sites Down and start them when
 needed. Cockpit shows the current committed and available capacity on Manage and Deploy.
 
+The default RAM admission policy is `enforce`: a create, start or increase to a running site's PHP
+memory is refused when the committed container limits exceed the host budget. On a single-tenant
+development or test host where the operator explicitly accepts swap and OOM risk, a root operator
+may opt into advisory admission by adding this line to `/etc/spawnwp/config.env`:
+
+```ini
+SPAWNWP_RAM_ADMISSION=advisory
+```
+
+Advisory mode permits those operations and marks the host as overcommitted in Cockpit, but it does
+not remove Docker cgroup limits and does not make swap part of the capacity guarantee. Keep the
+default on shared or production hosts. An absent or invalid setting never enables advisory mode.
+
 ## Network
 
 - **Ports 80 and 443** reachable from the internet (80 is required for Let's Encrypt

@@ -1208,11 +1208,19 @@ function applyHost(h) {
       const allocatable = capacity.allocatable_mb || 0;
       const available = capacity.available_mb || 0;
       const ratio = allocatable ? committed / allocatable : 1;
-      capacityBox.className = `capacity-summary${capacity.overcommitted || ratio >= .9 ? ' crit' : ratio >= .7 ? ' warn' : ''}`;
+      const advisory = capacity.admission_policy === 'advisory';
+      const severity = capacity.overcommitted || ratio >= .9 ? ' crit' : (advisory || ratio >= .7 ? ' warn' : '');
+      capacityBox.className = `capacity-summary${severity}${advisory ? ' advisory' : ''}`;
       capacityValue.textContent = `${(committed / 1024).toFixed(1)} / ${(allocatable / 1024).toFixed(1)} GiB reserved`;
-      capacityDetail.textContent = capacity.overcommitted
-        ? `Overcommitted · new starts and memory increases are blocked · system reserve ${(capacity.system_reserve_mb / 1024).toFixed(1)} GiB`
-        : `${(available / 1024).toFixed(1)} GiB available · ${capacity.running_containers || 0} running containers · Down sites count zero`;
+      if (capacity.overcommitted && advisory) {
+        capacityDetail.textContent = `Advisory policy · overcommitted · new starts allowed; swap/OOM risk · system reserve ${(capacity.system_reserve_mb / 1024).toFixed(1)} GiB`;
+      } else if (capacity.overcommitted) {
+        capacityDetail.textContent = `Overcommitted · new starts and memory increases are blocked · system reserve ${(capacity.system_reserve_mb / 1024).toFixed(1)} GiB`;
+      } else if (advisory) {
+        capacityDetail.textContent = `Advisory RAM policy · ${(available / 1024).toFixed(1)} GiB available · swap/OOM risk if overcommitted`;
+      } else {
+        capacityDetail.textContent = `${(available / 1024).toFixed(1)} GiB available · ${capacity.running_containers || 0} running containers · Down sites count zero`;
+      }
     }
   }
 

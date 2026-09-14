@@ -46,6 +46,12 @@ jobs:
           python ops/website/generate-sitemap.py --root website --repo . --output /tmp/spawnwp-public/sitemap-pages.xml
           mkdocs build --strict -f website/mkdocs-public.yml -d /tmp/spawnwp-public/docs
           python ops/website/check-site.py --root /tmp/spawnwp-public --sitemap /tmp/spawnwp-public/sitemap-pages.xml
+      - run: pip install -r website/requirements-test.txt
+      - run: playwright install --with-deps chromium
+      - name: Verify analytics on the generated site
+        env:
+          SPAWNWP_ANALYTICS_TEST_ROOT: /tmp/spawnwp-public
+        run: python -m unittest discover -s ops/website -p test_analytics_browser.py -v
       - uses: actions/upload-artifact@v4
         with:
           name: public-site-preview

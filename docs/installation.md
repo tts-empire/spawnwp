@@ -10,7 +10,7 @@ into the cockpit as quickly as possible.
 
 ## The one-liner
 
-```bash
+```{.bash .spawnwp-install-command}
 curl -fsSL https://spawnwp.com/install.sh | sudo bash
 ```
 
@@ -25,14 +25,14 @@ The installer prompts for the values it needs:
 
 For automated installs, pass the same values as environment variables:
 
-```bash
+```{.bash .spawnwp-install-command}
 curl -fsSL https://spawnwp.com/install.sh \
   | sudo DOMAIN=dev.example.com COCKPIT_DOMAIN=cockpit.example.com EMAIL=you@example.com bash
 ```
 
 !!! note "Review before running"
     To review the script first, download it and run it yourself:
-    ```bash
+    ```{.bash .spawnwp-install-command}
     curl -fsSL https://spawnwp.com/install.sh -o install.sh
     less install.sh
     sudo DOMAIN=… COCKPIT_DOMAIN=… EMAIL=… bash install.sh

@@ -30,8 +30,9 @@
   <script src="/assets/intro.js"></script>
   <link rel="stylesheet" href="/assets/site.css">
   <script src="/assets/site.js" defer></script>
+  <script src="/assets/copy-command.js" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://spawnwp.com/#website","url":"https://spawnwp.com/","name":"SpawnWP","description":"A free, self-hosted WordPress development lab for isolated, disposable environments.","sameAs":["https://github.com/tts-empire/spawnwp","https://www.facebook.com/profile.php?id=61591870231670"]},{"@type":"SoftwareSourceCode","@id":"https://spawnwp.com/#software","name":"SpawnWP","url":"https://spawnwp.com/","image":"https://spawnwp.com/assets/og-spawnwp-wordpress-lab.png","description":"A free, self-hosted WordPress development lab for creating isolated, disposable sites from a focused web cockpit.","runtimePlatform":"Debian 12 or 13; Ubuntu 22.04, 24.04 or 26.04","programmingLanguage":["Python","Shell","JavaScript","PHP"],"license":"https://github.com/tts-empire/spawnwp/blob/main/LICENSE","codeRepository":"https://github.com/tts-empire/spawnwp"},{"@type":"SoftwareApplication","@id":"https://spawnwp.com/#app","name":"SpawnWP","url":"https://spawnwp.com/","image":"https://spawnwp.com/assets/og-spawnwp-wordpress-lab.png","description":"SpawnWP is a free, self-hosted WordPress development lab. Create isolated, disposable sites on your Debian or Ubuntu server from a focused web cockpit.","applicationCategory":"DeveloperApplication","operatingSystem":"Debian 12 or 13; Ubuntu 22.04, 24.04 or 26.04","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"license":"https://github.com/tts-empire/spawnwp/blob/main/LICENSE","sameAs":["https://github.com/tts-empire/spawnwp"],"isBasedOn":{"@id":"https://spawnwp.com/#software"}},{"@type":"VideoObject","@id":"https://spawnwp.com/#promo-video","name":"SpawnWP — a real site, spawned in front of the camera","description":"A 77-second tour of the SpawnWP cockpit: spawning a real WordPress environment, managing isolated stacks and inspecting the system.","thumbnailUrl":"https://spawnwp.com/assets/promo-poster.jpg","contentUrl":"https://spawnwp.com/media/spawnwp-promo-1080p.mp4","uploadDate":"2026-07-14","duration":"PT1M17S","about":{"@id":"https://spawnwp.com/#app"}}]}</script>
-  <script src="/assets/analytics.js" async></script>
+  <script src="/assets/analytics.js" defer></script>
   <link rel="stylesheet" href="/assets/concierge.css">
   <script src="/assets/concierge.js" defer></script>
 </head>
@@ -62,7 +63,7 @@
         <h1>Your WordPress dev lab.<br>Your server.<br><em>Your rules.</em></h1>
         <p class="lede">Turn a fresh Debian or Ubuntu server into your own remotely accessible WordPress sandbox and development lab. Create disposable, isolated environments without a hosted control plane, per-site subscription or lock-in.</p>
         <div class="actions">
-          <a class="button primary" href="#install">Install SpawnWP</a>
+          <a class="button primary" href="#install" data-seo-funnel="open_install_section">Install SpawnWP</a>
           <a class="button secondary" href="/docs/">Read the docs</a>
         </div>
         <div class="terminal" aria-label="Installation command">
@@ -108,7 +109,7 @@
       <h2>A real site, spawned in front of the camera.</h2>
       <p class="section-copy">One take inside the cockpit: from an empty form to a working WordPress. Real progress, honest speed labels — nothing staged.</p>
       <figure class="promo-video">
-        <video controls preload="none" poster="/assets/promo-poster.jpg" src="/media/spawnwp-promo-1080p.mp4" width="1920" height="1080">
+        <video data-demo-video controls preload="none" poster="/assets/promo-poster.jpg" src="/media/spawnwp-promo-1080p.mp4" width="1920" height="1080">
           Your browser does not support the video tag. <a href="/media/spawnwp-promo-1080p.mp4">Download the video</a>.
         </video>
         <figcaption><strong>The 77-second tour</strong><span>Spawn, manage, inspect — recorded in the SpawnWP cockpit.</span></figcaption>

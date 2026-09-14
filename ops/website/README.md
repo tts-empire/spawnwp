@@ -95,3 +95,68 @@ rotate them if they appear in logs, and verify that the snapshot date continues 
 The `https://spawnwp.com/sitemap.xml` index is submitted and should report zero errors and
 warnings. After reconnecting OAuth, confirm that status, then monitor indexed pages, queries,
 CTR, average position and cannibalization together with Matomo conversions.
+
+### Demo and installation measurement (2026-09-14)
+
+The website measures intent, not successful server installations. Existing `SEO
+Funnel` actions remain compatible. `open_install_section` records the home CTA;
+`copy_install_command` is emitted only after copying succeeds, both on the home
+page and on the three explicitly marked installation-guide blocks. Other code
+examples do not count. Events contain the source pathname, never copied commands.
+
+Material's `document$` drives docs pageviews: update URL/title/referrer once per
+page navigation, including back/forward, and ignore anchor-only changes. The
+tracker must be loaded after Material and must dispatch through the current
+`window._paq`, because Matomo replaces its bootstrap queue when it loads.
+
+The home video emits `Demo Video` actions `demo_video_start`, `demo_video_50`, and
+`demo_video_complete` once each per page load. The 50% threshold uses the union of
+actually played ranges, not the seek position. Complete means the player reached
+its end; it does not claim the entire video was watched. No paid media plugin is
+required, and tracking failures never prevent copying or playback.
+
+Preview the four site-6 goals with:
+
+```bash
+python3 ops/website/configure_matomo_goals.py
+```
+
+Apply the preview using a config with sufficient Matomo Write/Admin access:
+
+```bash
+python3 ops/website/configure_matomo_goals.py --config /path/to/private-config.json --apply
+```
+
+The config has the same `url`, `token_auth`, `id_site` fields as the read-only
+report config. Keep it outside the repository and never pass the token on the
+command line. Goals match installation-guide pageviews, successful command copy,
+video 50%, and either modules or Turnstile documentation. Each allows one
+conversion per visit with zero revenue. The script checks all matches before
+writing, reuses existing IDs, refuses conflicting definitions and records an
+activation date in each managed goal description. Retrying after partial failure
+does not create duplicates. No manual `trackGoal` calls or historical backfill.
+
+`matomo_report.py` reports full event totals independently of the 25 displayed
+source-page rows. Rates use visits with the action, not repeated event counts.
+New actions before the rollout date and goals before activation are unavailable;
+intervals including activation day are partial and have no comparison rate.
+The private outreach reporter ships a copy of `matomo_measurement.py`; update it
+alongside this module. Snapshot JSON keeps legacy funnel keys and stores the
+additional metrics under `_measurement`, requiring no database migration.
+
+Browser verification runs on generated HTML (including real Material navigation):
+
+```bash
+pip install -r website/requirements-test.txt
+playwright install chromium
+SPAWNWP_ANALYTICS_TEST_ROOT=/path/to/public-site \
+  python3 -m unittest discover -s ops/website -p test_analytics_browser.py -v
+```
+
+The tests intercept external requests. An optional `SPAWNWP_MATOMO_TEST_JS` path
+to a downloaded public Matomo tracker enables its real request-payload check;
+those requests are also intercepted and never reach production. The site CI
+runs browser tests on its preview artifact. Production deployment uses
+`deploy-site.sh --publish` after the `site` and `test` workflows pass for main.
+Rollback uses the preceding release symlink. Managed goals can remain configured
+during rollback; unavailable events simply stop producing conversions.

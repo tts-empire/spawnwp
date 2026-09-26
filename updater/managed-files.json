@@ -80,6 +80,7 @@
     "migrations/retime-site-expiry.py",
     "migrations/add-provision-nginx-location.py",
     "migrations/repair-duplicate-project-ports.py",
+    "migrations/remove-test-mcp-fixture.py",
     "migrations/add-module-include.py",
     "migrations/add-ram-admission-limits.py",
     "nginx-http.conf.tpl",

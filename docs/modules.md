@@ -78,6 +78,12 @@ The catalog is optional. If it is unavailable or its signature is invalid, insta
 the manual upload/CLI workflow remain available. Operators can override the catalog endpoint with
 `SPAWNWP_MODULE_CATALOG_URL` and `SPAWNWP_MODULE_CATALOG_SIGNATURE_URL` when testing a mirror.
 
+Premium catalog entries use schema 2 and include a signed HTTPS `purchase_url`. The Modules page
+opens that Polar checkout with **Buy license**. After payment, the buyer returns with the license
+key supplied by Polar and chooses **Activate & install**; the product and module identifiers are
+resolved from the signed catalog and are never entered manually. An already installed premium
+module keeps the same checkout and license actions beside Manage, Disable and Update.
+
 ## Demo Launcher beta
 
 Demo Launcher is the first optional, separately developed module. It turns a captured blueprint

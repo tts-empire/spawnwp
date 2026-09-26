@@ -2633,9 +2633,12 @@ async function loadModules() {
       const id = esc(item.id);
       const caps = item.capabilities || {};
       const license = item.license || {};
+      const premium = item.commercial_model === 'premium';
+      const purchaseUrl = validPurchaseUrl(item.purchase_url);
       const actionButtons = [
-        item.commercial_model === 'premium' && !license.usable ? `<button class="btn-primary btn-sm" type="button" onclick="activateInstalledLicense('${id}')">Activate license</button>` : '',
-        item.commercial_model === 'premium' ? `<button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','refresh')">Refresh license</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','renew')">Renew updates</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','deactivate')">Release license for transfer</button>` : '',
+        premium && !license.usable && purchaseUrl ? `<a class="btn-neutral btn-sm" href="${esc(purchaseUrl)}" target="_blank" rel="noopener noreferrer">Buy license</a>` : '',
+        premium && !license.usable && item.product_id ? `<button class="btn-primary btn-sm" type="button" onclick="activateInstalledLicense('${id}')">Activate license</button>` : '',
+        premium ? `<button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','refresh')">Refresh license</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','renew')">Renew updates</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','deactivate')">Release license for transfer</button>` : '',
         item.admin_path ? `<a class="btn-primary btn-sm" href="${esc(item.admin_path)}">Manage</a>` : '',
         caps.activate && item.status !== 'active' ? `<button class="btn-success btn-sm" type="button" onclick="runModuleAction('${id}', 'enable')">Enable</button>` : '',
         caps.deactivate && item.status === 'active' ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'disable')">Disable</button>` : '',
@@ -2655,12 +2658,12 @@ async function loadModules() {
   }
 }
 
-async function installMarketplaceModule(id, version) {
+async function installMarketplaceModule(id, version, skipConfirm = false) {
   const item = MARKETPLACE_MODULES.find(entry => entry.id === id);
-  if (!item) return;
+  if (!item) return false;
   const installed = MARKETPLACE_INSTALLED.find(entry => entry.id === id);
   const prompt = installed ? `Install ${item.name} ${item.version} as an update?` : `Install ${item.name} ${item.version}?`;
-  if (!confirm(prompt)) return;
+  if (!skipConfirm && !confirm(prompt)) return false;
   try {
     const response = await sensitiveFetch(`${BASE}/modules/catalog/install`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2670,7 +2673,15 @@ async function installMarketplaceModule(id, version) {
     if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to install module');
     showToast('Module installation started');
     watchModuleOperation(payload.id);
-  } catch (error) { showToast(error.message, true); }
+    return true;
+  } catch (error) { showToast(error.message, true); return false; }
+}
+
+function validPurchaseUrl(value) {
+  try {
+    const url = new URL(value || '', window.location.href);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.hash ? url.href : '';
+  } catch (error) { return ''; }
 }
 
 async function loadMarketplace() {
@@ -2689,7 +2700,10 @@ async function loadMarketplace() {
       const installed = MARKETPLACE_INSTALLED.find(entry => entry.id === item.id);
       const same = installed && installed.version === item.version;
       const premium = item.commercial_model === 'premium';
-      const action = (premium ? `<button class="btn-neutral btn-sm" onclick="activateMarketplaceLicense('${esc(item.id)}')">Activate license</button>${item.purchase_url && /^https:\/\//.test(item.purchase_url) ? `<a class="btn-neutral btn-sm" href="${esc(item.purchase_url)}" target="_blank" rel="noopener noreferrer">Buy license ↗</a>` : ''}` : '') + (same ? '<span class="badge badge-green">Installed</span>' : `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">${installed ? 'Install update' : 'Install'}</button>`);
+      const purchaseUrl = validPurchaseUrl(item.purchase_url);
+      const action = premium
+        ? `${!installed && purchaseUrl ? `<a class="btn-neutral btn-sm" href="${esc(purchaseUrl)}" target="_blank" rel="noopener noreferrer">Buy license</a>` : ''}${same ? '<span class="badge badge-green">Installed</span>' : installed ? `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">Install update</button>` : `<button class="btn-primary btn-sm" type="button" onclick="activateAndInstallMarketplaceLicense('${esc(item.id)}','${esc(item.version)}')">Activate &amp; install</button>`}`
+        : (same ? '<span class="badge badge-green">Installed</span>' : `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">${installed ? 'Install update' : 'Install'}</button>`);
       const tags = Array.isArray(item.tags) ? item.tags.map(tag => `<span class="module-tag">${esc(tag)}</span>`).join('') : '';
       return `<article class="module-card marketplace-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} <span class="badge badge-gray">${premium ? 'Premium' : 'Free'}</span><span class="module-card-id">v${esc(item.version)}</span></div><p>${esc(item.description)}</p><div class="module-card-meta">Requires SpawnWP ${esc(item.min_core_version || '0.0.0')}–${esc(item.max_core_version || 'latest')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}</div>${tags ? `<div class="module-tags">${tags}</div>` : ''}</div><div class="module-card-actions">${item.docs_url && /^https:\/\//.test(item.docs_url) ? `<a class="btn-neutral btn-sm" href="${esc(item.docs_url)}" target="_blank" rel="noopener">Docs ↗</a>` : ''}${action}</div></article>`;
     }).join('') : '<p class="field-help">No free modules are currently available.</p>';
@@ -2700,20 +2714,25 @@ async function loadMarketplace() {
   }
 }
 
-async function moduleLicenseAction(id, action, body) {
+async function moduleLicenseAction(id, action, body, options = {}) {
   if (action === 'deactivate' && !confirm('Release this license for transfer? Disable the module first. Existing environments will be kept.')) return;
   try {
     const response = await sensitiveFetch(`${BASE}/module-licenses/${encodeURIComponent(id)}/${action}`, {method:'POST',headers:{'Content-Type':'application/json'},...(body ? {body:JSON.stringify(body)} : {})});
     const payload = await response.json();if(!response.ok)throw Error(payload.detail || 'License request failed');
     if(action==='renew') {const url=new URL(payload.checkout_url);if(url.protocol!=='https:')throw Error('Invalid checkout URL');window.location.assign(url.href);return;}
-    showToast('License updated');loadModules();
-  } catch(error) {showToast(error.message,true);}
+    showToast(options.successMessage || 'License updated');
+    if (options.reload !== false) { loadModules(); loadMarketplace(); }
+    return payload;
+  } catch(error) {showToast(error.message,true);return null;}
 }
 
-function activateMarketplaceLicense(id) {
+async function activateAndInstallMarketplaceLicense(id, version) {
   const item=MARKETPLACE_MODULES.find(m=>m.id===id);if(!item)return;
-  const key=prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
-  if(key)moduleLicenseAction(id,'activate',{product_id:item.product_id,license_key:key.trim()});
+  const key=prompt('After purchasing, enter the license key from your receipt. Do not paste this key into an LLM conversation.');
+  if (!key || !key.trim() || !item.product_id) return;
+  const activated = await moduleLicenseAction(id,'activate',{product_id:item.product_id,license_key:key.trim()}, {reload:false, successMessage:'License activated; starting installation'});
+  if (!activated) return;
+  await installMarketplaceModule(id, version, true);
 }
 
 function activateInstalledLicense(id) {
@@ -2722,15 +2741,6 @@ function activateInstalledLicense(id) {
   if (!productId) { showToast('This module does not declare a valid product id', true); return; }
   const key = prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
   if (key) moduleLicenseAction(id, 'activate', {product_id: productId, license_key: key.trim()});
-}
-
-function activateLicenseBeforeInstall() {
-  const moduleId = prompt('Enter the premium module id (for example: spawnwp-mcp):');
-  if (!moduleId) return;
-  const productId = prompt('Enter the Polar product id for this module:');
-  if (!productId) return;
-  const key = prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
-  if (key) moduleLicenseAction(moduleId.trim(), 'activate', {product_id: productId.trim(), license_key: key.trim()});
 }
 
 if (document.body.dataset.page === 'modules') {

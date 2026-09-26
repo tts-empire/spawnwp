@@ -195,6 +195,14 @@ def load_manifest(path: Path, archive: Path) -> dict:
                     or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", product_id)
                     or type(published_at) is not int or published_at <= 0):
                 raise ModuleError("Premium modules require a product id and signed publication timestamp")
+            purchase_url = manifest.get("purchase_url")
+            if purchase_url is not None:
+                parsed_purchase = urllib.parse.urlsplit(purchase_url if isinstance(purchase_url, str) else "")
+                if (not isinstance(purchase_url, str) or len(purchase_url) > 2048
+                        or parsed_purchase.scheme != "https" or not parsed_purchase.netloc
+                        or parsed_purchase.username or parsed_purchase.password
+                        or parsed_purchase.fragment):
+                    raise ModuleError("Premium purchase URL must be a valid HTTPS URL")
     files = manifest.get("files")
     if not isinstance(files, list) or len(files) > MAX_ARCHIVE_MEMBERS or not all(
         isinstance(item, dict) and isinstance(item.get("path"), str)

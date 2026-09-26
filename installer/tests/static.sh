@@ -368,6 +368,22 @@ if grep -Fq "api('/api/modules')" "$ROOT/runtime/assets/cockpit.js"; then
   echo "ERROR: Modules calls the nonexistent api() helper" >&2
   exit 1
 fi
+grep -Fq "Activate &amp; install" "$ROOT/runtime/assets/cockpit.js" || {
+  echo "ERROR: premium marketplace cards must offer contextual activate-and-install" >&2
+  exit 1
+}
+grep -Fq "Buy license" "$ROOT/runtime/assets/cockpit.js" || {
+  echo "ERROR: premium modules must expose their signed purchase checkout" >&2
+  exit 1
+}
+if grep -Fq "activateLicenseBeforeInstall" "$ROOT/runtime/assets/cockpit.js"; then
+  echo "ERROR: global pre-install license activation must not be shipped" >&2
+  exit 1
+fi
+grep -Fq '"purchase_url"' "$ROOT/runtime/app.py" || {
+  echo "ERROR: installed module metadata must expose its purchase URL" >&2
+  exit 1
+}
 
 # GitHub issue #13: Mailpit was only wired up on the Development blueprint (it
 # rode along with devkit.php's debug-tools flag), so Clean/Demo sites silently

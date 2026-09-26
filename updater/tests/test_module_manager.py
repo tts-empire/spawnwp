@@ -36,7 +36,7 @@ class ModuleManagerTests(unittest.TestCase):
     def package(self, *, module_id="demo-launcher", version="1.0.0",
                 min_core="0.5.29", max_core="0.9.99", core_api_scope=None,
                 lifecycle=False, schema=1, commercial_model="free",
-                published_at=1_789_000_000):
+                published_at=1_789_000_000, purchase_url=None):
         package = self.root / f"{module_id}-{version}"
         package.mkdir()
         (package / "app.py").write_text("VALUE = 1\n")
@@ -70,6 +70,8 @@ class ModuleManagerTests(unittest.TestCase):
             })
             if commercial_model == "premium":
                 manifest.update({"product_id": module_id, "published_at": published_at})
+                if purchase_url is not None:
+                    manifest["purchase_url"] = purchase_url
         manifest_path = self.root / f"{module_id}-{version}.manifest.json"
         manifest_path.write_text(json.dumps(manifest))
         (self.root / f"{module_id}-{version}.manifest.sig").write_bytes(b"signature")
@@ -235,6 +237,13 @@ class ModuleManagerTests(unittest.TestCase):
         manifest.write_text(json.dumps(value))
         with mock.patch.object(module_manager, "verify_signature"), self.assertRaisesRegex(
             module_manager.ModuleError, "publication timestamp",
+        ):
+            module_manager.install(str(archive))
+
+    def test_premium_manifest_rejects_invalid_purchase_url(self):
+        archive = self.package(schema=2, commercial_model="premium", purchase_url="http://example.test/checkout")
+        with mock.patch.object(module_manager, "verify_signature"), self.assertRaisesRegex(
+            module_manager.ModuleError, "purchase URL",
         ):
             module_manager.install(str(archive))
 

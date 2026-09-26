@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -2284,6 +2285,16 @@ MODULE_OPERATIONS_ROOT = MODULE_STATE_ROOT / "operations"
 MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 
 
+def _purchase_url(value: object) -> str:
+    if not isinstance(value, str) or len(value) > 2048:
+        return ""
+    parsed = urllib.parse.urlparse(value)
+    if (parsed.scheme != "https" or not parsed.netloc or parsed.username
+            or parsed.password or parsed.fragment):
+        return ""
+    return value
+
+
 def _module_state(module_id: str) -> dict:
     try:
         value = json.loads((MODULE_STATE_ROOT / module_id / "install.json").read_text())
@@ -2424,6 +2435,7 @@ def installed_modules() -> list[dict]:
             "source_url": recorded_source if recorded_source.startswith("https://") else "",
             "commercial_model": item.get("commercial_model", "free"),
             "product_id": item.get("product_id"),
+            "purchase_url": _purchase_url(item.get("purchase_url")),
             "license": module_licensing.status(item),
             "operation_id": _module_pending_operation(module_id),
             "capabilities": _module_capabilities(release),

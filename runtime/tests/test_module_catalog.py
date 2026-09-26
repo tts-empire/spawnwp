@@ -47,6 +47,7 @@ class ModuleCatalogTests(unittest.TestCase):
         premium = entry(
             commercial_model="premium", code_license="Proprietary",
             product_id="spawnwp-mcp", published_at=1_789_000_000,
+            purchase_url="https://polar.example/checkout/spawnwp-mcp",
         )
         premium.pop("license")
         result = module_catalog.validate(
@@ -57,6 +58,31 @@ class ModuleCatalogTests(unittest.TestCase):
 
     def test_validate_rejects_incomplete_premium_schema_two_entry(self):
         premium = entry(commercial_model="premium", code_license="Proprietary")
+        premium.pop("license")
+        with self.assertRaises(module_catalog.CatalogError):
+            module_catalog.validate(
+                {"schema": 2, "catalog_version": 2, "publisher": "SpawnWP", "modules": [premium]},
+                "0.5.34",
+            )
+
+    def test_validate_rejects_premium_without_purchase_url(self):
+        premium = entry(
+            commercial_model="premium", code_license="Proprietary",
+            product_id="spawnwp-mcp", published_at=1_789_000_000,
+        )
+        premium.pop("license")
+        with self.assertRaises(module_catalog.CatalogError):
+            module_catalog.validate(
+                {"schema": 2, "catalog_version": 2, "publisher": "SpawnWP", "modules": [premium]},
+                "0.5.34",
+            )
+
+    def test_validate_rejects_premium_purchase_url_with_credentials(self):
+        premium = entry(
+            commercial_model="premium", code_license="Proprietary",
+            product_id="spawnwp-mcp", published_at=1_789_000_000,
+            purchase_url="https://user:secret@polar.example/checkout",
+        )
         premium.pop("license")
         with self.assertRaises(module_catalog.CatalogError):
             module_catalog.validate(

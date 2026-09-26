@@ -133,6 +133,13 @@ def validate(payload: dict, current_core: str) -> dict:
                 validate_metadata({**item, "schema": 2})
             except LicenseError as exc:
                 raise CatalogError(str(exc)) from exc
+            purchase_url = item.get("purchase_url")
+            parsed_purchase = urllib.parse.urlparse(purchase_url or "")
+            if (not isinstance(purchase_url, str) or len(purchase_url) > 2048
+                    or parsed_purchase.scheme != "https" or not parsed_purchase.netloc
+                    or parsed_purchase.username or parsed_purchase.password
+                    or parsed_purchase.fragment):
+                raise CatalogError(f"Premium catalog module {module_id} needs a valid purchase URL")
         archive = item.get("archive_url")
         parsed = urllib.parse.urlparse(archive or "")
         if model == "free" and (parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.query or parsed.fragment or not str(archive).endswith(".tar.gz")):

@@ -4,6 +4,50 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.51
+
+- **Focused Modules experience.** The Modules page now contains only module installation and
+  management controls. Automation permissions are exposed by the module that actually uses them,
+  not as a global core link.
+- **Optional premium modules.** SpawnWP's existing core functionality and all capabilities already
+  available in SpawnWP remain usable without payment or a subscription. Future separately signed
+  modules may be released as free or paid premium add-ons, but purchasing a module will never be
+  required to keep or use the functionality already provided by SpawnWP.
+
+## 0.5.50
+
+- **Hardened premium purchase URLs.** Malformed premium checkout URLs are rejected cleanly while
+  preserving the contextual Polar checkout and `Activate & install` flow.
+
+## 0.5.49
+
+- **Optional premium purchase flow.** Premium marketplace entries can expose a signed Polar
+  checkout URL, followed by `Activate & install` with the license key supplied after checkout.
+- **Test fixture cleanup.** The temporary `spawnwp-mcp` licensing fixture is no longer part of the
+  core package or marketplace; existing validation installations remove it during update while
+  real third-party modules remain untouched.
+
+## 0.5.48
+
+- **Contextual premium activation.** License activation is shown only on the card or marketplace
+  entry for the corresponding premium module, instead of as an unexplained global action.
+
+## 0.5.47
+
+- **Actionable licensing errors.** Safe rejection details now distinguish invalid or already-bound
+  licenses from temporary service outages without exposing license keys or request bodies.
+
+## 0.5.46
+
+- **Premium activation groundwork.** The Modules page can activate a premium license before the
+  first install, protecting signed premium packages distributed privately or manually.
+
+## 0.5.45
+
+- **Signed premium-module foundation.** The cockpit can activate, refresh and renew entitlements,
+  resolve authenticated premium artifacts, and support the entitlement keyring and module API
+  needed by signed schema-2 modules.
+
 ## 0.5.44
 
 - **Optional advisory RAM admission.** Root operators on a single-tenant development or test host
@@ -99,7 +143,8 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 - **Signed optional modules.** SpawnWP now verifies module signatures, archive and per-file
   checksums, core compatibility and lifecycle hooks, then activates releases atomically. The
   Cockpit includes a dedicated Modules page with install, enable, disable, update and uninstall
-  controls, operation status and consistent navigation styling.
+  controls, operation status and consistent navigation styling. Modules are optional extensions;
+  the SpawnWP core and its existing functionality do not depend on purchasing a module.
 - **Least-privilege local modules.** A signed module can declare one `core_api_scope`; SpawnWP
   provisions a root-only credential, exposes it only through systemd, routes the module through
   the enabled Cockpit virtual host and revokes the credential on removal.
@@ -785,7 +830,14 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.5.44...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.5.51...HEAD
+[0.5.51]: https://github.com/tts-empire/spawnwp/compare/v0.5.50...v0.5.51
+[0.5.50]: https://github.com/tts-empire/spawnwp/compare/v0.5.49...v0.5.50
+[0.5.49]: https://github.com/tts-empire/spawnwp/compare/v0.5.48...v0.5.49
+[0.5.48]: https://github.com/tts-empire/spawnwp/compare/v0.5.47...v0.5.48
+[0.5.47]: https://github.com/tts-empire/spawnwp/compare/v0.5.46...v0.5.47
+[0.5.46]: https://github.com/tts-empire/spawnwp/compare/v0.5.45...v0.5.46
+[0.5.45]: https://github.com/tts-empire/spawnwp/compare/v0.5.44...v0.5.45
 [0.5.44]: https://github.com/tts-empire/spawnwp/compare/v0.5.43...v0.5.44
 [0.3.11]: https://github.com/tts-empire/spawnwp/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/tts-empire/spawnwp/compare/v0.3.9...v0.3.10

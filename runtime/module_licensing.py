@@ -197,6 +197,19 @@ def service_request(action: str, payload: dict) -> dict:
             if not isinstance(result, dict):
                 raise ValueError("invalid response")
             return result
+    except urllib.error.HTTPError as exc:
+        # The service deliberately returns short, operator-safe problem details
+        # for rejected activations and transfers. Preserve that detail instead
+        # of misreporting every 4xx as an outage; never echo request data.
+        try:
+            raw = exc.read(64 * 1024)
+            payload = json.loads(raw.decode("utf-8"))
+            detail = payload.get("detail") if isinstance(payload, dict) else None
+        except (OSError, UnicodeDecodeError, ValueError, AttributeError):
+            detail = None
+        if isinstance(detail, str) and 0 < len(detail) <= 240:
+            raise LicenseError(detail) from exc
+        raise LicenseError("License request was rejected by the licensing service") from exc
     except (urllib.error.URLError, OSError, ValueError) as exc:
         # Never include response bodies or request details (possibly license keys).
         raise LicenseError("License service unavailable or request rejected; existing entitlements are unchanged") from exc

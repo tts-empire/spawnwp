@@ -380,6 +380,10 @@ if grep -Fq "activateLicenseBeforeInstall" "$ROOT/runtime/assets/cockpit.js"; th
   echo "ERROR: global pre-install license activation must not be shipped" >&2
   exit 1
 fi
+if grep -Fq 'href="/automations"' "$ROOT/runtime/modules.html"; then
+  echo "ERROR: automation permissions must not be advertised globally on Modules" >&2
+  exit 1
+fi
 grep -Fq '"purchase_url"' "$ROOT/runtime/app.py" || {
   echo "ERROR: installed module metadata must expose its purchase URL" >&2
   exit 1

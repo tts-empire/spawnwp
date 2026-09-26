@@ -134,7 +134,9 @@ def validate(payload: dict, current_core: str) -> dict:
             except LicenseError as exc:
                 raise CatalogError(str(exc)) from exc
             purchase_url = item.get("purchase_url")
-            parsed_purchase = urllib.parse.urlparse(purchase_url or "")
+            parsed_purchase = urllib.parse.urlparse(
+                purchase_url if isinstance(purchase_url, str) else "",
+            )
             if (not isinstance(purchase_url, str) or len(purchase_url) > 2048
                     or parsed_purchase.scheme != "https" or not parsed_purchase.netloc
                     or parsed_purchase.username or parsed_purchase.password

@@ -90,6 +90,19 @@ class ModuleCatalogTests(unittest.TestCase):
                 "0.5.34",
             )
 
+    def test_validate_rejects_non_string_premium_purchase_url(self):
+        premium = entry(
+            commercial_model="premium", code_license="Proprietary",
+            product_id="spawnwp-mcp", published_at=1_789_000_000,
+            purchase_url=123,
+        )
+        premium.pop("license")
+        with self.assertRaises(module_catalog.CatalogError):
+            module_catalog.validate(
+                {"schema": 2, "catalog_version": 2, "publisher": "SpawnWP", "modules": [premium]},
+                "0.5.34",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2724,6 +2724,15 @@ function activateInstalledLicense(id) {
   if (key) moduleLicenseAction(id, 'activate', {product_id: productId, license_key: key.trim()});
 }
 
+function activateLicenseBeforeInstall() {
+  const moduleId = prompt('Enter the premium module id (for example: spawnwp-mcp):');
+  if (!moduleId) return;
+  const productId = prompt('Enter the Polar product id for this module:');
+  if (!productId) return;
+  const key = prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
+  if (key) moduleLicenseAction(moduleId.trim(), 'activate', {product_id: productId.trim(), license_key: key.trim()});
+}
+
 if (document.body.dataset.page === 'modules') {
   loadModules();
   loadMarketplace();

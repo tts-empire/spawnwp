@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Modules · SpawnWP Cockpit</title>
   <style>html,body{background:#000;color:#f8f8f8;color-scheme:dark}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}header{min-height:64px}main{min-height:420px}html.cockpit-preload body{visibility:hidden}</style>
-  <script src="/assets/cockpit-boot.js?v=0.5.47" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
-  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.47">
+  <script src="/assets/cockpit-boot.js?v=0.5.48" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
+  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.48">
 </head>
 <body data-page="modules">
   <header>
@@ -23,7 +23,7 @@
           <div class="section-title">Install a module</div>
           <p class="system-intro">Upload a signed extension package. SpawnWP verifies it before installation and activation.</p>
         </div>
-        <div class="actions"><button class="btn-neutral" type="button" onclick="activateLicenseBeforeInstall()">Activate license</button><button class="btn-primary" type="button" onclick="toggleModuleInstall()">Install module</button></div>
+        <button class="btn-primary" type="button" onclick="toggleModuleInstall()">Install module</button>
       </div>
       <form id="module-install-form" class="module-install" hidden>
         <div class="section-title">Install signed package</div>
@@ -35,6 +35,15 @@
         <p class="field-help">Only install packages from a trusted publisher: module installation runs signed code with root privileges.</p>
       </form>
       <div class="update-command"><span>Command-line alternative</span><code>sudo spawnwp module install PACKAGE.tar.gz</code></div>
+    </section>
+    <section class="section system-panel module-install-panel">
+      <div class="modules-heading">
+        <div>
+          <div class="section-title">Premium license</div>
+          <p class="system-intro">Already purchased a premium module? Activate its license here before installing the signed package.</p>
+        </div>
+        <button class="btn-neutral" type="button" onclick="activateLicenseBeforeInstall()">Activate premium license</button>
+      </div>
     </section>
     <section class="section module-list-section">
       <div class="section-title">Installed modules</div>
@@ -51,6 +60,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.47"></script>
+  <script src="/assets/cockpit.js?v=0.5.48"></script>
 </body>
 </html>

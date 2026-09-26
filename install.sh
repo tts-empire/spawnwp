@@ -163,16 +163,21 @@ install -d -m 0755 /srv/wp-dev /srv/wp-cockpit/static/assets /usr/local/lib/spaw
 install -d -m 0700 /var/lib/spawnwp/docker
 if [ "$mode" = source ]; then
   rsync -a --exclude primary.env "$(src runtime .)/" /srv/wp-dev/
-  install -m 0644 "$(src cockpit app.py)" "$(src cockpit auth.py)" "$(src cockpit requirements.txt)" /srv/wp-cockpit/
-  install -m 0644 "$SOURCE/runtime/manage.html" "$SOURCE/runtime/deploy.html" "$SOURCE/runtime/updates.html" /srv/wp-cockpit/static/
+  # Keep source installs in sync with the release payload.  The cockpit has
+  # several importable modules, so maintaining a short hand-written list here
+  # silently drops new core files (including automation and licensing).
+  install -m 0644 "$SOURCE/runtime/"*.py "$SOURCE/runtime/requirements.txt" /srv/wp-cockpit/
+  install -m 0644 "$SOURCE/runtime/"*.html /srv/wp-cockpit/static/
   install -m 0644 "$SOURCE/runtime/assets/"* /srv/wp-cockpit/static/assets/
   install -m 0755 "$SOURCE/updater/spawnwp" /usr/local/bin/spawnwp
   install -m 0644 "$SOURCE/updater/release-public.pem" /usr/local/lib/spawnwp/release-public.pem
+  install -m 0644 "$SOURCE/runtime/license-public-keys.json" /usr/local/lib/spawnwp/license-public-keys.json
 else
   rsync -a "$SOURCE/payload/runtime/" /srv/wp-dev/
   rsync -a "$SOURCE/payload/cockpit/" /srv/wp-cockpit/
   install -m 0755 "$SOURCE/payload/bin/spawnwp" /usr/local/bin/spawnwp
   install -m 0644 "$SOURCE/payload/lib/release-public.pem" /usr/local/lib/spawnwp/release-public.pem
+  install -m 0644 "$SOURCE/payload/lib/license-public-keys.json" /usr/local/lib/spawnwp/license-public-keys.json
 fi
 rsync -a "$(src installer .)/" /usr/local/lib/spawnwp/installer/
 if [ "$mode" = package ]; then

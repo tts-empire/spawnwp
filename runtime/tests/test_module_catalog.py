@@ -20,6 +20,10 @@ def entry(**overrides):
 
 
 class ModuleCatalogTests(unittest.TestCase):
+    def test_deployed_schema_one_catalog_remains_the_default(self):
+        self.assertEqual(module_catalog.DEFAULT_URL,
+                         "https://spawnwp.com/modules/catalog.json")
+
     def test_validate_filters_incompatible_entries(self):
         payload = {"schema": 1, "catalog_version": 1, "publisher": "SpawnWP",
                    "modules": [entry(), entry(id="future", min_core_version="9.0.0", max_core_version="9.9.9")]}
@@ -38,6 +42,27 @@ class ModuleCatalogTests(unittest.TestCase):
     def test_canonical_json_is_deterministic(self):
         payload = {"b": 1, "a": ["x"]}
         self.assertEqual(module_catalog.canonical_json(payload), b'{"a":["x"],"b":1}\n')
+
+    def test_validate_accepts_a_complete_premium_schema_two_entry(self):
+        premium = entry(
+            commercial_model="premium", code_license="Proprietary",
+            product_id="spawnwp-mcp", published_at=1_789_000_000,
+        )
+        premium.pop("license")
+        result = module_catalog.validate(
+            {"schema": 2, "catalog_version": 2, "publisher": "SpawnWP", "modules": [premium]},
+            "0.5.34",
+        )
+        self.assertEqual(result["modules"][0]["commercial_model"], "premium")
+
+    def test_validate_rejects_incomplete_premium_schema_two_entry(self):
+        premium = entry(commercial_model="premium", code_license="Proprietary")
+        premium.pop("license")
+        with self.assertRaises(module_catalog.CatalogError):
+            module_catalog.validate(
+                {"schema": 2, "catalog_version": 2, "publisher": "SpawnWP", "modules": [premium]},
+                "0.5.34",
+            )
 
 
 if __name__ == "__main__":

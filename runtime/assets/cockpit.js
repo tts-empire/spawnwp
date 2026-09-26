@@ -2515,6 +2515,7 @@ if (document.body.dataset.page === 'system') { loadSystemInfo(); loadBlueprintCa
 let MODULE_OPERATION_TIMER = null;
 const MODULE_SOURCE_BY_ID = {};
 let MARKETPLACE_MODULES = [];
+let INSTALLED_MODULES = [];
 let MARKETPLACE_INSTALLED = [];
 
 function toggleModuleInstall(force) {
@@ -2544,11 +2545,8 @@ async function runModuleAction(id, action, recordedSource) {
       : forceUninstall
         ? 'Force uninstall this module? This bypasses its active-resource safety check and removes its integration.'
         : 'Uninstall this module? Its code, routes, services and module credentials will be removed, while campaigns and settings are kept for a future reinstall.')) return;
-  if (action === 'update' && !recordedSource) recordedSource = MODULE_SOURCE_BY_ID[id] || '';
-  if (action === 'update' && !recordedSource) {
-    recordedSource = prompt('Enter the HTTPS URL of the signed .tar.gz package (including matching manifest and signature):', 'https://');
-    if (!recordedSource) return;
-  }
+  // Without an explicit source, the server resolves the latest compatible,
+  // entitled release. Never silently reinstall the originally recorded URL.
   const method = (action === 'uninstall' || forceUninstall || purgeUninstall) ? 'DELETE' : 'POST';
   let endpoint = (action === 'uninstall' || forceUninstall || purgeUninstall) ? `${BASE}/modules/${encodeURIComponent(id)}` : `${BASE}/modules/${encodeURIComponent(id)}/${action}`;
   if (forceUninstall) endpoint += '?force=true';
@@ -2624,6 +2622,7 @@ async function loadModules() {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || response.statusText || 'Unable to load modules');
     const modules = payload.modules || [];
+    INSTALLED_MODULES = modules;
     Object.keys(MODULE_SOURCE_BY_ID).forEach(key => delete MODULE_SOURCE_BY_ID[key]);
     modules.forEach(item => { MODULE_SOURCE_BY_ID[item.id] = item.source_url || ''; });
     if (summary) {
@@ -2633,7 +2632,10 @@ async function loadModules() {
     root.innerHTML = modules.length ? modules.map(item => {
       const id = esc(item.id);
       const caps = item.capabilities || {};
+      const license = item.license || {};
       const actionButtons = [
+        item.commercial_model === 'premium' && !license.usable ? `<button class="btn-primary btn-sm" type="button" onclick="activateInstalledLicense('${id}')">Activate license</button>` : '',
+        item.commercial_model === 'premium' ? `<button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','refresh')">Refresh license</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','renew')">Renew updates</button><button class="btn-neutral btn-sm" type="button" onclick="moduleLicenseAction('${id}','deactivate')">Release license for transfer</button>` : '',
         item.admin_path ? `<a class="btn-primary btn-sm" href="${esc(item.admin_path)}">Manage</a>` : '',
         caps.activate && item.status !== 'active' ? `<button class="btn-success btn-sm" type="button" onclick="runModuleAction('${id}', 'enable')">Enable</button>` : '',
         caps.deactivate && item.status === 'active' ? `<button class="btn-neutral btn-sm" type="button" onclick="runModuleAction('${id}', 'disable')">Disable</button>` : '',
@@ -2641,7 +2643,8 @@ async function loadModules() {
         caps.uninstall ? `<button class="btn-danger btn-sm" type="button" onclick="runModuleAction('${id}', 'uninstall')">Uninstall</button>` : '',
         caps.uninstall ? `<button class="btn-danger btn-sm" type="button" onclick="runModuleAction('${id}', 'purge-uninstall')">Uninstall and delete data</button>` : '',
       ].join('');
-      return `<article class="module-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} ${moduleStatusBadge(item.status)} <span class="module-card-id">${id}</span></div><p>${esc(item.description || 'SpawnWP module')}</p><div class="module-card-meta">Version ${esc(item.version || 'unknown')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}${item.last_error ? ` · ${esc(item.last_error)}` : ''}</div></div><div class="module-card-actions">${actionButtons || '<span class="field-help">No management actions available</span>'}</div></article>`;
+      const licenseText = item.commercial_model !== 'premium' ? '' : license.state === 'updates_expired' ? 'Updates expired. This version continues to work; renew to receive new versions.' : license.usable ? 'Perpetual use · Updates until '+new Date(license.updates_until*1000).toLocaleDateString() : license.message || 'License activation required';
+      return `<article class="module-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} ${moduleStatusBadge(item.status)} <span class="module-card-id">${id}</span></div><p>${esc(item.description || 'SpawnWP module')}</p><p>${esc(licenseText)}</p><div class="module-card-meta">Version ${esc(item.version || 'unknown')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}${item.last_error ? ` · ${esc(item.last_error)}` : ''}</div></div><div class="module-card-actions">${actionButtons || '<span class="field-help">No management actions available</span>'}</div></article>`;
     }).join('') : '<p class="field-help">No optional modules are installed. Install a signed package to get started.</p>';
     root.removeAttribute('aria-busy');
     const pending = modules.find(item => item.operation_id);
@@ -2681,19 +2684,44 @@ async function loadMarketplace() {
     MARKETPLACE_MODULES = payload.modules || [];
     MARKETPLACE_INSTALLED = payload.installed || [];
     const summary = document.getElementById('marketplace-summary');
-    if (summary) summary.innerHTML = `<span class="badge badge-gray">${MARKETPLACE_MODULES.length} available</span><span class="badge badge-green">Free · signed catalog</span>`;
+    if (summary) summary.innerHTML = `<span class="badge badge-gray">${MARKETPLACE_MODULES.length} available</span><span class="badge badge-green">Signed catalog</span>`;
     root.innerHTML = MARKETPLACE_MODULES.length ? MARKETPLACE_MODULES.map(item => {
       const installed = MARKETPLACE_INSTALLED.find(entry => entry.id === item.id);
       const same = installed && installed.version === item.version;
-      const action = same ? '<span class="badge badge-green">Installed</span>' : `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">${installed ? 'Install update' : 'Install'}</button>`;
+      const premium = item.commercial_model === 'premium';
+      const action = (premium ? `<button class="btn-neutral btn-sm" onclick="activateMarketplaceLicense('${esc(item.id)}')">Activate license</button>${item.purchase_url && /^https:\/\//.test(item.purchase_url) ? `<a class="btn-neutral btn-sm" href="${esc(item.purchase_url)}" target="_blank" rel="noopener noreferrer">Buy license ↗</a>` : ''}` : '') + (same ? '<span class="badge badge-green">Installed</span>' : `<button class="btn-primary btn-sm" type="button" onclick="installMarketplaceModule('${esc(item.id)}','${esc(item.version)}')">${installed ? 'Install update' : 'Install'}</button>`);
       const tags = Array.isArray(item.tags) ? item.tags.map(tag => `<span class="module-tag">${esc(tag)}</span>`).join('') : '';
-      return `<article class="module-card marketplace-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} <span class="badge badge-gray">Free</span><span class="module-card-id">v${esc(item.version)}</span></div><p>${esc(item.description)}</p><div class="module-card-meta">Requires SpawnWP ${esc(item.min_core_version || '0.0.0')}–${esc(item.max_core_version || 'latest')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}</div>${tags ? `<div class="module-tags">${tags}</div>` : ''}</div><div class="module-card-actions">${item.docs_url ? `<a class="btn-neutral btn-sm" href="${esc(item.docs_url)}" target="_blank" rel="noopener">Docs ↗</a>` : ''}${action}</div></article>`;
+      return `<article class="module-card marketplace-card"><div class="module-card-main"><div class="module-card-title">${esc(item.name)} <span class="badge badge-gray">${premium ? 'Premium' : 'Free'}</span><span class="module-card-id">v${esc(item.version)}</span></div><p>${esc(item.description)}</p><div class="module-card-meta">Requires SpawnWP ${esc(item.min_core_version || '0.0.0')}–${esc(item.max_core_version || 'latest')}${item.core_api_scope ? ` · Core access: ${esc(item.core_api_scope)}` : ''}</div>${tags ? `<div class="module-tags">${tags}</div>` : ''}</div><div class="module-card-actions">${item.docs_url && /^https:\/\//.test(item.docs_url) ? `<a class="btn-neutral btn-sm" href="${esc(item.docs_url)}" target="_blank" rel="noopener">Docs ↗</a>` : ''}${action}</div></article>`;
     }).join('') : '<p class="field-help">No free modules are currently available.</p>';
     root.removeAttribute('aria-busy');
   } catch (error) {
     root.innerHTML = `<div class="inline-alert">${esc(error.message || 'Unable to load marketplace')}</div>`;
     root.removeAttribute('aria-busy');
   }
+}
+
+async function moduleLicenseAction(id, action, body) {
+  if (action === 'deactivate' && !confirm('Release this license for transfer? Disable the module first. Existing environments will be kept.')) return;
+  try {
+    const response = await sensitiveFetch(`${BASE}/module-licenses/${encodeURIComponent(id)}/${action}`, {method:'POST',headers:{'Content-Type':'application/json'},...(body ? {body:JSON.stringify(body)} : {})});
+    const payload = await response.json();if(!response.ok)throw Error(payload.detail || 'License request failed');
+    if(action==='renew') {const url=new URL(payload.checkout_url);if(url.protocol!=='https:')throw Error('Invalid checkout URL');window.location.assign(url.href);return;}
+    showToast('License updated');loadModules();
+  } catch(error) {showToast(error.message,true);}
+}
+
+function activateMarketplaceLicense(id) {
+  const item=MARKETPLACE_MODULES.find(m=>m.id===id);if(!item)return;
+  const key=prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
+  if(key)moduleLicenseAction(id,'activate',{product_id:item.product_id,license_key:key.trim()});
+}
+
+function activateInstalledLicense(id) {
+  const item = INSTALLED_MODULES.find(m => m.id === id);
+  const productId = item && item.product_id;
+  if (!productId) { showToast('This module does not declare a valid product id', true); return; }
+  const key = prompt('Enter the license key from your purchase receipt. Do not paste this key into an LLM conversation.');
+  if (key) moduleLicenseAction(id, 'activate', {product_id: productId, license_key: key.trim()});
 }
 
 if (document.body.dataset.page === 'modules') {

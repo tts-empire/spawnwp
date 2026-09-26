@@ -24,6 +24,8 @@ from auth import initialize as initialize_auth
 from auth import is_enrolled, login_page, rate_limit, router as auth_router, session as auth_session, valid_csrf
 from ingest import router as ingest_router, spawnwp_version
 from module_catalog import CatalogError, load as load_module_catalog
+import module_licensing
+import operation_lock
 from capacity import (
     CapacityError, CapacityExceeded, format_compose_memory, php_container_memory_bytes,
     public_snapshot as public_capacity_snapshot, release_reservation,
@@ -33,7 +35,12 @@ from capacity import (
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     initialize_auth()
-    yield
+    import automation
+    automation.start_worker()
+    try:
+        yield
+    finally:
+        automation.stop_worker()
 
 
 app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -51,7 +58,8 @@ MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|
 
 
 def requires_recent_auth(path: str) -> bool:
-    return path in DESTRUCTIVE_PATHS or bool(FILE_WRITE_RE.match(path)) or bool(MODULE_MUTATION_RE.match(path))
+    return (path in DESTRUCTIVE_PATHS or bool(FILE_WRITE_RE.match(path)) or bool(MODULE_MUTATION_RE.match(path))
+            or path.startswith("/api/automation-admin/") or path.startswith("/api/module-licenses/"))
 
 
 @app.middleware("http")
@@ -62,7 +70,7 @@ async def application_authentication(request: Request, call_next):
         "/login", "/api/version", "/api/auth/state", "/api/auth/setup/start",
         "/api/auth/setup/finish", "/api/auth/passkey/start", "/api/auth/passkey/finish",
         "/api/auth/fallback",
-    } or path.startswith("/api/ingest/") or path == "/api/provision" or path.startswith("/api/provision/")
+    } or path.startswith("/api/ingest/") or path == "/api/provision" or path.startswith("/api/provision/") or path.startswith("/api/automation/v1/")
     # Signed-request auth for public machine paths lives in ingest.py/provision.py.
     active = None if public else auth_session(request)
     response = None
@@ -87,7 +95,33 @@ async def application_authentication(request: Request, call_next):
     elif active and request.method in {"POST", "PUT", "PATCH", "DELETE"} and requires_recent_auth(path) and int(__import__("time").time()) - active["recent_auth"] > 600:
         response = JSONResponse({"detail": "Recent authentication required; sign out and sign in again"}, status_code=403)
     else:
-        response = await call_next(request)
+        # The lease covers streaming responses and is inherited by child
+        # processes, so disconnecting the browser cannot unlock a running job.
+        locked = mutation and (path in {"/api/run", "/api/new-project", "/api/destroy", "/api/restore", "/api/php-switch", "/api/provision"}
+                               or path.startswith("/api/expiry/"))
+        if locked:
+            try:
+                lease = operation_lock.acquire()
+            except HTTPException as exc:
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+            token = operation_lock.current.set(lease)
+            try:
+                response = await call_next(request)
+                iterator = response.body_iterator
+                async def with_lease():
+                    try:
+                        async for chunk in iterator:
+                            yield chunk
+                    finally:
+                        operation_lock.release(lease)
+                response.body_iterator = with_lease()
+            except BaseException:
+                operation_lock.release(lease)
+                raise
+            finally:
+                operation_lock.current.reset(token)
+        else:
+            response = await call_next(request)
     # Security headers on every response — including the fail-closed redirect and
     # the 401/403 early returns above, not only the ones that reach call_next.
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -200,7 +234,7 @@ async def stream_command(cmd: list[str], cwd: Path, env: dict | None = None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=cwd,
-            env={**os.environ, **env} if env else None,
+            **operation_lock.child_options(env),
         )
     except Exception:
         release_reservation(reservation)
@@ -966,7 +1000,7 @@ def run_project_creation(body: NewProject, timeout: int = 300) -> str:
         proc = subprocess.Popen(
             command,
             cwd=PRIMARY_PROJECT,
-            env={**os.environ, **env} if env else None,
+            **operation_lock.child_options(env),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -2237,6 +2271,8 @@ def set_image_settings(body: ImageSettings):
 # validation and keeping the cockpit's existing SSE contract independent.
 from provision import router as provision_router
 app.include_router(provision_router)
+from automation import router as automation_router
+app.include_router(automation_router)
 
 
 # ── Cockpit pages and shared assets ───────────────────────────────────────────
@@ -2386,6 +2422,9 @@ def installed_modules() -> list[dict]:
             "last_error": str(state.get("last_error", ""))[:500],
             "updated_at": state.get("updated_at"),
             "source_url": recorded_source if recorded_source.startswith("https://") else "",
+            "commercial_model": item.get("commercial_model", "free"),
+            "product_id": item.get("product_id"),
+            "license": module_licensing.status(item),
             "operation_id": _module_pending_operation(module_id),
             "capabilities": _module_capabilities(release),
         })
@@ -2430,7 +2469,7 @@ def modules_catalog_install(body: CatalogInstallRequest):
         raise HTTPException(409, "Requested module version is not the catalog version")
     return _start_module_operation(
         "install", item["id"],
-        [str(SPAWNWP_CLI), "module", "install", item["archive_url"]],
+        [str(SPAWNWP_CLI), "module", "install", "premium:" + item["id"] if item.get("commercial_model") == "premium" else item["archive_url"]],
     )
 
 
@@ -2540,6 +2579,52 @@ def cockpit_login():
 @app.get("/modules", include_in_schema=False)
 def modules_page():
     return FileResponse(STATIC_DIR / "modules.html")
+
+
+@app.get("/automations", include_in_schema=False)
+def automations_page():
+    return FileResponse(STATIC_DIR / "automations.html")
+
+
+class LicenseActivation(BaseModel):
+    product_id: str
+    license_key: str
+
+
+@app.post("/api/module-licenses/{module_id}/activate")
+def activate_module_license(module_id: str, body: LicenseActivation):
+    try:
+        return module_licensing.activate(_validate_module_id(module_id), body.product_id, body.license_key)
+    except module_licensing.LicenseError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/module-licenses/{module_id}/refresh")
+def refresh_module_license(module_id: str):
+    try:
+        return module_licensing.refresh(_validate_module_id(module_id))
+    except module_licensing.LicenseError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/module-licenses/{module_id}/renew")
+def renew_module_license(module_id: str):
+    try:
+        return module_licensing.service_request("renew", {"module_id": _validate_module_id(module_id)})
+    except module_licensing.LicenseError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/module-licenses/{module_id}/deactivate")
+def deactivate_module_license(module_id: str):
+    module_id = _validate_module_id(module_id)
+    installed = next((m for m in installed_modules() if m["id"] == module_id), None)
+    if installed and (installed["status"] not in {"disabled", "removed"} or installed["operation_id"]):
+        raise HTTPException(409, "Disable the module and wait for its operations before transferring the license")
+    try:
+        return module_licensing.deactivate(module_id)
+    except module_licensing.LicenseError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/manage", include_in_schema=False)

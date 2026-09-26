@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Automation permissions · SpawnWP</title><link rel="stylesheet" href="/assets/cockpit.css"></head>
+<body><header><a class="brand" href="/manage">SpawnWP</a><nav><a href="/modules">Modules</a></nav></header>
+<main><section class="section"><h1>Automation permissions</h1>
+<p>Only approve clients you are connecting now. Client names are supplied by the requesting application, not verified identities.</p>
+<p>Read access starts with no existing environments. Select environments explicitly. Creation grants access to the environments that this connection creates.</p>
+<div id="grants"></div></section><section class="section"><h2>Operations</h2>
+<p>Approvals last ten minutes and apply only to the displayed request. Bringing expiry forward can permanently delete an environment through the expiry timer.</p>
+<div id="operations"></div></section><section class="section"><h2>Recent audit events</h2><pre id="audit"></pre></section></main><div id="toast"></div>
+<script src="/assets/cockpit.js"></script><script>
+const display = (tag, text) => {const node=document.createElement(tag);node.textContent=text;return node;};
+async function action(path, method, body) {
+  try {const r=await sensitiveFetch('/api/automation-admin/'+path,{method,headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    const value=await r.json(); if(!r.ok)throw Error(value.detail||'Request failed'); await load();
+  } catch(e) {showToast(e.message,true);}
+}
+async function load() {
+  try {
+    const r=await fetch('/api/automation-admin',{cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.detail||'Unable to load authorizations');
+    const root=document.getElementById('grants');root.replaceChildren();
+    for(const grant of data.grants){
+      const card=display('article','');card.className='module-card';const content=display('div','');
+      content.append(display('h3',grant.label+' · '+grant.status),display('p','Connection '+grant.id));
+      if(grant.status==='pending'){
+        const form=document.createElement('form');
+        for(const name of ['read','create','start','stop','expiry','snapshot']){const label=display('label',name+' ');const input=document.createElement('input');input.type='checkbox';input.name='actions';input.value=name;input.checked=name==='read';label.append(input);form.append(label);}
+        form.append(display('p','Existing environments:'));
+        for(const name of data.projects){const label=display('label',name+' ');const input=document.createElement('input');input.type='checkbox';input.name='projects';input.value=name;label.append(input);form.append(label);}
+        const label=display('label','Maximum created environments ');const quota=document.createElement('input');quota.type='number';quota.min='1';quota.max='100';quota.value='3';label.append(quota);form.append(label);
+        const button=display('button','Approve connection');button.type='submit';form.append(button);
+        form.onsubmit=e=>{e.preventDefault();const fd=new FormData(form);action('grants/'+grant.id+'/approve','POST',{actions:fd.getAll('actions'),projects:fd.getAll('projects'),quota:Number(quota.value)});};content.append(form);
+      }else{content.append(display('p','Permissions: '+grant.actions.join(', ')+' · Existing environments: '+grant.projects.join(', ')));}
+      if(grant.status!=='revoked'){const button=display('button','Revoke');button.onclick=()=>action('grants/'+grant.id,'DELETE');content.append(button);}
+      card.append(content);root.append(card);
+    }
+    const operations=document.getElementById('operations');operations.replaceChildren();
+    for(const op of data.operations){const card=document.createElement('article');card.className='module-card';const content=display('div','');content.append(display('h3',op.request.action+' · '+op.request.project+' · '+op.status),display('pre',JSON.stringify(op.request,null,2)),display('p',op.error));
+      if(op.status==='awaiting_approval'){const b=display('button','Approve this exact operation');b.onclick=()=>{if(confirm('Approve '+op.request.action+' for '+op.request.project+'?'))action('operations/'+op.id+'/approve','POST');};content.append(b);}
+      if(['queued','awaiting_approval'].includes(op.status)){const b=display('button','Cancel');b.onclick=()=>action('operations/'+op.id,'DELETE');content.append(b);}card.append(content);operations.append(card);}
+    document.getElementById('audit').textContent=JSON.stringify(data.audit,null,2);
+  }catch(e){showToast(e.message,true);}
+}
+load();
+</script></body></html>

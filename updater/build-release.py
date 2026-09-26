@@ -89,7 +89,7 @@ def main() -> int:
         entries: list[dict] = []
         for relative in managed["cockpit"]:
             source = ROOT / "runtime" / relative
-            target = (relative if relative in {"app.py", "auth.py", "capacity.py", "ingest.py", "machine_auth.py", "module_api.py", "module_catalog.py", "provision.py", "requirements.txt"}
+            target = (relative if relative.endswith(".py") or relative == "requirements.txt"
                       else f"static/{relative}")
             add_entry(entries, package, source, f"payload/cockpit/{target}", "cockpit", target)
         for relative in managed["runtime"]:
@@ -128,6 +128,8 @@ def main() -> int:
                   "payload/lib/release-public.pem", "lib", "release-public.pem")
         add_entry(entries, package, ROOT / "updater/release-public.pem",
                   "payload/lib/module-public.pem", "lib", "module-public.pem")
+        add_entry(entries, package, ROOT / "runtime/license-public-keys.json",
+                  "payload/lib/license-public-keys.json", "lib", "license-public-keys.json")
 
         # The SpawnWP Deploy plugin, bundled so the cockpit can install it on
         # sites created with the opt-in checkbox. Generated (not a repo file),

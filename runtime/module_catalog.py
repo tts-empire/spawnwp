@@ -1,4 +1,4 @@
-"""Fetch and verify the signed SpawnWP free-module catalog."""
+"""Fetch and verify signed module catalogs, preserving schema 1 compatibility."""
 
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ from pathlib import Path
 
 MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+# Keep the deployed schema-1 catalog as the default until catalog-v2 and its
+# signature are published.  Operators can opt in to v2 with the environment
+# override below, without breaking existing marketplace installs.
 DEFAULT_URL = "https://spawnwp.com/modules/catalog.json"
 PUBLIC_KEY = Path(os.environ.get("SPAWNWP_MODULE_PUBLIC_KEY", "/usr/local/lib/spawnwp/module-public.pem"))
 MAX_BYTES = 2 * 1024 * 1024
@@ -92,7 +95,7 @@ def _verify(payload: bytes, signature_b64: bytes) -> None:
 
 
 def validate(payload: dict, current_core: str) -> dict:
-    if not isinstance(payload, dict) or payload.get("schema") != 1:
+    if not isinstance(payload, dict) or type(payload.get("schema")) is not int or payload["schema"] not in {1, 2}:
         raise CatalogError("Catalog schema is invalid")
     catalog_version = payload.get("catalog_version")
     if not isinstance(catalog_version, int) or catalog_version < 1:
@@ -117,11 +120,22 @@ def validate(payload: dict, current_core: str) -> dict:
         _version(version); min_v = _version(minimum); max_v = _version(maximum)
         if min_v > max_v:
             raise CatalogError(f"Catalog core range is invalid for {module_id}")
-        if item.get("license") != "free":
+        if payload["schema"] == 1 and item.get("license") != "free":
             raise CatalogError(f"Catalog module {module_id} is not free")
+        model = "free" if payload["schema"] == 1 else item.get("commercial_model")
+        if model not in {"free", "premium"}:
+            raise CatalogError("Invalid commercial model")
+        if payload["schema"] == 2 and (not isinstance(item.get("code_license"), str) or not item["code_license"].strip()):
+            raise CatalogError("Code license is required")
+        if model == "premium":
+            from module_licensing import LicenseError, validate_metadata
+            try:
+                validate_metadata({**item, "schema": 2})
+            except LicenseError as exc:
+                raise CatalogError(str(exc)) from exc
         archive = item.get("archive_url")
         parsed = urllib.parse.urlparse(archive or "")
-        if parsed.scheme != "https" or not parsed.netloc or not str(archive).endswith(".tar.gz"):
+        if model == "free" and (parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.query or parsed.fragment or not str(archive).endswith(".tar.gz")):
             raise CatalogError(f"Catalog archive URL is invalid for {module_id}")
         for key in ("name", "description", "publisher"):
             if not isinstance(item.get(key), str) or not item[key].strip():
@@ -129,7 +143,7 @@ def validate(payload: dict, current_core: str) -> dict:
         if current < min_v or current > max_v:
             continue
         clean.append(item)
-    return {"schema": 1, "catalog_version": catalog_version, "publisher": publisher, "modules": clean}
+    return {"schema": payload["schema"], "catalog_version": catalog_version, "publisher": publisher, "modules": clean}
 
 
 def load(current_core: str, *, force: bool = False) -> dict:

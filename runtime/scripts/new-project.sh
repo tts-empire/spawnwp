@@ -46,11 +46,13 @@ php_ini_defaults
 source "$(dirname "${BASH_SOURCE[0]}")/lib-metrics.sh"
 CREATE_START=$(date +%s)
 
-exec 9>/run/lock/spawnwp-projects.lock
-if ! flock -n 9; then
-  echo "ERROR: another site operation is already in progress." >&2
-  rm -f "$RESOLVED_BLUEPRINT"
-  exit 1
+if [ "${SPAWNWP_PROJECT_LOCK_HELD:-0}" != "1" ]; then
+  exec 9>/run/lock/spawnwp-projects.lock
+  if ! flock -n 9; then
+    echo "ERROR: another site operation is already in progress." >&2
+    rm -f "$RESOLVED_BLUEPRINT"
+    exit 1
+  fi
 fi
 
 NGINX_BACKUP=$(mktemp)

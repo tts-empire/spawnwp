@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
 MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
@@ -26,6 +27,7 @@ PUBLIC_KEY = Path(os.environ.get(
 CORE_VERSION_FILE = Path(os.environ.get("SPAWNWP_VERSION_FILE", "/var/lib/spawnwp/VERSION"))
 COCKPIT_PYTHON = Path(os.environ.get("SPAWNWP_COCKPIT_PYTHON", "/srv/wp-cockpit/venv/bin/python"))
 MODULE_API_HELPER = Path(os.environ.get("SPAWNWP_MODULE_API_HELPER", "/srv/wp-cockpit/module_api.py"))
+LICENSE_HELPER = Path(os.environ.get("SPAWNWP_LICENSE_HELPER", "/srv/wp-cockpit/module_licensing.py"))
 MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024
 MAX_EXTRACTED_BYTES = 2 * 1024 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 10_000
@@ -116,8 +118,18 @@ def safe_extract(archive: Path, destination: Path) -> None:
         package.extractall(destination, filter="data")
 
 
-def _download(url: str, target: Path, maximum: int) -> None:
-    with urllib.request.urlopen(url, timeout=30) as response, target.open("wb") as out:
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ModuleError("Authenticated artifact redirects are not allowed")
+
+
+def _download(url: str, target: Path, maximum: int, token: str | None = None) -> None:
+    if token:
+        request = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
+        response = urllib.request.build_opener(_NoRedirect()).open(request, timeout=30)
+    else:
+        response = urllib.request.urlopen(url, timeout=30)
+    with response, target.open("wb") as out:
         declared = response.headers.get("Content-Length")
         if declared:
             try:
@@ -153,14 +165,36 @@ def load_manifest(path: Path, archive: Path) -> dict:
         manifest = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise ModuleError("Module manifest is invalid") from exc
+    if not isinstance(manifest, dict):
+        raise ModuleError("Module manifest must be an object")
     module_id = str(manifest.get("id", ""))
     version = str(manifest.get("version", ""))
-    if manifest.get("schema") != 1 or not MODULE_ID_RE.fullmatch(module_id):
+    if type(manifest.get("schema")) is not int or manifest["schema"] not in {1, 2} or not MODULE_ID_RE.fullmatch(module_id):
         raise ModuleError("Module manifest schema or id is invalid")
     version_tuple(version)
     core_api_scope = manifest.get("core_api_scope")
-    if core_api_scope is not None and core_api_scope not in {"ingest", "provision"}:
+    scopes = {"ingest", "provision"} | ({"automation"} if manifest["schema"] == 2 else set())
+    if core_api_scope is not None and core_api_scope not in scopes:
         raise ModuleError("Module manifest requests an unsupported core API scope")
+    model = manifest.get("commercial_model", "free")
+    if model not in {"free", "premium"} or (manifest["schema"] == 1 and model != "free"):
+        raise ModuleError("Invalid commercial model")
+    if manifest["schema"] == 2:
+        if not isinstance(manifest.get("code_license"), str) or not manifest["code_license"].strip():
+            raise ModuleError("Schema 2 requires a code license")
+        requested = manifest.get("core_capabilities", [])
+        allowed = {"read", "create", "start", "stop", "expiry", "snapshot"}
+        if not isinstance(requested, list) or not all(isinstance(x, str) and x in allowed for x in requested):
+            raise ModuleError("Invalid core capabilities")
+        if core_api_scope == "automation" and "read" not in requested:
+            raise ModuleError("Automation modules must declare read capability")
+        if model == "premium":
+            product_id = manifest.get("product_id")
+            published_at = manifest.get("published_at")
+            if (not isinstance(product_id, str)
+                    or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", product_id)
+                    or type(published_at) is not int or published_at <= 0):
+                raise ModuleError("Premium modules require a product id and signed publication timestamp")
     files = manifest.get("files")
     if not isinstance(files, list) or len(files) > MAX_ARCHIVE_MEMBERS or not all(
         isinstance(item, dict) and isinstance(item.get("path"), str)
@@ -183,8 +217,56 @@ def load_manifest(path: Path, archive: Path) -> dict:
     return manifest
 
 
+def _license_helper(action: str, value: dict) -> dict:
+    if not COCKPIT_PYTHON.is_file() or not LICENSE_HELPER.is_file():
+        raise ModuleError("Premium module support is not installed in this core")
+    result = subprocess.run([str(COCKPIT_PYTHON), str(LICENSE_HELPER), action],
+                            input=json.dumps(value), capture_output=True, text=True, timeout=60)
+    if result.returncode:
+        raise ModuleError(result.stderr.strip() or "Module entitlement check failed")
+    try:
+        return json.loads(result.stdout)
+    except ValueError as exc:
+        raise ModuleError("Invalid module licensing response") from exc
+
+
+def _check_entitlement(manifest: dict) -> None:
+    if manifest.get("commercial_model") == "premium":
+        _license_helper("check", manifest)
+
+
 def _artifact_paths(source: str, temporary: Path) -> tuple[Path, Path, Path, str]:
+    if source.startswith("premium:"):
+        module_id = source.removeprefix("premium:")
+        if not MODULE_ID_RE.fullmatch(module_id):
+            raise ModuleError("Invalid premium module id")
+        descriptor = _license_helper("resolve", {"id": module_id})
+        origin = urllib.parse.urlsplit(os.environ.get("SPAWNWP_LICENSE_SERVICE", "https://licenses.spawnwp.com"))
+        if descriptor.get("module_id") != module_id or not isinstance(descriptor.get("artifacts"), dict):
+            raise ModuleError("Invalid artifact descriptor")
+        paths = []
+        for kind, filename in (("archive", "module.tar.gz"), ("manifest", "module.manifest.json"), ("signature", "module.manifest.sig")):
+            artifact = descriptor["artifacts"].get(kind, {})
+            url = artifact.get("url", "")
+            parsed = urllib.parse.urlsplit(url)
+            token = artifact.get("token", "")
+            if (parsed.scheme != "https" or parsed.netloc != origin.netloc or parsed.username
+                    or parsed.query or parsed.fragment or not isinstance(token, str) or not token
+                    or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256", "")))):
+                raise ModuleError("Invalid authenticated artifact URL or digest")
+            path = temporary / filename
+            try:
+                _download(url, path, MAX_DOWNLOAD_BYTES if kind == "archive" else 1024 * 1024, token)
+            except (OSError, urllib.error.URLError) as exc:
+                raise ModuleError("Authenticated artifact download failed; retry to obtain new download credentials") from exc
+            if sha256(path) != artifact["sha256"]:
+                raise ModuleError("Authenticated artifact checksum mismatch")
+            paths.append(path)
+        return *paths, source
     if source.startswith("https://"):
+        parsed = urllib.parse.urlsplit(source)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ModuleError("Module source URLs cannot contain credentials, queries or fragments")
         archive = temporary / Path(source).name
         if not archive.name.endswith(".tar.gz"):
             raise ModuleError("Module URL must end in .tar.gz")
@@ -253,22 +335,40 @@ def install(source: str, *, expected_id: str | None = None) -> dict:
         module_id, version = manifest["id"], manifest["version"]
         if expected_id is not None and module_id != expected_id:
             raise ModuleError("Downloaded package id does not match the requested module")
+        if source.startswith("premium:") and source != "premium:" + module_id:
+            raise ModuleError("Resolved premium package id does not match")
+        _check_entitlement(manifest)
         unpacked = temporary / "unpacked"
         unpacked.mkdir()
         safe_extract(archive, unpacked)
         package = unpacked / f"{module_id}-{version}"
         if not package.is_dir():
             raise ModuleError("Module archive layout is invalid")
+        verified_paths = set()
         for entry in manifest.get("files", []):
             relative = Path(str(entry.get("path", "")))
             if relative.is_absolute() or ".." in relative.parts:
                 raise ModuleError("Module manifest contains an unsafe file path")
+            if str(relative) in verified_paths or str(relative) == "module.json":
+                raise ModuleError("Module manifest contains a duplicate or reserved file path")
+            verified_paths.add(str(relative))
             file = package / relative
             if not file.is_file() or sha256(file) != entry.get("sha256"):
                 raise ModuleError(f"Module file verification failed: {relative}")
+        actual_paths = {str(path.relative_to(package)) for path in package.rglob("*") if path.is_file()}
+        if actual_paths != verified_paths:
+            raise ModuleError("Module archive contains files not covered by the signed manifest")
         destination = MODULES_ROOT / module_id / "releases" / version
         destination.parent.mkdir(parents=True, exist_ok=True)
-        if not destination.exists():
+        if destination.exists():
+            # Version directories are immutable. Never run stale or tampered hooks
+            # simply because a directory for this version already exists.
+            if _manifest(destination) != manifest or any(
+                not (destination / entry["path"]).is_file()
+                or sha256(destination / entry["path"]) != entry["sha256"] for entry in manifest["files"]
+            ) or {str(p.relative_to(destination)) for p in destination.rglob("*") if p.is_file()} != verified_paths | {"module.json"}:
+                raise ModuleError("Existing module version differs from the signed package")
+        else:
             os.replace(package, destination)
         shutil.copy2(manifest_path, destination / "module.json")
         previous = None
@@ -321,7 +421,15 @@ def install(source: str, *, expected_id: str | None = None) -> dict:
                 previous_release = destination.parent / previous
                 current_link.symlink_to(previous_release)
                 try:
+                    if previous_scope:
+                        _manage_credential("ensure", module_id, previous_scope)
                     _run_hook(previous_release, "install.py")
+                    if previous_state.get("status") == "disabled":
+                        _run_hook(previous_release, "deactivate.py")
+                        if previous_scope:
+                            _manage_credential("revoke", module_id)
+                    elif (previous_release / "activate.py").is_file():
+                        _run_hook(previous_release, "activate.py")
                 except Exception as rollback_exc:
                     raise ModuleError(
                         f"{exc}; previous module release could not be restarted: {rollback_exc}",
@@ -355,19 +463,23 @@ def installed(module_id: str | None = None) -> list[dict]:
 
 
 def update(module_id: str, source: str | None = None) -> dict:
+    _current_release(module_id)
     state_path = STATE_ROOT / module_id / "install.json"
     if not state_path.is_file():
         raise ModuleError(f"Module '{module_id}' is not installed")
     state = json.loads(state_path.read_text())
-    chosen = source or state.get("source", "")
-    if not chosen.startswith("https://") and source is None:
-        raise ModuleError("A new --source is required for a module installed from a local file")
+    manifest = _manifest(_current_release(module_id))
+    chosen = source
+    if chosen is None:
+        chosen = ("premium:" + module_id if manifest.get("commercial_model") == "premium"
+                  else _license_helper("catalog-source", {"id": module_id})["source"])
     return install(chosen, expected_id=module_id)
 
 
 def enable(module_id: str) -> dict:
     release = _current_release(module_id)
     manifest = _manifest(release)
+    _check_entitlement(manifest)
     if not (release / "activate.py").is_file():
         raise ModuleError(f"Module '{module_id}' does not support activation controls")
     scope = manifest.get("core_api_scope")

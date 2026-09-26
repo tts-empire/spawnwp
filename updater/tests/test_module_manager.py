@@ -35,7 +35,8 @@ class ModuleManagerTests(unittest.TestCase):
 
     def package(self, *, module_id="demo-launcher", version="1.0.0",
                 min_core="0.5.29", max_core="0.9.99", core_api_scope=None,
-                lifecycle=False):
+                lifecycle=False, schema=1, commercial_model="free",
+                published_at=1_789_000_000):
         package = self.root / f"{module_id}-{version}"
         package.mkdir()
         (package / "app.py").write_text("VALUE = 1\n")
@@ -52,7 +53,7 @@ class ModuleManagerTests(unittest.TestCase):
         digest = hashlib.sha256((package / "app.py").read_bytes()).hexdigest()
         archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         manifest = {
-            "schema": 1, "id": module_id, "name": "Demo Launcher",
+            "schema": schema, "id": module_id, "name": "Demo Launcher",
             "version": version, "description": "Temporary public demos",
             "min_core_version": min_core, "max_core_version": max_core,
             "archive_sha256": archive_digest,
@@ -61,6 +62,14 @@ class ModuleManagerTests(unittest.TestCase):
         }
         if core_api_scope is not None:
             manifest["core_api_scope"] = core_api_scope
+        if schema == 2:
+            manifest.update({
+                "commercial_model": commercial_model,
+                "code_license": "Proprietary",
+                "core_capabilities": ["read", "create"],
+            })
+            if commercial_model == "premium":
+                manifest.update({"product_id": module_id, "published_at": published_at})
         manifest_path = self.root / f"{module_id}-{version}.manifest.json"
         manifest_path.write_text(json.dumps(manifest))
         (self.root / f"{module_id}-{version}.manifest.sig").write_bytes(b"signature")
@@ -196,6 +205,38 @@ class ModuleManagerTests(unittest.TestCase):
         self.assertFalse(module_manager.installed()[0]["capabilities"]["activate"])
         with self.assertRaises(module_manager.ModuleError):
             module_manager.disable("demo-launcher")
+
+    def test_schema_two_automation_module_is_accepted(self):
+        archive = self.package(schema=2, core_api_scope="automation")
+        with mock.patch.object(module_manager, "verify_signature"), \
+                mock.patch.object(module_manager, "_manage_credential", return_value={}):
+            result = module_manager.install(str(archive))
+        self.assertEqual(result["id"], "demo-launcher")
+
+    def test_schema_one_cannot_request_automation_scope(self):
+        archive = self.package(core_api_scope="automation")
+        with mock.patch.object(module_manager, "verify_signature"), self.assertRaises(
+            module_manager.ModuleError,
+        ):
+            module_manager.install(str(archive))
+
+    def test_manual_premium_upload_requires_a_valid_entitlement(self):
+        archive = self.package(schema=2, commercial_model="premium")
+        with mock.patch.object(module_manager, "verify_signature"), \
+                mock.patch.object(module_manager, "_license_helper", side_effect=module_manager.ModuleError("missing entitlement")):
+            with self.assertRaisesRegex(module_manager.ModuleError, "missing entitlement"):
+                module_manager.install(str(archive))
+
+    def test_premium_manifest_requires_product_and_publication_metadata(self):
+        archive = self.package(schema=2, commercial_model="premium")
+        manifest = archive.with_name(archive.name[:-7] + ".manifest.json")
+        value = json.loads(manifest.read_text())
+        value.pop("published_at")
+        manifest.write_text(json.dumps(value))
+        with mock.patch.object(module_manager, "verify_signature"), self.assertRaisesRegex(
+            module_manager.ModuleError, "publication timestamp",
+        ):
+            module_manager.install(str(archive))
 
 
 if __name__ == "__main__":

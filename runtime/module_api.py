@@ -17,7 +17,7 @@ import ingest
 import machine_auth
 
 MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
-ALLOWED_SCOPES = {"ingest", "provision"}
+ALLOWED_SCOPES = {"ingest", "provision", "automation"}
 MODULES_ROOT = Path(os.environ.get("SPAWNWP_MODULES_ROOT", "/opt/spawnwp/modules"))
 CREDENTIALS_ROOT = Path(os.environ.get(
     "SPAWNWP_MODULE_CREDENTIALS_ROOT", "/var/lib/spawnwp/modules",
@@ -93,6 +93,14 @@ def ensure(module_id: str, scope: str) -> dict:
     manifest = _manifest(module_id)
     if scope not in ALLOWED_SCOPES or manifest.get("core_api_scope") != scope:
         raise ModuleAPIError("Requested core API scope is not declared by the signed module")
+    if scope == "automation" and manifest.get("schema") != 2:
+        raise ModuleAPIError("Automation requires module manifest schema 2")
+    if manifest.get("commercial_model") == "premium":
+        from module_licensing import LicenseError, check
+        try:
+            check(manifest)
+        except LicenseError as exc:
+            raise ModuleAPIError(str(exc)) from exc
     path = credential_path(module_id)
     existing = _read_credential(path, module_id, scope)
     db = ingest._connect()
@@ -152,7 +160,7 @@ def revoke(module_id: str) -> dict:
     db = ingest._connect()
     try:
         rows = db.execute(
-            "SELECT id FROM connections WHERE connection_kind='local_module' AND module_id=?",
+            "SELECT id,scope FROM connections WHERE connection_kind='local_module' AND module_id=?",
             (module_id,),
         ).fetchall()
         now = int(time.time())
@@ -172,6 +180,12 @@ def revoke(module_id: str) -> dict:
     finally:
         db.close()
     credential_path(module_id).unlink(missing_ok=True)
+    if any(row["scope"] == "automation" for row in rows):
+        # Lazy import keeps legacy credential management independent at startup.
+        from automation import revoke_module
+        for row in rows:
+            if row["scope"] == "automation":
+                revoke_module(row["id"])
     return {"module_id": module_id, "revoked": len(rows)}
 
 

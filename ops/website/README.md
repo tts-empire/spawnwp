@@ -42,14 +42,18 @@ Old `-dev` packages are retained for audit under
 
 | URL | Primary intent | Status |
 |---|---|---|
+| / | self-hosted WordPress sandbox and development lab | published |
 | /wordpress-sandbox/ | self-hosted WordPress sandbox | published |
 | /alternatives/instawp/ | self-hosted InstaWP alternative | published |
 | /alternatives/localwp/ | LocalWP alternative for remote development | published |
 | /alternatives/tastewp/ | self-hosted TasteWP alternative | published |
+| /alternatives/easyengine/ | EasyEngine alternative for disposable WordPress sites | published |
+| /alternatives/spinupwp/ | SpinupWP alternative for development and test sites | published |
 | /use-cases/plugin-development/ | WordPress plugin development environment | published |
 | /use-cases/wordpress-product-demos/ | WordPress product demos for themes and plugins | published |
 | /guides/test-wordpress-multiple-php-versions/ | test WordPress plugin multiple PHP versions | published |
 | /guides/wordpress-sandbox-vs-staging/ | WordPress sandbox vs staging | published |
+| /guides/running-spawnwp-long-term/ | long-running environments, security and operations | published |
 | /alternatives/wordpress-playground/ | WordPress Playground comparison | backlog |
 | /guides/remote-wordpress-development/ | remote WordPress development | backlog |
 | /guides/reusable-wordpress-blueprints/ | reusable WordPress blueprints | backlog |
@@ -95,3 +99,15 @@ rotate them if they appear in logs, and verify that the snapshot date continues 
 The `https://spawnwp.com/sitemap.xml` index is submitted and should report zero errors and
 warnings. After reconnecting OAuth, confirm that status, then monitor indexed pages, queries,
 CTR, average position and cannibalization together with Matomo conversions.
+
+### SEO metadata release review
+
+On 2026-10-09, PR [#19](https://github.com/tts-empire/spawnwp/pull/19) updated the title
+and meta description on `/wordpress-sandbox/` and `/alternatives/localwp/`. The change is
+live in release `20261009-website-v1.87` (main commit `9a095a388694fe498d9aa642ce751b1c97c2437b`).
+
+Starting 2026-11-06, compare the 28 days after publication (2026-10-09 through 2026-11-05)
+with the preceding 28 days (2026-09-11 through 2026-10-08). In Search Console, compare
+clicks, impressions, CTR, average position and queries for each changed URL. In Matomo site 6,
+compare page views and SEO Funnel actions from those landing pages. Use the latest complete
+Search Console data and note any other page or campaign changes that affect interpretation.

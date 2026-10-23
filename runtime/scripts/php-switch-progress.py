@@ -12,6 +12,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from php_security import accepts_image
+
 PREFIX = "::spawnwp-event::"
 ALLOWED = {"7.4", "8.2", "8.3", "8.4", "8.5"}
 
@@ -158,7 +161,8 @@ def healthy(project: Path, timeout: int = 180) -> bool:
     return False
 
 
-def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> int:
+def switch(project: Path, version: str, lock_root: Path = Path("/run/lock"),
+           accept_vulnerable: bool = False, accepted_image_id: str = "") -> int:
     project = project.resolve()
     if version not in ALLOWED:
         emit("error", message="Unsupported PHP version")
@@ -190,9 +194,14 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
         # tag encodes it, so the target tag has to be derived from both.
         wp_version = env_value(original, "WP_VERSION", "latest") or "latest"
         image, wp_suffix, context_hash = image_identity(project, version, wp_version)
-        cached = subprocess.run(
-            ["docker", "image", "inspect", image], capture_output=True,
-        ).returncode == 0
+        if version == "7.4" and not accepts_image(image, accept_vulnerable, accepted_image_id):
+            emit("error", message="PHP 7.4 is a vulnerable legacy runtime. Review the English LAB warning and explicitly accept the exact image before continuing.")
+            return 2
+        inspected = subprocess.run(
+            ["docker", "image", "inspect", "-f", '{{index .Config.Labels "org.spawnwp.context-hash"}}', image],
+            capture_output=True, text=True,
+        )
+        cached = inspected.returncode == 0 and inspected.stdout.strip() == context_hash
         emit("start", previous=previous, target=version, first_download=not cached)
         updated = replace_env(original, "PHP_VERSION", version)
         # Also (re)write WP_IMAGE_SUFFIX: sites created before 0.5.20 don't have
@@ -209,7 +218,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
                 emit("progress", phase="cache", percent=82, message=f"PHP {version} image is already available", indeterminate=False)
             else:
                 emit("progress", phase="download", percent=None, message=f"First use of PHP {version}: downloading and compiling the image", indeterminate=True)
-                if command(["docker", "compose", "--progress", "json", "build", "php"], project, structured=True) != 0:
+                if command(["docker", "compose", "--progress", "json", "build", "--pull", "php"], project, structured=True) != 0:
                     raise RuntimeError("The PHP image build failed")
             if not php_was_running:
                 metric_incr("php_switches")
@@ -220,7 +229,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
                 return 0
             emit("progress", phase="start", percent=88, message="Restarting the PHP service", indeterminate=False)
             started = True
-            if run_simple(["docker", "compose", "up", "-d", "php"], project) != 0:
+            if run_simple(["docker", "compose", "up", "-d", "--force-recreate", "php"], project) != 0:
                 raise RuntimeError("The PHP service could not be started")
             emit("progress", phase="health", percent=95, message="Waiting for the PHP health check", indeterminate=True)
             if not healthy(project):
@@ -232,7 +241,7 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock")) -> 
             write_atomic(env_path, original)
             emit("log", line=f"Restored PHP_VERSION={previous}")
             if started and php_was_running:
-                run_simple(["docker", "compose", "up", "-d", "php"], project)
+                run_simple(["docker", "compose", "up", "-d", "--force-recreate", "php"], project)
             emit("error", message=str(exc), previous=previous)
             return 1
 
@@ -241,8 +250,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--accept-vulnerable", action="store_true")
+    parser.add_argument("--accepted-image-id", default="")
     args = parser.parse_args()
-    return switch(args.project, args.version)
+    return switch(args.project, args.version, accept_vulnerable=args.accept_vulnerable,
+                  accepted_image_id=args.accepted_image_id)
 
 
 if __name__ == "__main__":

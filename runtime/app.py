@@ -32,6 +32,7 @@ from capacity import (
     public_snapshot as public_capacity_snapshot, release_reservation,
     reserve_new_project, reserve_php_resize, reserve_project_start,
 )
+from php_security import accepts_image, image_report, status as php_security_status
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -53,6 +54,7 @@ app.include_router(ingest_router)
 # writes (whose paths carry a {project} segment, matched by regex).
 DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
                      "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings",
+                     "/api/images/refresh-adminer", "/api/adminer-update",
                      "/api/snapshots/delete"}
 FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir|unzip)$")
 MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|update))?$|^/api/modules/catalog/install$")
@@ -98,7 +100,7 @@ async def application_authentication(request: Request, call_next):
     else:
         # The lease covers streaming responses and is inherited by child
         # processes, so disconnecting the browser cannot unlock a running job.
-        locked = mutation and (path in {"/api/run", "/api/new-project", "/api/destroy", "/api/restore", "/api/php-switch", "/api/provision"}
+        locked = mutation and (path in {"/api/run", "/api/new-project", "/api/destroy", "/api/restore", "/api/php-switch", "/api/provision", "/api/adminer-update"}
                                or path.startswith("/api/expiry/"))
         if locked:
             try:
@@ -183,7 +185,7 @@ def blueprint_catalog() -> dict:
 
 
 def validate_blueprint_choice(blueprint_id: str, php_version: str | None,
-                              wordpress_version: str | None = None) -> None:
+                              wordpress_version: str | None = None) -> dict:
     cmd = ["python3", str(BLUEPRINT_TOOL), "resolve", blueprint_id]
     if php_version:
         cmd.extend(["--php", php_version])
@@ -192,6 +194,10 @@ def validate_blueprint_choice(blueprint_id: str, php_version: str | None,
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=PRIMARY_PROJECT)
     if result.returncode != 0:
         raise HTTPException(400, result.stderr.strip().removeprefix("ERROR: ").strip())
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(500, "Blueprint resolver returned invalid JSON") from exc
 
 SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9\-]{0,30}$')
 WP_USERNAME_RE = re.compile(r'^[a-z0-9][a-z0-9._\-]{0,59}$')
@@ -560,6 +566,34 @@ def list_projects():
             except json.JSONDecodeError:
                 pass
 
+        # Report the runtime actually executing in each web-serving container.
+        # Image tags alone cannot prove the PHP patch level because Docker tags float.
+        php_security = image_report(
+            f"wp-dev-php:{env.get('PHP_VERSION', '8.3')}{env.get('WP_IMAGE_SUFFIX', '')}"
+        )
+        adminer_security = {"status": "unverified", "php_full_version": "unknown"}
+        running = {c.get("name") for c in containers if "Up" in c.get("status", "")}
+        if "php" in running:
+            try:
+                runtime = subprocess.run(
+                    ["docker", "compose", "exec", "-T", "php", "php", "-r", "echo PHP_VERSION;"],
+                    cwd=proj, capture_output=True, text=True, timeout=10,
+                )
+                if runtime.returncode == 0:
+                    php_security = php_security_status(runtime.stdout.strip())
+            except (OSError, subprocess.TimeoutExpired):
+                php_security = php_security_status(None)
+        if "adminer" in running:
+            try:
+                runtime = subprocess.run(
+                    ["docker", "compose", "exec", "-T", "adminer", "php", "-r", "echo PHP_VERSION;"],
+                    cwd=proj, capture_output=True, text=True, timeout=10,
+                )
+                if runtime.returncode == 0:
+                    adminer_security = php_security_status(runtime.stdout.strip())
+            except (OSError, subprocess.TimeoutExpired):
+                adminer_security = php_security_status(None)
+
         # Mailpit web UI path, served on the cockpit subdomain (same origin as
         # this dashboard) under MAILPIT_WEBROOT — so a relative path is enough.
         webroot = env.get("MAILPIT_WEBROOT", "").strip("/")
@@ -593,6 +627,12 @@ def list_projects():
             "days_left": days_left,
             "seconds_left": seconds_left,
             "php": env.get("PHP_VERSION", "?"),
+            "php_full_version": php_security.get("php_full_version", "unknown"),
+            "php_security_status": php_security["status"],
+            "php_image_id": php_security.get("image_id", ""),
+            "php_image_tag": env.get("PHP_VERSION", "?") + env.get("WP_IMAGE_SUFFIX", ""),
+            "adminer_php_full_version": adminer_security.get("php_full_version", "unknown"),
+            "adminer_php_security_status": adminer_security["status"],
             "port": env.get("WEB_PORT", "?"),
             "db_name": env.get("DB_NAME", "wordpress"),
             "db_user": env.get("DB_USER", "wpuser"),
@@ -795,6 +835,8 @@ def restore_snapshot(body: RestoreSnapshot):
 class PhpSwitch(BaseModel):
     project: str
     version: str
+    accept_vulnerable_runtime: bool = False
+    accepted_image_id: str = ""
 
 @app.post("/api/php-switch")
 def php_switch(body: PhpSwitch):
@@ -802,8 +844,17 @@ def php_switch(body: PhpSwitch):
         raise HTTPException(400, "Invalid PHP version")
     guard_not_busy()
     proj = resolve_project(body.project)
+    wp_version = _read_env(proj).get("WP_VERSION", "latest") or "latest"
+    suffix = run(["bash", "scripts/lib-image.sh", "suffix", wp_version], PRIMARY_PROJECT).strip()
+    image = f"wp-dev-php:{body.version}{suffix}"
+    if body.version == "7.4" and not accepts_image(
+            image, body.accept_vulnerable_runtime, body.accepted_image_id):
+        raise HTTPException(409, "PHP 7.4 is vulnerable. Review the English LAB warning and accept the exact image before continuing.")
+    args = ["python3", str(PHP_SWITCH_TOOL), "--project", str(proj), "--version", body.version]
+    if body.accept_vulnerable_runtime:
+        args.extend(["--accept-vulnerable", "--accepted-image-id", body.accepted_image_id])
     return sse_response([
-        "python3", str(PHP_SWITCH_TOOL), "--project", str(proj), "--version", body.version,
+        *args,
     ], proj)
 
 
@@ -930,6 +981,8 @@ class NewProject(BaseModel):
     install_deploy_plugin: bool = False   # opt-in: bundle the SpawnWP Deploy plugin
     deactivate_plugins: bool = False   # captured blueprints: leave plugins inactive
     group: str = ""   # optional Manage-dashboard group label
+    accept_vulnerable_runtime: bool = False
+    accepted_image_id: str = ""
 
 
 def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, str | None]:
@@ -943,7 +996,13 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, 
         raise HTTPException(400, "lifetime_days must be between 0 and 365")
     if body.lifetime_seconds is not None and not 300 <= body.lifetime_seconds <= 365 * 86400:
         raise HTTPException(400, "lifetime_seconds must be between 300 and 31536000")
-    validate_blueprint_choice(body.blueprint, body.php_version, body.wordpress_version)
+    resolved = validate_blueprint_choice(body.blueprint, body.php_version, body.wordpress_version)
+    selected_php = body.php_version or resolved["selected_php"]
+    if selected_php == "7.4":
+        suffix = "" if resolved["selected_wp"] == "latest" else f"-wp{resolved['selected_wp']}"
+        image = f"wp-dev-php:{selected_php}{suffix}"
+        if not accepts_image(image, body.accept_vulnerable_runtime, body.accepted_image_id):
+            raise HTTPException(409, "PHP 7.4 is vulnerable. Review the English LAB warning and accept the exact image before continuing.")
     guard_not_busy()
     guard_capacity()
     if is_project(PROJECTS_ROOT / name):
@@ -966,6 +1025,8 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, 
         env["SPAWNWP_SITE_LIFETIME_DAYS"] = str(body.lifetime_days)
     if body.install_deploy_plugin:
         env["SPAWNWP_INSTALL_DEPLOY_PLUGIN"] = "1"
+    if body.accept_vulnerable_runtime:
+        env["SPAWNWP_ACCEPT_VULNERABLE_PHP"] = "1"
     if body.deactivate_plugins:
         env["SPAWNWP_DEACTIVATE_PLUGINS"] = "1"
     command = [
@@ -2205,6 +2266,7 @@ def list_images():
             "age_days": age,
             "stale": age >= stale_days,
             "used_by": sorted(used.get(tag, [])),
+            **image_report(f"{PHP_IMAGE_REPO}:{tag}"),
         })
     images.sort(key=lambda i: (i["php_version"], i["wp_version"]))
     return {"images": images, "stale_days": stale_days}
@@ -2236,6 +2298,7 @@ def delete_image(body: ImageDelete):
 
 class ImageRefresh(BaseModel):
     php_version: str
+    wordpress_version: str = "latest"
 
 
 @app.post("/api/images/refresh")
@@ -2243,7 +2306,68 @@ def refresh_image(body: ImageRefresh):
     if not PHP_VER_RE.match(body.php_version):
         raise HTTPException(400, "Invalid PHP version")
     guard_not_busy()
-    return sse_response(["bash", str(REFRESH_IMAGE_TOOL), body.php_version], PRIMARY_PROJECT)
+    if body.wordpress_version != "latest" and not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", body.wordpress_version):
+        raise HTTPException(400, "Invalid WordPress version")
+    return sse_response(["bash", str(REFRESH_IMAGE_TOOL), body.php_version, body.wordpress_version], PRIMARY_PROJECT)
+
+
+ADMINER_REFRESH_TOOL = PRIMARY_PROJECT / "scripts" / "refresh-adminer-image.sh"
+
+
+@app.post("/api/images/refresh-adminer")
+def refresh_adminer_image():
+    """Pull and verify Adminer's runtime; existing site containers are untouched."""
+    guard_not_busy()
+    return sse_response(["bash", str(ADMINER_REFRESH_TOOL)], PRIMARY_PROJECT)
+
+
+class AdminerUpdate(BaseModel):
+    project: str
+
+
+@app.post("/api/adminer-update")
+def update_adminer(body: AdminerUpdate):
+    if not SLUG_RE.fullmatch(body.project):
+        raise HTTPException(400, "Invalid project name")
+    project = PROJECTS_ROOT / body.project
+    if not is_project(project) or project.resolve().parent != PROJECTS_ROOT.resolve():
+        raise HTTPException(404, "Project not found")
+    guard_not_busy()
+
+    # Verify the exact pulled image immediately before replacing a site's
+    # Adminer container. The command is fixed, networkless and read-only.
+    try:
+        probe = subprocess.run(
+            ["docker", "run", "--rm", "--network", "none", "--read-only",
+             "--memory", "128m", "--cpus", "0.5", "--pids-limit", "16",
+             "--user", "65534:65534", "--cap-drop", "ALL",
+             "--security-opt", "no-new-privileges",
+             "--entrypoint", "php", "adminer:5", "-r", "echo PHP_VERSION;"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(503, "Unable to verify the prepared Adminer image") from exc
+    adminer_status = php_security_status(probe.stdout.strip() if probe.returncode == 0 else None)
+    if adminer_status["status"] != "patched":
+        raise HTTPException(409, "The prepared Adminer image does not have a verified PHP security fix")
+
+    result = subprocess.run(
+        ["docker", "compose", "up", "-d", "--force-recreate", "--no-deps", "adminer"],
+        cwd=project, capture_output=True, text=True, timeout=180,
+    )
+    if result.returncode != 0:
+        raise HTTPException(500, result.stderr.strip() or "Unable to update Adminer")
+    try:
+        runtime = subprocess.run(
+            ["docker", "compose", "exec", "-T", "adminer", "php", "-r", "echo PHP_VERSION;"],
+            cwd=project, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(503, "Adminer was recreated, but its runtime could not be verified") from exc
+    verified = php_security_status(runtime.stdout.strip() if runtime.returncode == 0 else None)
+    if verified["status"] != "patched":
+        raise HTTPException(500, "Adminer was recreated, but its PHP security status is not verified")
+    return {"project": project.name, "php_full_version": verified["php_full_version"], "status": "patched"}
 
 
 class ImageSettings(BaseModel):

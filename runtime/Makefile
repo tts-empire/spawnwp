@@ -20,8 +20,8 @@ up:
 
 # Forced rebuild of the php image (use it after editing the Dockerfile)
 rebuild:
-	$(COMPOSE) build --no-cache php
-	$(COMPOSE) up -d php
+	$(COMPOSE) build --pull --no-cache php
+	$(COMPOSE) up -d --force-recreate php
 	@echo "php image rebuilt and restarted."
 
 down:
@@ -47,6 +47,7 @@ php-switch:
 ifndef VER
 	$(error VER is required. Usage: make php-switch VER=8.2)
 endif
+	@if [ "$(VER)" = "7.4" ] && [ "$(ACCEPT_VULNERABLE)" != "1" ]; then echo "PHP 7.4 is a vulnerable, unsupported runtime. Use ACCEPT_VULNERABLE=1 only for an isolated LAB not exposed to the Internet." >&2; exit 2; fi
 	@sed -i "s/^PHP_VERSION=.*/PHP_VERSION=$(VER)/" .env
 	@if [ "$(VER)" = "7.4" ]; then SERIES=6; else SERIES=7; fi; \
 	if grep -q '^WORDPRESS_SERIES=' .env; then \
@@ -55,13 +56,13 @@ endif
 		echo "WORDPRESS_SERIES=$$SERIES" >> .env; \
 	fi
 	@echo "Switched PHP_VERSION to $(VER)."
-	@if docker image inspect wp-dev-php:$(VER) >/dev/null 2>&1; then \
+	@if docker image inspect wp-dev-php:$(VER) >/dev/null 2>&1 && [ "$(VER)" != "7.4" ]; then \
 		echo "Image wp-dev-php:$(VER) already present — skipping the build (instant switch)."; \
 	else \
 		echo "First build for PHP $(VER): base pull + extension compilation, may take a few minutes..."; \
-		$(COMPOSE) build php; \
+		$(COMPOSE) build --pull php; \
 	fi
-	$(COMPOSE) up -d php
+	$(COMPOSE) up -d --force-recreate php
 	@echo "Done. PHP version is now $(VER)."
 
 # ── Development shell & tools ─────────────────────────────────────────────────

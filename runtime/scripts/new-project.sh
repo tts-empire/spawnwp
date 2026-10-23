@@ -270,6 +270,10 @@ cd "${PROJ_DIR}"
 # stale — the cockpit's System info tab offers a manual Refresh; nothing rebuilds
 # automatically. Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
 IMAGE=$(spawnwp_image_tag "${PHP_VERSION}" "${WP_VERSION}")
+if [ "${PHP_VERSION}" = "7.4" ] && [ "${SPAWNWP_ACCEPT_VULNERABLE_PHP:-0}" != "1" ]; then
+  echo "ERROR: PHP 7.4 is a vulnerable legacy runtime. Review the English LAB warning and accept the risk before continuing." >&2
+  exit 1
+fi
 CONTEXT_HASH=$(spawnwp_context_hash "${WP_VERSION}")
 export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
 MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
@@ -286,8 +290,8 @@ else
   CREATED=$(docker image inspect -f '{{.Created}}' "$IMAGE")
   AGE_DAYS=$(( ( $(date +%s) - $(date -d "$CREATED" +%s) ) / 86400 ))
   if [ "$IMAGE_HASH" != "$CONTEXT_HASH" ]; then
-    echo "==> php build context changed: rebuilding ${IMAGE}..."
-    NEED_BUILD=1
+    echo "==> php build context or security policy changed: pulling and rebuilding ${IMAGE}..."
+    NEED_BUILD=1; BUILD_ARGS=(--pull)
   elif [ "$AGE_DAYS" -ge "$MAX_AGE_DAYS" ]; then
     echo "==> Reusing php image ${IMAGE} (stale: ${AGE_DAYS} days old)."
   else

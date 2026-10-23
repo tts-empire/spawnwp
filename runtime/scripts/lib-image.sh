@@ -23,6 +23,7 @@ PHP_IMAGE_REPO=wp-dev-php
 # input, so a custom PHP setting must not force an image rebuild.
 # installer/tests/static.sh asserts this list covers every COPY in the Dockerfile.
 SPAWNWP_IMAGE_INPUTS=(Dockerfile php.ini opcache.ini xdebug.ini phpstan-wp.neon)
+SPAWNWP_PHP_SECURITY_POLICY=php2shell-2026-10-21
 
 # "" for latest/unset, "-wp<version>" for a pinned WordPress. Anything that is not
 # a plain dotted version is treated as latest rather than smuggled into a tag.
@@ -55,6 +56,7 @@ spawnwp_context_hash() {
     for f in "${SPAWNWP_IMAGE_INPUTS[@]}"; do
       sha256sum "docker/php/$f"
     done
+    printf '%s\n' "$SPAWNWP_PHP_SECURITY_POLICY"
     echo "wp=${wp}"
   } | sha256sum | cut -c1-12
 }

@@ -106,6 +106,8 @@ class PhpSwitchProgressTests(unittest.TestCase):
             def fake_run(args, **kwargs):
                 if args[:2] == ["bash", "scripts/lib-image.sh"]:
                     return SimpleNamespace(returncode=0, stdout=answers[args[2]] + "\n")
+                if args[:3] == ["docker", "image", "inspect"]:
+                    return SimpleNamespace(returncode=0, stdout="abc123def456\n")
                 return SimpleNamespace(returncode=0, stdout="")
 
             output = StringIO()

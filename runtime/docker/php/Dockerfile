@@ -6,6 +6,13 @@ FROM wordpress:php${PHP_VERSION}-fpm
 
 ARG PHP_VERSION
 ARG WORDPRESS_VERSION=latest
+ARG SPAWNWP_CONTEXT_HASH=dev
+
+# Reject floating PHP base tags that have not yet picked up the php2shell fixes.
+# PHP 7.4 remains available for explicitly acknowledged LAB use.
+RUN if [ "$PHP_VERSION" != "7.4" ]; then \
+      php -r '$v=PHP_VERSION; $min=["8.2"=>"8.2.35","8.3"=>"8.3.36","8.4"=>"8.4.27","8.5"=>"8.5.12"][$argv[1]]??null; if (!$min || version_compare($v,$min,"<")) { fwrite(STDERR,"SpawnWP security check failed: PHP ".$v." is below the fixed release floor for ".$argv[1].". Refresh the base image and rebuild.\\n"); exit(1); }' "$PHP_VERSION"; \
+    fi
 
 # FTP/FTPS: WordPress reported "ftp and ftps are not available" because ext/ftp was
 # never installed. FTPS additionally needs OpenSSL *headers* (libssl-dev — the base
@@ -68,6 +75,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        fi \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /usr/local/share/spawnwp \
+    && php -r 'file_put_contents("/usr/local/share/spawnwp/php-version", PHP_VERSION."\n");'
+
 # WP-CLI
 RUN curl -sS https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp \
     && chmod +x /usr/local/bin/wp
@@ -125,4 +135,7 @@ COPY xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 # the current docker/php context (+ WP build args) to skip rebuilds when nothing
 # changed. Declared last so changing the hash never invalidates the layers above.
 ARG SPAWNWP_CONTEXT_HASH=dev
-LABEL org.spawnwp.context-hash=$SPAWNWP_CONTEXT_HASH
+LABEL org.spawnwp.context-hash=$SPAWNWP_CONTEXT_HASH \
+      org.spawnwp.php-series=$PHP_VERSION \
+      org.spawnwp.php-version-file=/usr/local/share/spawnwp/php-version \
+      org.spawnwp.php-security-policy=php2shell-2026-10-21

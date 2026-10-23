@@ -73,6 +73,30 @@ make up
 
 New sites always build a fresh image, so they get the latest WordPress automatically.
 
+## Responding to PHP2Shell
+
+PHP2Shell (CVE-2026-109618 and CVE-2026-109619) affects PHP runtimes serving web requests.
+For upstream PHP releases, the fixed versions are 8.2.35, 8.3.36, 8.4.27 and 8.5.12. A
+distribution may backport a fix without changing the displayed upstream version; verify those
+packages against the vendor advisory. See [Security](security.md) for general runtime boundaries.
+
+1. Open **Manage** and review the PHP security warning on each site. The Cockpit inspects the
+   running PHP-FPM and Adminer binaries; an image tag alone is not proof of its patch level.
+2. Open **System → PHP images**. Use **Prepare update** for each vulnerable PHP series and pinned
+   WordPress image shown in the site card. This pulls the current base and builds an image; running
+   containers remain unchanged.
+3. Apply the new image to each affected site by switching to the same PHP series or recreating its
+   PHP service after taking a snapshot. Verify the site's reported PHP version and health.
+4. Open **System → Adminer image**, prepare the latest image, then use **Update Adminer** on each
+   affected site. The Cockpit recreates only Adminer and verifies its PHP version.
+5. Confirm the warning clears for every internet-facing site. If immediate remediation is not
+   possible, follow current PHP and national CSIRT guidance on restricting public exposure.
+
+PHP 7.4 and other unsupported branches have no verified upstream fixed release in this product.
+SpawnWP permits PHP 7.4 only after explicit acceptance for the exact cached image. That exception
+is for a non-internet-facing LAB that is isolated from public and untrusted networks. The product
+does not verify network isolation; the operator must enforce and check it independently.
+
 ## Long-term hardening checklist
 
 SpawnWP sites are permanent by default, while sites with an explicit lifetime are removed by

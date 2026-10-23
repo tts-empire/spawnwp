@@ -4,6 +4,19 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.52
+
+- **PHP2Shell security fixes.** New and refreshed PHP images require the upstream fixed release for
+  PHP 8.2–8.5. The Cockpit reports the PHP version and patch status of each running PHP and
+  Adminer container; vulnerable or unverified runtimes show a persistent warning.
+- **Explicit PHP 7.4 LAB acknowledgement.** PHP 7.4 remains selectable only after the administrator
+  accepts the risk for the exact cached image. The warning calls for an isolated LAB environment.
+- **Controlled runtime updates.** PHP image refreshes pull the latest base and preserve pinned
+  WordPress versions. Adminer can be prepared once and applied to a site separately; applying it
+  recreates only that site's Adminer container and verifies the resulting PHP runtime.
+- **English security and operations guidance.** Added PHP2Shell response steps, including version
+  verification, update order, and the limits of the LAB exception.
+
 ## 0.5.51
 
 - **Focused Modules experience.** The Modules page now contains only module installation and
@@ -830,7 +843,8 @@ First public release.
   exposure, loopback-only service
   ports, per-install random secrets.
 
-[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.5.51...HEAD
+[Unreleased]: https://github.com/tts-empire/spawnwp/compare/v0.5.52...HEAD
+[0.5.52]: https://github.com/tts-empire/spawnwp/compare/v0.5.51...v0.5.52
 [0.5.51]: https://github.com/tts-empire/spawnwp/compare/v0.5.50...v0.5.51
 [0.5.50]: https://github.com/tts-empire/spawnwp/compare/v0.5.49...v0.5.50
 [0.5.49]: https://github.com/tts-empire/spawnwp/compare/v0.5.48...v0.5.49

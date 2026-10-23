@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Deploy · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}html.cockpit-preload body{visibility:hidden}</style>
-  <script src="/assets/cockpit-boot.js?v=0.5.51" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
-  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.51">
+  <script src="/assets/cockpit-boot.js?v=0.5.52" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
+  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.52">
 </head>
 <body data-page="deploy">
   <header>
@@ -44,7 +44,7 @@
       <form class="deploy-form" onsubmit="createProject(event)">
         <div class="deploy-fields">
           <label><span>Site name</span><input id="new-name" type="text" placeholder="site-name" aria-describedby="new-name-help" required><small class="field-help" id="new-name-help">Lowercase letters, numbers and hyphens only; no spaces. Maximum 31 characters.</small></label>
-          <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select><small class="field-help">Switchable later from Manage.</small></label>
+          <label><span>PHP runtime</span><select id="new-php" required aria-label="PHP version"><option value="8.3">PHP 8.3</option></select><small class="field-help">Switchable later from Manage.</small><div id="php-risk-warning" class="blueprint-warning" hidden><strong>Warning: vulnerable or unsupported PHP runtime</strong><br>Use this runtime only for testing in an isolated LAB environment that is not exposed to the Internet. Continuing may expose your data and environment to compromise. You are responsible for the risks associated with using this runtime. Upgrade to a patched, supported version as soon as possible.</div></label>
           <label id="new-wordpress-field" hidden><span>WordPress</span><select id="new-wordpress" aria-label="WordPress version"></select><small class="field-help" id="new-wordpress-help">Captured blueprints reproduce the origin's WordPress version.</small></label>
           <label><span>Lifetime</span><select id="new-lifetime" aria-describedby="lifetime-help">
             <option value="0" selected>Permanent</option>
@@ -108,6 +108,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.51"></script>
+  <script src="/assets/cockpit.js?v=0.5.52"></script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 {
   "cockpit": [
     "app.py",
+    "php_security.py",
     "capacity.py",
     "auth.py",
     "ingest.py",
@@ -24,6 +25,7 @@
   ],
   "runtime": [
     "Makefile",
+    "php_security.py",
     "compose.yaml",
     "env.example",
     "gitignore.template",
@@ -54,6 +56,7 @@
     "scripts/new-project.sh",
     "scripts/php-ini-apply.sh",
     "scripts/refresh-image.sh",
+    "scripts/refresh-adminer-image.sh",
     "scripts/site-expiry.sh",
     "scripts/php-switch-progress.py",
     "scripts/reset.sh",

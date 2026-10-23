@@ -513,6 +513,7 @@ if (newName) newName.addEventListener('input', e => {
 // Per-blueprint deploy time on a ready image; development adds wp.org plugin installs.
 const BLUEPRINT_TIMES = { clean: '~35 sec', demo: '~35 sec', development: '~1–2 min' };
 let PHP_IMAGES = null;   // PHP versions whose image is already built; null = unknown
+let PHP_IMAGE_CATALOG = [];
 
 function blueprintTime(id) {
   const item = BLUEPRINTS.find(candidate => candidate.id === id);
@@ -538,7 +539,7 @@ async function loadBlueprints() {
   fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json())
     // De-duplicated: one PHP version can now have several images (one per pinned
     // WordPress version), and this list is only asked "is PHP x.y built at all?".
-    .then(data => { PHP_IMAGES = [...new Set((data.images || []).map(img => img.php_version))]; updateExpectedTime(); })
+    .then(data => { PHP_IMAGE_CATALOG = data.images || []; PHP_IMAGES = [...new Set(PHP_IMAGE_CATALOG.map(img => img.php_version))]; updateExpectedTime(); })
     .catch(() => {});
   try {
     const response = await fetch(`${BASE}/blueprints`, { cache: 'no-store' });
@@ -614,6 +615,9 @@ function updateBlueprintSelection() {
   if (!item) return;
   const php = document.getElementById('new-php');
   php.innerHTML = item.php.allowed.map(version => `<option value="${esc(version)}">PHP ${esc(version)}</option>`).join('');
+  const risk = document.getElementById('php-risk-warning');
+  if (risk) risk.hidden = php.value !== '7.4';
+  php.onchange = () => { if (risk) risk.hidden = php.value !== '7.4'; };
   php.value = item.php.default;
   const note = document.getElementById('blueprint-note');
   note.textContent = item.description;
@@ -1120,8 +1124,9 @@ function renderTop(p) {
   return `<div class="card-header">
       <div>
         <div class="card-title" role="button" tabindex="0" aria-expanded="true" title="Collapse / expand this site" onclick="toggleCollapse('${p.name}')" onkeydown="collapseKey(event, '${p.name}')"><span class="collapse-toggle" aria-hidden="true">▾</span>${esc(p.name)}</div>
-        <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
+        <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php_full_version || p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
+        ${p.php_security_status !== 'patched' || p.adminer_php_security_status !== 'patched' ? `<div class="blueprint-warning"><strong>PHP security warning</strong><br>${p.php_security_status === 'vulnerable' ? `This site's PHP ${esc(p.php_full_version)} is vulnerable. ` : p.php_security_status !== 'patched' ? 'The site PHP patch status could not be verified. ' : ''}${p.adminer_php_security_status === 'vulnerable' ? `Adminer PHP ${esc(p.adminer_php_full_version)} is vulnerable. ` : p.adminer_php_security_status === 'unverified' ? 'Adminer PHP patch status could not be verified. ' : ''}Update the runtime before exposing this site to the Internet. For LAB use, keep it isolated and accept the risk.${p.containers.some(c => c.name === 'adminer' && (c.status || '').toLowerCase().startsWith('up')) ? `<br><button class="btn-neutral btn-sm sensitive" onclick="updateAdminer('${p.name}')">Update Adminer</button>` : ''}</div>` : ''}
       </div>
       <span class="card-badges">${groupChip(p)}${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
     </div>
@@ -1140,7 +1145,7 @@ function renderTop(p) {
       <button class="btn-neutral btn-sm" onclick="showFiles('${p.name}')" title="Browse, edit and upload this site's files">📂 Files</button>
       <button class="btn-neutral btn-sm" onclick="toggleWpCli('${p.name}')" title="Run WP-CLI commands inside this site">⌨ WP-CLI</button>
       ${p.expires_at ? `<button class="btn-neutral btn-sm" onclick="showExpiry('${p.name}', ${p.days_left})" title="Extend the lifetime or make the site permanent">⏳ Lifetime</button>` : ''}
-      <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value); this.value=''">
+      <select class="sensitive" ${PHP_SWITCH_ACTIVE.has(p.name) ? 'disabled title="PHP switch in progress"' : ''} onchange="if(this.value) phpSwitch('${p.name}', this.value, '${esc(p.php_image_tag || p.php)}'); this.value=''">
         <option value="">PHP ${esc(p.php)} ▾</option>
         <option value="7.4">→ PHP 7.4 (legacy)</option>
         <option value="8.2">→ PHP 8.2</option>
@@ -1551,16 +1556,29 @@ function renderDiskVisual(vis, d) {
     </div>`;
 }
 
-function phpSwitch(project, version) {
+async function phpSwitch(project, version, currentImageTag) {
   if (blockedIfBusy()) return;
   if (PHP_SWITCH_ACTIVE.has(project)) {
     showToast('A PHP switch is already running for this environment', true);
     return;
   }
+  let acceptedImageId = '';
+  let acceptVulnerableRuntime = false;
+  if (version === '7.4') {
+    const suffix = String(currentImageTag || '').replace(/^\d+\.\d+/, '');
+    const targetTag = `${version}${suffix}`;
+    try {
+      const data = await fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json());
+      acceptedImageId = (data.images || []).find(img => img.image_tag === targetTag)?.image_id || '';
+    } catch (_) { /* The server will still require explicit acceptance. */ }
+    const warning = 'WARNING: PHP 7.4 is a vulnerable, unsupported runtime. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
+    if (!confirm(warning)) return;
+    acceptVulnerableRuntime = true;
+  }
   PHP_SWITCH_ACTIVE.add(project);
   delete projectSignatures[project];
   loadProjects();
-  streamSSE(`${BASE}/php-switch`, { project, version }, `out-${project}`, ok => {
+  streamSSE(`${BASE}/php-switch`, { project, version, accept_vulnerable_runtime: acceptVulnerableRuntime, accepted_image_id: acceptedImageId }, `out-${project}`, ok => {
     PHP_SWITCH_ACTIVE.delete(project);
     delete projectSignatures[project];
     setTimeout(loadProjects, ok ? 1500 : 0);
@@ -1584,6 +1602,19 @@ function createProject(e) {
   const name = nameInput.value.trim();
   const blueprint = document.getElementById('new-blueprint').value;
   const php_version = document.getElementById('new-php').value;
+  const earlyWpField = document.getElementById('new-wordpress-field');
+  const wordpress_version = earlyWpField && !earlyWpField.hidden ? document.getElementById('new-wordpress').value : null;
+  let accept_vulnerable_runtime = false;
+  let accepted_image_id = '';
+  if (php_version === '7.4') {
+    const warning = 'WARNING: PHP 7.4 is a vulnerable, unsupported runtime. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
+    if (!confirm(warning)) return;
+    accept_vulnerable_runtime = true;
+    const blueprintItem = BLUEPRINTS.find(item => item.id === blueprint);
+    const selectedWp = wordpress_version || blueprintItem?.wordpress || 'latest';
+    const suffix = selectedWp === 'latest' ? '' : `-wp${selectedWp}`;
+    accepted_image_id = PHP_IMAGE_CATALOG.find(img => img.image_tag === `${php_version}${suffix}`)?.image_id || '';
+  }
   const validName = /^[a-z0-9][a-z0-9-]{0,30}$/.test(name);
   nameInput.classList.toggle('input-error', !validName);
   nameHelp.classList.toggle('input-error', !validName);
@@ -1609,11 +1640,9 @@ function createProject(e) {
   const install_deploy_plugin = document.getElementById('new-install-deploy').checked;
   const capturedPanel = document.getElementById('captured-panel');
   const deactivate_plugins = !!capturedPanel && !capturedPanel.hidden && document.getElementById('new-deactivate-plugins').checked;
-  const wpField = document.getElementById('new-wordpress-field');
-  const wordpress_version = wpField && !wpField.hidden ? document.getElementById('new-wordpress').value : null;
   const groupField = document.getElementById('new-group');
   const group = groupField ? groupField.value.trim() : '';
-  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, wordpress_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins, group }, 'out-new', ok => {
+  streamSSE(`${BASE}/new-project`, { name, blueprint, php_version, wordpress_version, php_settings, lifetime_days, install_deploy_plugin, deactivate_plugins, group, accept_vulnerable_runtime, accepted_image_id }, 'out-new', ok => {
     btn.disabled = false;
     DEPLOY_ACTIVE = false;
     if (ok) {
@@ -2325,6 +2354,8 @@ async function loadSystemInfo() {
       fetch(`${BASE}/images/settings`, { cache: 'no-store' }).then(r => r.json()),
     ]);
     renderImages(imagesData);
+    const adminerEl = document.getElementById('adminer-image-status');
+    if (adminerEl) adminerEl.textContent = 'Adminer image status is checked when a site runtime is inspected.';
     renderDockerDisk(disk);
     document.getElementById('gc-days').value = settings.autodelete_days;
   } catch (e) {
@@ -2355,8 +2386,13 @@ function renderImages(data) {
     const wp = img.wp_version === 'latest'
       ? ''
       : ` <span class="badge badge-gray" title="This image bakes in WordPress ${esc(img.wp_version)}, pinned by a blueprint">WP ${esc(img.wp_version)}</span>`;
-    return `<tr><td><b>PHP ${esc(img.php_version)}</b>${wp}</td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
-      <td class="table-actions"><button class="btn-neutral btn-sm sensitive" onclick="refreshImage('${esc(img.php_version)}')" title="Rebuild now with the latest WordPress (~5 min)">Refresh</button>${delBtn}</td></tr>`;
+    const security = img.status === 'patched'
+      ? `<span class="badge badge-green" title="Build passed the fixed PHP release floor">Patched</span>`
+      : img.status === 'vulnerable'
+        ? `<span class="badge badge-red" title="PHP ${esc(img.php_full_version)} is below the fixed release floor">Vulnerable</span>`
+        : `<span class="badge badge-yellow" title="This image has no verified SpawnWP security metadata">Unverified</span>`;
+    return `<tr><td><b>PHP ${esc(img.php_version)}</b>${wp}<br>${security}${img.php_full_version ? ` <small>${esc(img.php_full_version)}</small>` : ''}</td><td>${img.size_gb} GB</td><td>${age}</td><td>${used}</td>
+      <td class="table-actions"><button class="btn-neutral btn-sm sensitive" onclick="refreshImage('${esc(img.php_version)}','${esc(img.wp_version)}')" title="Build this PHP and WordPress image from the current base (~5 min)">Prepare update</button>${delBtn}</td></tr>`;
   }).join('');
 }
 
@@ -2370,13 +2406,38 @@ function renderDockerDisk(data) {
     Reclaimable build cache is trimmed automatically after builds and weekly.</p>`;
 }
 
-function refreshImage(version) {
+function refreshImage(version, wordpressVersion = 'latest') {
   if (blockedIfBusy()) return;
-  if (!confirm(`Rebuild the PHP ${version} image now with the latest WordPress?\n\nThis takes about 5 minutes. Deploys are blocked while it runs; running sites are not touched (they pick the new image on their next recreate).`)) return;
-  streamSSE(`${BASE}/images/refresh`, { php_version: version }, 'out-system', ok => {
-    if (ok) showToast(`PHP ${version} image refreshed`);
+  if (!confirm(`Build the PHP ${version} image for WordPress ${wordpressVersion} from the latest base?\n\nThis prepares an image and does not change running sites. Applying it is a separate action.`)) return;
+  streamSSE(`${BASE}/images/refresh`, { php_version: version, wordpress_version: wordpressVersion }, 'out-system', ok => {
+    if (ok) showToast(`PHP ${version} image prepared`);
     loadSystemInfo();
   });
+}
+
+function refreshAdminerImage() {
+  if (blockedIfBusy()) return;
+  if (!confirm('Pull and verify the latest Adminer image?\n\nThis prepares the shared image only. Running Adminer containers stay unchanged until updated site by site.')) return;
+  streamSSE(`${BASE}/images/refresh-adminer`, {}, 'out-system', ok => {
+    if (ok) showToast('Patched Adminer image prepared');
+    loadSystemInfo();
+  });
+}
+
+async function updateAdminer(project) {
+  if (blockedIfBusy()) return;
+  if (!confirm(`Recreate Adminer for ${project} with the prepared, verified image?\n\nThis briefly interrupts the database web interface. The WordPress and database containers are not restarted.`)) return;
+  try {
+    const response = await fetch(`${BASE}/adminer-update`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({project}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Unable to update Adminer');
+    showToast(`Adminer updated to PHP ${data.php_full_version}`);
+    await loadProjects();
+  } catch (error) {
+    showToast(error.message, true);
+  }
 }
 
 // tag is the image tag, e.g. "8.4" or "8.4-wp7.0.1" — not just the PHP version,

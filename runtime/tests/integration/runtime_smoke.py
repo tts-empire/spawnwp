@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated real-container contract test; never uses /srv or production volumes."""
 import argparse
+import sys
 import json
 import hashlib
 import zipfile
@@ -24,6 +25,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--image',required=True)
     parser.add_argument('--php',required=True)
+    parser.add_argument('--transition-images',type=Path)
     parser.add_argument('--benchmark-only',action='store_true')
     parser.add_argument('--keep-on-failure',action='store_true')
     parser.add_argument('--report',type=Path,default=Path('/tmp/spawnwp-runtime-smoke.json'))
@@ -56,6 +58,8 @@ def main():
         print('PASS '+label,flush=True)
     try:
         shutil.copy(RUNTIME/'compose.yaml',root/'compose.yaml')
+        for module in ('php_security.py','runtime_images.py','runtime_migration.py','service_images.py'):
+            shutil.copy(RUNTIME/module,root/module)
         shutil.copytree(RUNTIME/'docker',root/'docker')
         content=root/'projects/primary/wp-content';content.mkdir(parents=True)
         os.chown(content,33,33)
@@ -67,6 +71,17 @@ def main():
             'REDIS_PASSWORD=smoke-redis-only','MAILPIT_WEBROOT=/smoke-mail','WP_ADMIN_USER=smoke','WP_ADMIN_EMAIL=smoke@example.invalid'])+'\n')
         (root/'.env').chmod(0o600)
         print('Starting isolated stack '+name,flush=True)
+        # Match the provisioner's two-phase startup. Older image entrypoints can
+        # restart during first extraction; a transient unhealthy state must not
+        # make Compose permanently fail nginx's dependency before FPM is ready.
+        call('up','-d','--no-build','php',timeout=240)
+        php_container=call('ps','-aq','php')
+        for _ in range(120):
+            probe=subprocess.run(['docker','exec',php_container,'php','-r',
+                '$s=@fsockopen("127.0.0.1",9000,$n,$m,1);exit($s?0:1);'],capture_output=True)
+            if probe.returncode==0:break
+            time.sleep(1)
+        else:raise RuntimeError('FPM did not listen after first-run initialization')
         call('--profile','redis','up','-d','--no-build','--wait','--wait-timeout','240',timeout=360)
         check('all Compose services healthy under production resource/capability limits')
         php('wp','core','install','--url=http://test.local','--title=Smoke','--admin_user=smoke',
@@ -239,6 +254,10 @@ echo json_encode(['version'=>PHP_VERSION,'extensions'=>get_loaded_extensions(),
         manifest=json.loads((RUNTIME/'blueprints/development.json').read_text());manifest['source']='built-in'
         apply(manifest)
         check('development blueprint and toolkit',(mu/'devkit.php').is_file())
+        if args.transition_images:
+            sys.path.insert(0,str(root))
+            from runtime_transitions import exercise
+            report['transitions']=exercise(root,json.loads(args.transition_images.read_text()),args.php)
         report['result']='passed'
     except Exception as exc:
         report['result']='failed';report['error']=str(exc);report['command_output']=getattr(exc,'output','');report['command_stderr']=getattr(exc,'stderr','')
@@ -255,6 +274,8 @@ echo json_encode(['version'=>PHP_VERSION,'extensions'=>get_loaded_extensions(),
             print('Retained test project: '+str(root),flush=True)
         else:
             subprocess.run([*compose,'--profile','redis','down','-v','--remove-orphans'],check=False)
+            for ref in report.get('transitions',{}).get('retained_test_refs',[]):
+                subprocess.run(['docker','image','rm',ref],capture_output=True)
             shutil.rmtree(root)
 
 if __name__=='__main__': main()

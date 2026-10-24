@@ -13,6 +13,7 @@ from typing import Callable
 
 from php_security import image_report
 
+PHP_IMAGE_REPO = "wp-dev-php"
 SERIES = {"7.4", "8.2", "8.3", "8.4", "8.5"}
 TAG_RE = re.compile(r"^([0-9]+\.[0-9]+)(?:-wp([0-9.]+))?(?:-trixie-([a-f0-9]{12,64}))?$")
 
@@ -28,7 +29,7 @@ def suffix(wp: str) -> str:
 def alias(series: str, wp: str = "latest") -> str:
     if series not in SERIES:
         raise ValueError("Unsupported PHP version")
-    return f"wp-dev-php:{series}{suffix(wp)}"
+    return f"{PHP_IMAGE_REPO}:{series}{suffix(wp)}"
 
 
 def selected(env: dict[str, str]) -> str:

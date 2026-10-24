@@ -16,7 +16,7 @@ jobs:
   runtime:
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 10
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
         php: ['7.4', '8.2', '8.3', '8.4', '8.5']

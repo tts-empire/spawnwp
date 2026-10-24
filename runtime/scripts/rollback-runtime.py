@@ -25,7 +25,7 @@ def rollback(project:Path,accept_legacy=False,accepted_image_id=''):
         prior=environment(record['environment']);reference=record['previous_ref']
         report=image_report(reference)
         if not report.get('image_id'):raise RuntimeError('The retained image is not available')
-        if report.get('legacy') and not (accept_legacy and accepted_image_id==report['image_id']):
+        if (report.get('legacy') or report.get('status')!='patched') and not (accept_legacy and accepted_image_id==report['image_id']):
             raise RuntimeError('Review and accept the exact EOL image before rolling back')
         original=(project/'.env').read_text();updated=original
         for key in ['PHP_VERSION','WP_IMAGE_SUFFIX']:

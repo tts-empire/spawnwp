@@ -65,6 +65,15 @@ def backup(project: Path) -> Path:
                     source.backup(target)
                 finally:
                     target.close(); source.close()
+        if not mailpit and "mailpit_data" in config.get("volumes", {}):
+            volume_name = config["volumes"]["mailpit_data"]["name"]
+            info = json.loads(subprocess.check_output(["docker","volume","inspect",volume_name],text=True))[0]
+            database = Path(info["Mountpoint"]) / "mailpit.db"
+            if database.is_file():
+                source = sqlite3.connect(database.as_uri()+"?mode=ro",uri=True)
+                target = sqlite3.connect(destination/"mailpit.db")
+                try: source.backup(target)
+                finally: target.close(); source.close()
         (destination/"complete.json").write_text(json.dumps({"created_at":time.time(),"php_container":php})+"\n")
         return destination
     finally:

@@ -24,6 +24,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--image',required=True)
     parser.add_argument('--php',required=True)
+    parser.add_argument('--benchmark-only',action='store_true')
     parser.add_argument('--keep-on-failure',action='store_true')
     parser.add_argument('--report',type=Path,default=Path('/tmp/spawnwp-runtime-smoke.json'))
     args=parser.parse_args()
@@ -74,6 +75,14 @@ def main():
         report['deploy_seconds']=time.monotonic()-deploy_started
         report['wordpress_version']=php('wp','core','version')
         check('WordPress bootstrap and permalinks')
+        if args.benchmark_only:
+            port=call('port','nginx','80').rsplit(':',1)[1]
+            request=urllib.request.Request('http://127.0.0.1:'+port+'/',headers={'Host':'test.local'})
+            with urllib.request.urlopen(request,timeout=20) as response:
+                check('benchmark HTTP readiness',response.status==200)
+            report['deploy_seconds']=time.monotonic()-deploy_started
+            report['result']='passed'
+            return
         mu=content/'mu-plugins';mu.mkdir(exist_ok=True)
         shutil.copy(RUNTIME/'scripts/mail-capture.php',mu/'mail-capture.php')
         fixture=content/'spawnwp-runtime-test.php'

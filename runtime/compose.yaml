@@ -75,8 +75,8 @@ services:
         // php.ini display_errors (the Deploy "display_errors" dev toggle) rather
         // than WordPress's default-on, so a stray plugin notice never breaks the
         // page by emitting output before headers.
-        define('WP_DEBUG_LOG', true);
-        define('WP_DEBUG_DISPLAY', null);
+        if (!defined('WP_DEBUG_LOG')) { define('WP_DEBUG_LOG', true); }
+        if (!defined('WP_DEBUG_DISPLAY')) { define('WP_DEBUG_DISPLAY', null); }
         define('WP_HOME', '${WP_HOME}');
         define('WP_SITEURL', '${WP_SITEURL}');
         define('SPAWNWP_DEPLOY_HEALTHCHECK_URL', 'http://nginx/');

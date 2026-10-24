@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+ARG PHP_BASE_IMAGE=debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+FROM ${PHP_BASE_IMAGE} AS legacy
+ENV PHP_INI_DIR=/usr/local/etc/php PHPRC=/usr/local/etc/php/php.ini \
+    PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d COMPOSER_HOME=/usr/local/composer
+COPY sury-archive-keyring.gpg /usr/share/keyrings/sury-archive-keyring.gpg
+COPY sury-packages.txt sury-downloads-amd64.txt sury-downloads-arm64.txt /usr/local/share/spawnwp/
+COPY install-legacy.sh /tmp/install-legacy.sh
+RUN sh /tmp/install-legacy.sh && rm /tmp/install-legacy.sh
+COPY php-fpm-legacy /usr/local/sbin/php-fpm
+COPY fpm-legacy.conf /usr/local/etc/php-fpm.conf
+COPY fpm-healthcheck /usr/local/bin/fpm-healthcheck
+RUN chmod 755 /usr/local/sbin/php-fpm /usr/local/bin/fpm-healthcheck
+
+FROM legacy AS pcntl-builder
+COPY build-pcntl.sh /tmp/build-pcntl.sh
+RUN sh /tmp/build-pcntl.sh
+
+FROM legacy AS runtime
+ARG PHP_BASE_IMAGE
+COPY runtime-lock.json tools-lock.json UPSTREAM-NOTICES.md /usr/local/share/spawnwp/
+COPY --from=pcntl-builder /pcntl/pcntl.so /usr/lib/php/20190902/pcntl.so
+RUN echo 'extension=pcntl' > /usr/local/etc/php/fpm-conf.d/20-pcntl.ini
+COPY tooling-composer.json /usr/local/composer/composer.json
+COPY tooling-composer.lock /usr/local/composer/composer.lock
+COPY install-tools.sh seed-wordpress.sh /usr/local/share/spawnwp/
+RUN sh /usr/local/share/spawnwp/install-tools.sh
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY wp-config-docker.php /usr/src/wordpress/wp-config-docker.php
+ARG WORDPRESS_VERSION=latest
+RUN sh /usr/local/share/spawnwp/seed-wordpress.sh "$WORDPRESS_VERSION" \
+    && chmod 755 /usr/local/bin/docker-entrypoint.sh \
+    && ln -s docker-entrypoint.sh /usr/local/bin/docker-ensure-installed.sh
+COPY php.ini opcache.ini /usr/local/etc/php/conf.d/
+COPY xdebug-default.ini /usr/local/etc/php/conf.d/xdebug.ini
+COPY phpstan-wp.neon /usr/local/etc/phpstan-wp.neon
+RUN php -r 'file_put_contents("/usr/local/share/spawnwp/php-version",PHP_VERSION."\n");' \
+    && php-fpm -t
+ARG SPAWNWP_CONTEXT_HASH=dev
+LABEL org.spawnwp.context-hash=$SPAWNWP_CONTEXT_HASH \
+      org.spawnwp.php-series=7.4 org.spawnwp.runtime-provider=sury \
+      org.spawnwp.base-image=$PHP_BASE_IMAGE \
+      org.spawnwp.php-security-policy=trixie-2026-10-24
+WORKDIR /var/www/html
+VOLUME /var/www/html
+EXPOSE 9000
+STOPSIGNAL SIGQUIT
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["php-fpm"]

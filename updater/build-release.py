@@ -114,6 +114,7 @@ def main() -> int:
                 "migrations/remove-test-mcp-fixture.py",
                 "migrations/add-module-include.py",
                 "migrations/add-ram-admission-limits.py",
+                "migrations/prepare-trixie-runtimes.py",
                 "port_allocator.py",
                 "telemetry.py",
             } else "0644"
@@ -176,6 +177,7 @@ def main() -> int:
                 "installer/migrations/remove-test-mcp-fixture.py",
                 "installer/migrations/add-module-include.py",
                 "installer/migrations/add-ram-admission-limits.py",
+                "installer/migrations/prepare-trixie-runtimes.py",
             ],
             "files": entries,
         }

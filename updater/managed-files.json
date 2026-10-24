@@ -21,7 +21,10 @@
     "assets/cockpit.css",
     "assets/cockpit-boot.js",
     "assets/cockpit.js",
-    "system.html"
+    "system.html",
+    "runtime_images.py",
+    "runtime_migration.py",
+    "service_images.py"
   ],
   "runtime": [
     "Makefile",
@@ -38,7 +41,6 @@
     "docker/php/opcache.ini",
     "docker/php/php.ini",
     "docker/php/phpstan-wp.neon",
-    "docker/php/xdebug.ini",
     "docker/php/zz-site.ini",
     "scripts/apply-blueprint.sh",
     "scripts/apply-content-blueprint.sh",
@@ -64,7 +66,36 @@
     "scripts/snapshot.sh",
     "scripts/wait-for-wordpress.sh",
     "mu-plugins/spawnwp-autologin.php",
-    "mu-plugins/spawnwp-restricted-admin.php"
+    "mu-plugins/spawnwp-restricted-admin.php",
+    "runtime_images.py",
+    "runtime_migration.py",
+    "service_images.py",
+    "runtime-migration.json",
+    "scripts/prepare-image.py",
+    "scripts/backup-runtime.py",
+    "docker/php/Dockerfile.legacy",
+    "docker/php/build-pcntl.sh",
+    "docker/php/docker-entrypoint.sh",
+    "docker/php/fpm-healthcheck",
+    "docker/php/fpm-legacy.conf",
+    "docker/php/install-legacy.sh",
+    "docker/php/install-tools.sh",
+    "docker/php/php-fpm-legacy",
+    "docker/php/runtime-lock.json",
+    "docker/php/seed-wordpress.sh",
+    "docker/php/sury-archive-keyring.gpg",
+    "docker/php/sury-packages.txt",
+    "docker/php/tooling-composer.json",
+    "docker/php/tooling-composer.lock",
+    "docker/php/tools-lock.json",
+    "docker/php/wp-config-docker.php",
+    "docker/php/zz-xdebug.ini",
+    "docker/php/xdebug-default.ini",
+    "docker/php/sury-downloads-amd64.txt",
+    "docker/php/UPSTREAM-NOTICES.md",
+    "docker/php/sury-downloads-arm64.txt",
+    "scripts/rollback-runtime.py",
+    "docker/php/xdebug.ini"
   ],
   "installer": [
     "docker-prune.service",
@@ -97,6 +128,7 @@
     "spawnwp-telemetry.timer",
     "spawnwp-update.service",
     "telemetry.py",
-    "wp-cockpit.service"
+    "wp-cockpit.service",
+    "migrations/prepare-trixie-runtimes.py"
   ]
 }

@@ -2,124 +2,87 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, ExitStack
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-
-path = Path(__file__).parents[1] / "scripts/php-switch-progress.py"
-spec = importlib.util.spec_from_file_location("php_switch_progress", path)
-progress = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(progress)
-
-
-class FakeProcess:
-    def __init__(self, lines, returncode=0):
-        self.stdout = iter(lines)
-        self.returncode = returncode
-
-    def wait(self):
-        return self.returncode
-
+path=Path(__file__).parents[1]/'scripts/php-switch-progress.py'
+spec=importlib.util.spec_from_file_location('php_switch_progress',path)
+progress=importlib.util.module_from_spec(spec);spec.loader.exec_module(progress)
+OLD='wp-dev-php:8.3-trixie-aaaaaaaaaaaa'
+NEW='wp-dev-php:8.4-trixie-bbbbbbbbbbbb'
 
 class PhpSwitchProgressTests(unittest.TestCase):
-    def test_php_85_is_supported(self):
-        self.assertIn("8.5", progress.ALLOWED)
-
-    def project(self, root: Path) -> Path:
-        project = root / "site"
-        project.mkdir()
-        (project / "compose.yaml").write_text("services: {}\n")
-        (project / ".env").write_text("PHP_VERSION=8.3\nWORDPRESS_SERIES=7\n")
+    def fixture(self,root):
+        project=root/'site';project.mkdir();(project/'compose.yaml').write_text('services: {}\n')
+        (project/'.env').write_text('PHP_VERSION=8.3\nWP_VERSION=7.0.1\nPHP_IMAGE_REF='+OLD+'\n')
+        (project/'.spawnwp').mkdir();(project/'.spawnwp/runtime-migrated.json').write_text('{}')
         return project
 
-    def test_structured_build_progress_is_monotonic(self):
-        lines = [
-            json.dumps({"id": "pull", "status": "Downloading", "current": 25, "total": 100}) + "\n",
-            json.dumps({"id": "pull", "status": "Downloading", "current": 80, "total": 100}) + "\n",
-            json.dumps({"id": "export", "status": "Exporting layers"}) + "\n",
-        ]
-        output = StringIO()
-        with mock.patch.object(progress.subprocess, "Popen", return_value=FakeProcess(lines)), redirect_stdout(output):
-            self.assertEqual(0, progress.command(["docker"], Path("/tmp"), structured=True))
-        events = [json.loads(line.removeprefix(progress.PREFIX)) for line in output.getvalue().splitlines()]
-        percentages = [event["percent"] for event in events if event["type"] == "progress" and event["percent"] is not None]
-        self.assertEqual(percentages, sorted(percentages))
+    def mocks(self,running=True):
+        stack=ExitStack()
+        def run(args,**kwargs):
+            return SimpleNamespace(returncode=0,stdout='php\nnginx\n' if args[:3]==['docker','compose','ps'] and running else '')
+        stack.enter_context(mock.patch.object(progress.subprocess,'run',side_effect=run))
+        stack.enter_context(mock.patch.object(progress.subprocess,'check_output',return_value='sha256:old'))
+        stack.enter_context(mock.patch.object(progress,'image_identity',return_value=('wp-dev-php:8.4-wp7.0.1','-wp7.0.1','abc123')))
+        stack.enter_context(mock.patch.object(progress,'prepare',return_value=NEW))
+        stack.enter_context(mock.patch.object(progress,'preserve',return_value=OLD))
+        stack.enter_context(mock.patch.object(progress,'metric_incr'))
+        return stack
 
-    def test_failed_first_build_restores_environment(self):
+    def test_supported_versions(self):
+        self.assertEqual({'7.4','8.2','8.3','8.4','8.5'},progress.ALLOWED)
+
+    def test_failed_build_does_not_change_selection_or_start_services(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            project = self.project(root)
-            output = StringIO()
-            with mock.patch.object(progress.subprocess, "run",
-                                   return_value=SimpleNamespace(returncode=1, stdout="")), \
-                 mock.patch.object(progress, "command", return_value=1), redirect_stdout(output):
-                result = progress.switch(project, "8.4", root / "locks")
-            self.assertEqual(1, result)
-            self.assertEqual("PHP_VERSION=8.3\nWORDPRESS_SERIES=7\n", (project / ".env").read_text())
+            root=Path(tmp);project=self.fixture(root);original=(project/'.env').read_text()
+            with self.mocks(),mock.patch.object(progress,'prepare',side_effect=RuntimeError('build failed')),\
+                 mock.patch.object(progress,'run_simple') as execute,redirect_stdout(StringIO()):
+                self.assertEqual(1,progress.switch(project,'8.4',root/'locks'))
+            self.assertEqual(original,(project/'.env').read_text());execute.assert_not_called()
 
-    def test_cached_switch_reaches_complete(self):
+    def test_running_site_checks_http_before_completion(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            project = self.project(root)
-            output = StringIO()
-            with mock.patch.object(progress.subprocess, "run",
-                                   return_value=SimpleNamespace(returncode=0, stdout="")), \
-                 mock.patch.object(progress, "run_simple", return_value=0), \
-                 mock.patch.object(progress, "healthy", return_value=True), redirect_stdout(output):
-                result = progress.switch(project, "8.4", root / "locks")
-            self.assertEqual(0, result)
-            self.assertIn("PHP_VERSION=8.4", (project / ".env").read_text())
-            self.assertIn('"type":"complete"', output.getvalue())
+            root=Path(tmp);project=self.fixture(root);out=StringIO()
+            with self.mocks(),mock.patch.object(progress,'run_simple',return_value=0) as execute,\
+                 mock.patch.object(progress,'healthy',return_value=True),\
+                 mock.patch.object(progress,'site_ready',return_value=True) as ready,redirect_stdout(out):
+                self.assertEqual(0,progress.switch(project,'8.4',root/'locks'))
+            self.assertIn('PHP_IMAGE_REF='+NEW,(project/'.env').read_text());ready.assert_called_once()
+            self.assertIn('"type":"complete"',out.getvalue())
+            self.assertIn('--no-deps',execute.call_args.args[0]);self.assertIn('--no-build',execute.call_args.args[0])
+            self.assertIn('WP_IMAGE_SUFFIX=-wp7.0.1',(project/'.env').read_text())
 
-    def test_switching_a_down_site_does_not_start_it(self):
+    def test_down_site_remains_down(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            project = self.project(root)
-            output = StringIO()
-            with mock.patch.object(progress.subprocess, "run",
-                                   return_value=SimpleNamespace(returncode=0, stdout="")), \
-                 mock.patch.object(progress, "run_simple") as run_simple, \
-                 mock.patch.object(progress, "healthy") as healthy, redirect_stdout(output):
-                result = progress.switch(project, "8.4", root / "locks")
-            self.assertEqual(0, result)
-            run_simple.assert_not_called()
-            healthy.assert_not_called()
-            self.assertIn("site remains Down", output.getvalue())
+            root=Path(tmp);project=self.fixture(root)
+            with self.mocks(running=False),mock.patch.object(progress,'run_simple') as execute,\
+                 mock.patch.object(progress,'site_ready') as ready,redirect_stdout(StringIO()):
+                self.assertEqual(0,progress.switch(project,'8.4',root/'locks'))
+            execute.assert_not_called();ready.assert_not_called()
+            self.assertIn(NEW,(project/'.env').read_text())
 
-    def test_switch_stamps_the_context_hash_and_the_image_suffix(self):
-        """A switch must build with SPAWNWP_CONTEXT_HASH set.
-
-        It used to build without it, so compose stamped the image label "dev" and
-        every later deploy on that PHP version saw a cache miss and rebuilt from
-        scratch (~5 min). It must also record WP_IMAGE_SUFFIX, which is how compose
-        resolves the image tag — sites created before 0.5.20 have no such line.
-        """
+    def test_failed_http_rolls_back_exact_image(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            project = self.project(root)
-            (project / ".env").write_text("PHP_VERSION=8.3\nWP_VERSION=7.0.1\n")
-            answers = {"tag": "wp-dev-php:8.4-wp7.0.1", "suffix": "-wp7.0.1", "hash": "abc123def456"}
+            root=Path(tmp);project=self.fixture(root)
+            with self.mocks(),mock.patch.object(progress,'run_simple',return_value=0) as execute,\
+                 mock.patch.object(progress,'healthy',return_value=True),\
+                 mock.patch.object(progress,'site_ready',side_effect=[False,True]),redirect_stdout(StringIO()):
+                self.assertEqual(1,progress.switch(project,'8.4',root/'locks'))
+            self.assertIn('PHP_IMAGE_REF='+OLD,(project/'.env').read_text())
+            self.assertIn('PHP_VERSION=8.3',(project/'.env').read_text());self.assertEqual(2,execute.call_count)
+            history=json.loads((project/'.spawnwp/runtime-history.json').read_text())
+            self.assertEqual(OLD,history[0]['previous_ref'])
 
-            def fake_run(args, **kwargs):
-                if args[:2] == ["bash", "scripts/lib-image.sh"]:
-                    return SimpleNamespace(returncode=0, stdout=answers[args[2]] + "\n")
-                if args[:3] == ["docker", "image", "inspect"]:
-                    return SimpleNamespace(returncode=0, stdout="abc123def456\n")
-                return SimpleNamespace(returncode=0, stdout="")
+    def test_unaccepted_legacy_does_not_prepare_an_image(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);project=self.fixture(root)
+            with self.mocks(),mock.patch.object(progress,'accepts_image',return_value=False),\
+                 mock.patch.object(progress,'prepare') as prepare,redirect_stdout(StringIO()):
+                self.assertEqual(2,progress.switch(project,'7.4',root/'locks'))
+            prepare.assert_not_called()
 
-            output = StringIO()
-            with mock.patch.object(progress.subprocess, "run", side_effect=fake_run), \
-                 mock.patch.object(progress, "run_simple", return_value=0), \
-                 mock.patch.object(progress, "healthy", return_value=True), \
-                 mock.patch.dict(progress.os.environ, {}, clear=False), redirect_stdout(output):
-                result = progress.switch(project, "8.4", root / "locks")
-                self.assertEqual("abc123def456", progress.os.environ["SPAWNWP_CONTEXT_HASH"])
-            self.assertEqual(0, result)
-            self.assertIn("WP_IMAGE_SUFFIX=-wp7.0.1", (project / ".env").read_text())
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__=='__main__':unittest.main()

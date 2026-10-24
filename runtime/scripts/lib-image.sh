@@ -22,8 +22,8 @@ PHP_IMAGE_REPO=wp-dev-php
 # zz-site.ini is deliberately absent: it is a per-site runtime mount, not a build
 # input, so a custom PHP setting must not force an image rebuild.
 # installer/tests/static.sh asserts this list covers every COPY in the Dockerfile.
-SPAWNWP_IMAGE_INPUTS=(Dockerfile php.ini opcache.ini xdebug.ini phpstan-wp.neon)
-SPAWNWP_PHP_SECURITY_POLICY=php2shell-2026-10-21
+SPAWNWP_IMAGE_INPUTS=(Dockerfile Dockerfile.legacy UPSTREAM-NOTICES.md build-pcntl.sh docker-entrypoint.sh fpm-healthcheck fpm-legacy.conf install-legacy.sh install-tools.sh opcache.ini php-fpm-legacy php.ini phpstan-wp.neon runtime-lock.json seed-wordpress.sh sury-archive-keyring.gpg sury-downloads-amd64.txt sury-downloads-arm64.txt sury-packages.txt tooling-composer.json tooling-composer.lock tools-lock.json wp-config-docker.php xdebug-default.ini)
+SPAWNWP_PHP_SECURITY_POLICY=trixie-2026-10-24
 
 # "" for latest/unset, "-wp<version>" for a pinned WordPress. Anything that is not
 # a plain dotted version is treated as latest rather than smuggled into a tag.
@@ -68,7 +68,7 @@ spawnwp_prune_image_context() {
   local dir="$1/docker/php" keep name
   [ -d "$dir" ] || return 0
   # zz-site.ini is not a build input but IS needed at runtime (it is bind-mounted).
-  keep=" ${SPAWNWP_IMAGE_INPUTS[*]} zz-site.ini "
+  keep=" ${SPAWNWP_IMAGE_INPUTS[*]} zz-site.ini zz-xdebug.ini xdebug.ini "
   while IFS= read -r -d '' entry; do
     name=${entry##*/}
     [[ "$keep" == *" $name "* ]] || rm -rf "$entry"

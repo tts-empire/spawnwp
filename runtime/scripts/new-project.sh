@@ -105,7 +105,7 @@ WP_ADMIN_USER="${NAME}-$(openssl rand -hex 3)"
 # Copy stack structure
 mkdir -p "${PROJ_DIR}"
 PROJECT_CREATED=1
-cp compose.yaml "${PROJ_DIR}/"
+cp compose.yaml php_security.py runtime_images.py runtime_migration.py service_images.py "${PROJ_DIR}/"
 cp -r docker "${PROJ_DIR}/"
 # Pre-0.3.13 stacks mounted a docker/mariadb/custom.cnf that never existed, so
 # Docker auto-created an empty DIRECTORY with that name; don't propagate it.
@@ -115,6 +115,7 @@ rm -rf "${PROJ_DIR}/docker/mariadb/custom.cnf"
 # hash, and cost it a needless 5-minute rebuild — plus break cache sharing with
 # every other site. write_php_ini below re-creates zz-site.ini.
 spawnwp_prune_image_context "${PROJ_DIR}"
+cp docker/php/xdebug-default.ini "${PROJ_DIR}/docker/php/zz-xdebug.ini"
 cp Makefile "${PROJ_DIR}/"
 cp -r scripts "${PROJ_DIR}/"
 write_php_ini "${PROJ_DIR}"
@@ -269,42 +270,25 @@ cd "${PROJ_DIR}"
 # call: images past SPAWNWP_IMAGE_MAX_AGE_DAYS (default 7) are only FLAGGED as
 # stale — the cockpit's System info tab offers a manual Refresh; nothing rebuilds
 # automatically. Escape hatch: SPAWNWP_REBUILD=1 forces a fresh build.
-IMAGE=$(spawnwp_image_tag "${PHP_VERSION}" "${WP_VERSION}")
 if [ "${PHP_VERSION}" = "7.4" ] && [ "${SPAWNWP_ACCEPT_VULNERABLE_PHP:-0}" != "1" ]; then
-  echo "ERROR: PHP 7.4 is a vulnerable legacy runtime. Review the English LAB warning and accept the risk before continuing." >&2
-  exit 1
+  echo "ERROR: PHP 7.4 requires explicit legacy LAB acceptance." >&2; exit 1
 fi
-CONTEXT_HASH=$(spawnwp_context_hash "${WP_VERSION}")
-export SPAWNWP_CONTEXT_HASH="$CONTEXT_HASH"
-MAX_AGE_DAYS="${SPAWNWP_IMAGE_MAX_AGE_DAYS:-7}"
-NEED_BUILD=0
+export SPAWNWP_CONTEXT_HASH=$(spawnwp_context_hash "${WP_VERSION}")
 BUILD_ARGS=()
-if [ "${SPAWNWP_REBUILD:-0}" = "1" ]; then
-  echo "==> SPAWNWP_REBUILD=1: forcing a fresh php image build..."
-  NEED_BUILD=1; BUILD_ARGS=(--pull)
-elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo "==> php image ${IMAGE} not present: building (first use of PHP ${PHP_VERSION})..."
-  NEED_BUILD=1; BUILD_ARGS=(--pull)
-else
-  IMAGE_HASH=$(docker image inspect -f '{{index .Config.Labels "org.spawnwp.context-hash"}}' "$IMAGE" 2>/dev/null || true)
-  CREATED=$(docker image inspect -f '{{.Created}}' "$IMAGE")
-  AGE_DAYS=$(( ( $(date +%s) - $(date -d "$CREATED" +%s) ) / 86400 ))
-  if [ "$IMAGE_HASH" != "$CONTEXT_HASH" ]; then
-    echo "==> php build context or security policy changed: pulling and rebuilding ${IMAGE}..."
-    NEED_BUILD=1; BUILD_ARGS=(--pull)
-  elif [ "$AGE_DAYS" -ge "$MAX_AGE_DAYS" ]; then
-    echo "==> Reusing php image ${IMAGE} (stale: ${AGE_DAYS} days old)."
-  else
-    echo "==> Reusing php image ${IMAGE} (context unchanged, ${AGE_DAYS}d old)."
-  fi
+if [ "${SPAWNWP_REBUILD:-0}" = "1" ]; then BUILD_ARGS=(--refresh); fi
+python3 scripts/prepare-image.py --project . --version "$PHP_VERSION" --wordpress "$WP_VERSION" \
+  "${BUILD_ARGS[@]}" --output-ref .spawnwp/prepared-image
+IMAGE=$(cat .spawnwp/prepared-image)
+if [ "$PHP_VERSION" = "7.4" ]; then
+  python3 - "$IMAGE" "${SPAWNWP_ACCEPTED_IMAGE_ID:-}" <<'VERIFY'
+import sys
+from php_security import accepts_image
+if not accepts_image(sys.argv[1], True, sys.argv[2]):
+    raise SystemExit("Prepared image changed: review and accept its exact identity before creating a legacy site")
+VERIFY
 fi
-if [ "$NEED_BUILD" = "1" ]; then
-  docker compose build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} php
-  # Trim the BuildKit cache now that the image is tagged. 'until' counts from last
-  # use, so the layers this build just touched survive and future rebuilds still
-  # hit the cache; only stale orphaned layers are dropped.
-  docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
-fi
+printf '\nPHP_IMAGE_REF=%s\n' "$IMAGE" >> .env
+export PHP_IMAGE_REF="$IMAGE"
 
 # Deterministic two-phase startup. On the FIRST run the WordPress entrypoint
 # extracts the whole install into the empty volume (thousands of files): under
@@ -485,4 +469,5 @@ echo "      User: ${WP_ADMIN_USER}"
 echo "      Pass: ${WP_ADMIN_PASS}"
 echo "    Blueprint: ${BLUEPRINT_NAME} ${BLUEPRINT_VERSION}"
 
+printf '{"image_ref":"%s"}\n' "$PHP_IMAGE_REF" > .spawnwp/runtime-migrated.json
 FINISHED=1

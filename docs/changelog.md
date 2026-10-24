@@ -4,6 +4,17 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.53
+
+- **Debian 13 PHP images.** All five runtime branches target Trixie. PHP 7.4 uses audited
+  Sury backports, verified by exact package revision and installed binary checksums.
+- **Immutable runtime selection.** Preparing an image is separate from applying it.
+  Runtime updates check FastCGI, HTTP and database readiness and retain rollback images.
+- **Stack compatibility.** Nginx 1.30.6 is prepared independently, debugger settings are
+  mounted per site, and captured blueprints receive Mailpit capture before activation.
+- **Controlled migration.** Existing sites retain their selected images and settings;
+  customized runtime files require review. See [migration guidance](runtime-migration.md).
+
 ## 0.5.52
 
 - **PHP2Shell security fixes.** New and refreshed PHP images require the upstream fixed release for

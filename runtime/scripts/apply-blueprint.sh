@@ -9,6 +9,8 @@ if [ ! -f "$MANIFEST" ]; then
   exit 1
 fi
 
+install -D -o 33 -g 33 -m 0644 scripts/mail-capture.php projects/primary/wp-content/mu-plugins/mail-capture.php
+
 SCHEMA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema_version", 1))' "$MANIFEST")
 if [ "$SCHEMA" = "2" ]; then
   exec bash scripts/apply-content-blueprint.sh "$MANIFEST"
@@ -54,7 +56,6 @@ if [ -n "$BLUEPRINT_THEME" ]; then
 fi
 
 echo "==> Wiring outgoing mail to Mailpit..."
-install -D -o 33 -g 33 -m 0644 scripts/mail-capture.php projects/primary/wp-content/mu-plugins/mail-capture.php
 
 if [ "$BLUEPRINT_DEVKIT" = "1" ]; then
   echo "==> Installing SpawnWP development toolkit..."

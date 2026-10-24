@@ -305,6 +305,12 @@ def run_migrations(release: Path, manifest: dict) -> None:
             raise UpdateError((result.stderr or result.stdout or f"Migration failed: {relative}").strip())
 
 
+def mutable_runtime_file(entry: dict) -> bool:
+    return entry["target_root"] == "runtime" and entry["target"] in {
+        "docker/php/zz-site.ini", "docker/php/zz-xdebug.ini", "docker/php/xdebug.ini",
+    }
+
+
 def activate(release: Path, *, rollback: bool = False) -> None:
     manifest = json.loads((release / "manifest.json").read_text())
     current_manifest = {}
@@ -319,13 +325,15 @@ def activate(release: Path, *, rollback: bool = False) -> None:
     snapshot_targets(all_entries, backup)
     try:
         for entry in manifest["files"]:
+            if mutable_runtime_file(entry) and (TARGETS[entry["target_root"]] / entry["target"]).exists():
+                continue
             atomic_copy(
                 release / entry["source"],
                 TARGETS[entry["target_root"]] / entry["target"],
                 int(entry.get("mode", "0644"), 8),
             )
         for entry in all_entries:
-            if (entry["target_root"], entry["target"]) not in new_targets:
+            if (entry["target_root"], entry["target"]) not in new_targets and not mutable_runtime_file(entry):
                 (TARGETS[entry["target_root"]] / entry["target"]).unlink(missing_ok=True)
         health_check()
         run_migrations(release, manifest)

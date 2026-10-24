@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keep the official image's command/configuration contract with Sury's binary.
+export PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d:/usr/local/etc/php/fpm-conf.d
+exec /usr/sbin/php-fpm7.4 --fpm-config /usr/local/etc/php-fpm.conf "$@"

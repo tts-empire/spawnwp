@@ -60,15 +60,17 @@ Compose projects with the actual security/resource limits and tests FPM/CLI,
 WordPress, MariaDB, Redis, Mailpit, Adminer, backup/restore, INI overrides, Xdebug and
 standard/imported blueprints. Reports are uploaded as CI artifacts.
 
-Before release promotion also complete host installation/update checks, all PHP
-transition pairs, repeated warm-deploy benchmarks (no unexplained median regression
-above 15%), and the plugin transfer fixture. Exercise one legacy, one modern, and one
-imported clone in staging: apply the migration, check the site and its dependent
-services, verify backup/restore and rollback, then remove the clones. This is a
-targeted acceptance run; a fixed 24-hour soak is optional and should be reserved for
-changes that affect long-running jobs or integrations that the functional checks do
-not cover. After promotion, use the normal deployment monitoring and rollback
-procedure rather than blocking release on an arbitrary waiting period.
+Before publication, install the signed candidate on the development Cockpit using
+the local-bundle update path. Confirm the Cockpit health check passes, the existing
+environment remains healthy with its selected images unchanged, and the runtime
+migration review status is visible. Image builds, all PHP transition pairs and the
+warm-deploy comparison are covered by the native amd64/arm64 CI workflows above.
+
+The migration never switches an existing environment's PHP image automatically.
+Each site owner chooses when to prepare and apply a runtime; the site backup and
+rollback path protect that explicit change. There is no fixed staging soak or
+three-clone release gate for this runtime update. Follow normal Cockpit monitoring
+after publication and use the documented rollback path if a site reports a problem.
 
 ## Updating locked inputs
 

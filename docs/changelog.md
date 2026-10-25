@@ -7,7 +7,12 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 ## 0.5.53
 
 - **Debian 13 PHP images.** All five runtime branches target Trixie. PHP 7.4 uses audited
-  Sury backports, verified by exact package revision and installed binary checksums.
+  Sury backports for CVE-2026-109618 and CVE-2026-109619, verified by exact package
+  revisions and installed binary checksums. PHP 7.4 is end-of-life; these fixes do not
+  make it generally supported or suitable for production.
+- **Existing sites are not switched automatically.** Updating SpawnWP keeps each site's
+  current PHP image. To move a site to a Debian 13 image, prepare the runtime and apply it
+  to that site in Cockpit. Adminer images are updated separately.
 - **Immutable runtime selection.** Preparing an image is separate from applying it.
   Runtime updates check FastCGI, HTTP and database readiness and retain rollback images.
 - **Stack compatibility.** Nginx 1.30.6 is prepared independently, debugger settings are

@@ -1,0 +1,44 @@
+name: Runtime images
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'runtime/docker/**'
+      - 'runtime/compose.yaml'
+      - 'runtime/*images.py'
+      - 'runtime/php_security.py'
+      - 'runtime/scripts/**'
+      - 'runtime/tests/integration/**'
+      - '.github/workflows/runtime-images.yml'
+permissions:
+  contents: read
+jobs:
+  runtime:
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        php: ['7.4', '8.2', '8.3', '8.4', '8.5']
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build and verify both WordPress variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          for wordpress in latest 7.0.1; do
+            sudo python3 runtime/scripts/prepare-image.py --project runtime --version '${{ matrix.php }}' --wordpress "$wordpress" --output-ref /tmp/runtime-image-ref
+            image=$(sudo cat /tmp/runtime-image-ref)
+            sudo python3 runtime/tests/integration/runtime_smoke.py --image "$image" --php '${{ matrix.php }}' --report "$PWD/reports/${wordpress}.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-${{ matrix.php }}-${{ matrix.runner }}
+          path: reports/

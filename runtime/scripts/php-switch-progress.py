@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from php_security import accepts_image
+from runtime_images import prepare, preserve, selected, write_atomic as save_atomic
 
 PREFIX = "::spawnwp-event::"
 ALLOWED = {"7.4", "8.2", "8.3", "8.4", "8.5"}
@@ -167,6 +168,9 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock"),
     if version not in ALLOWED:
         emit("error", message="Unsupported PHP version")
         return 2
+    if (project / ".spawnwp" / "runtime-migration-required.json").exists():
+        emit("error", message="Customized runtime files require migration review before switching")
+        return 2
     env_path = project / ".env"
     if not env_path.is_file() or not (project / "compose.yaml").is_file():
         emit("error", message="Invalid SpawnWP environment")
@@ -194,56 +198,104 @@ def switch(project: Path, version: str, lock_root: Path = Path("/run/lock"),
         # tag encodes it, so the target tag has to be derived from both.
         wp_version = env_value(original, "WP_VERSION", "latest") or "latest"
         image, wp_suffix, context_hash = image_identity(project, version, wp_version)
+        os.environ["SPAWNWP_CONTEXT_HASH"] = context_hash
         if version == "7.4" and not accepts_image(image, accept_vulnerable, accepted_image_id):
             emit("error", message="PHP 7.4 is a vulnerable legacy runtime. Review the English LAB warning and explicitly accept the exact image before continuing.")
             return 2
-        inspected = subprocess.run(
-            ["docker", "image", "inspect", "-f", '{{index .Config.Labels "org.spawnwp.context-hash"}}', image],
-            capture_output=True, text=True,
-        )
-        cached = inspected.returncode == 0 and inspected.stdout.strip() == context_hash
-        emit("start", previous=previous, target=version, first_download=not cached)
+        previous_env = dict(line.split("=",1) for line in original.splitlines()
+                            if "=" in line and not line.startswith("#"))
+        # Freeze the previous image before preparing can move a floating alias,
+        # including a same-version refresh of a Down site.
+        try:
+            old_reference = selected(previous_env)
+            if php_was_running:
+                cid = subprocess.check_output(["docker","compose","ps","-q","php"],cwd=project,text=True).strip()
+                old_reference = subprocess.check_output(["docker","inspect","-f","{{.Image}}",cid],text=True).strip()
+            previous_ref = preserve(old_reference, previous, wp_version)
+        except Exception as exc:
+            emit("error", message="Previous image could not be retained: " + str(exc), previous=previous)
+            return 1
+        emit("start", previous=previous, target=version)
+        # Build and verify before touching the site's environment or live containers.
+        try:
+            target = prepare(project, version, wp_version,
+                             log=lambda line: emit("log", line=line))
+            if version == "7.4" and not accepts_image(target, accept_vulnerable, accepted_image_id):
+                raise RuntimeError("The prepared legacy image changed; review and accept its exact identity")
+        except Exception as exc:
+            emit("error", message=str(exc), previous=previous)
+            return 1
         updated = replace_env(original, "PHP_VERSION", version)
-        # Also (re)write WP_IMAGE_SUFFIX: sites created before 0.5.20 don't have
-        # it, and compose needs it to resolve the same tag we just computed.
         updated = replace_env(updated, "WP_IMAGE_SUFFIX", wp_suffix)
-        write_atomic(env_path, updated)
-        # Without this the build stamps the label "dev" and poisons the cache for
-        # every later deploy on this PHP version.
-        os.environ["SPAWNWP_CONTEXT_HASH"] = context_hash
-
+        updated = replace_env(updated, "PHP_IMAGE_REF", target)
+        rollback = original
         started = False
         try:
-            if cached:
-                emit("progress", phase="cache", percent=82, message=f"PHP {version} image is already available", indeterminate=False)
-            else:
-                emit("progress", phase="download", percent=None, message=f"First use of PHP {version}: downloading and compiling the image", indeterminate=True)
-                if command(["docker", "compose", "--progress", "json", "build", "--pull", "php"], project, structured=True) != 0:
-                    raise RuntimeError("The PHP image build failed")
+            rollback = replace_env(original, "PHP_IMAGE_REF", previous_ref)
+            record = project / ".spawnwp" / "runtime-rollback.json"
+            entry = {"previous_ref":previous_ref, "environment":rollback,
+                     "created_at":time.time(), "retain_until":time.time()+14*86400}
+            save_atomic(record, json.dumps(entry)+"\n")
+            history_path = project / ".spawnwp" / "runtime-history.json"
+            history = json.loads(history_path.read_text()) if history_path.exists() else []
+            history = [item for item in history if item.get("retain_until",0)>time.time()]
+            history.append({key:value for key,value in entry.items() if key!="environment"})
+            save_atomic(history_path,json.dumps(history)+"\n")
+            if not (project / ".spawnwp" / "runtime-migrated.json").exists():
+                emit("progress", phase="backup", percent=84, message="Saving the complete pre-migration backup", indeterminate=True)
+                if run_simple(["python3","scripts/backup-runtime.py"], project):
+                    raise RuntimeError("Pre-migration backup failed; runtime not changed")
+            write_atomic(env_path, updated)
             if not php_was_running:
                 metric_incr("php_switches")
-                emit(
-                    "complete", phase="complete", percent=100,
-                    message=f"PHP {version} is selected; the site remains Down",
-                )
+                emit("complete", phase="complete", percent=100,
+                     message=f"PHP {version} is selected; the site remains Down")
                 return 0
-            emit("progress", phase="start", percent=88, message="Restarting the PHP service", indeterminate=False)
+            emit("progress", phase="start", percent=88, message="Starting the verified PHP image", indeterminate=False)
             started = True
-            if run_simple(["docker", "compose", "up", "-d", "--force-recreate", "php"], project) != 0:
+            if run_simple(["docker","compose","up","-d","--no-deps","--no-build","--force-recreate","php"], project):
                 raise RuntimeError("The PHP service could not be started")
-            emit("progress", phase="health", percent=95, message="Waiting for the PHP health check", indeterminate=True)
             if not healthy(project):
                 raise RuntimeError("PHP did not become healthy in time")
+            if not site_ready(project):
+                raise RuntimeError("WordPress did not pass HTTP/database readiness checks")
+            save_atomic(project / ".spawnwp" / "runtime-migrated.json", json.dumps({"image_ref":target,"applied_at":time.time()})+"\n")
             metric_incr("php_switches")
             emit("complete", phase="complete", percent=100, message=f"PHP {version} is active")
             return 0
         except Exception as exc:
-            write_atomic(env_path, original)
-            emit("log", line=f"Restored PHP_VERSION={previous}")
+            write_atomic(env_path, rollback if started else original)
             if started and php_was_running:
-                run_simple(["docker", "compose", "up", "-d", "--force-recreate", "php"], project)
+                restored = run_simple(["docker","compose","up","-d","--no-deps","--no-build","--force-recreate","php"], project)
+                if restored or not healthy(project) or not site_ready(project):
+                    emit("error", message="Rollback could not restore site readiness; previous image and backup retained", previous=previous)
+                    return 1
             emit("error", message=str(exc), previous=previous)
             return 1
+
+
+def site_ready(project: Path) -> bool:
+    # nginx resolves the php service name when it loads its configuration.
+    # Replacing FPM can change its IP, so a graceful reload is required.
+    services = subprocess.run(["docker","compose","ps","--services","--filter","status=running"],
+                              cwd=project,capture_output=True,text=True)
+    if "nginx" in services.stdout.split():
+        for args in (["docker","compose","exec","-T","nginx","nginx","-t"],
+                     ["docker","compose","exec","-T","nginx","nginx","-s","reload"]):
+            if run_simple(args,project):
+                return False
+        check = ["docker","compose","exec","-T","php","php","-r",
+                 '$c=stream_context_create(["http"=>["timeout"=>15,"follow_location"=>0,"ignore_errors"=>true]]);'
+                 '$r=file_get_contents("http://nginx/",false,$c);'
+                 'exit($r!==false && preg_match("~^HTTP/[^ ]+ [23][0-9]{2}~",$http_response_header[0]??"")?0:1);']
+        for attempt in range(15):
+            if run_simple(check,project)==0:
+                break
+            time.sleep(2)
+        else:
+            return False
+    return run_simple(["docker","compose","exec","-T","-u","www-data","php",
+                       "wp","db","query","SELECT 1","--skip-column-names"],project)==0
 
 
 def main() -> int:

@@ -6,6 +6,7 @@
 #   - it is at least N days old.
 # The next deploy on a deleted version simply rebuilds it (~5 min).
 set -euo pipefail
+cd "$(dirname "$0")/.."
 source /etc/spawnwp/config.env
 
 N="${SPAWNWP_IMAGE_AUTODELETE_DAYS:-0}"
@@ -25,16 +26,20 @@ fi
 # under `set -euo pipefail` that would kill the GC outright — the same trap that
 # made System → Refresh die with "Exited with code 2".
 declare -A USED
-for env_file in /srv/*/.env; do
-  [ -f "$env_file" ] || continue
-  ver=$(grep -E '^PHP_VERSION=' "$env_file" | head -1 | cut -d= -f2 || true)
-  suffix=$(grep -E '^WP_IMAGE_SUFFIX=' "$env_file" | head -1 | cut -d= -f2 || true)
-  [ -n "$ver" ] && USED["${ver}${suffix}"]=1
-done
+# Failure to read rollback state aborts GC rather than deleting unverified images.
+REFERENCES=$(python3 - <<'PYREF'
+from pathlib import Path
+from runtime_images import references
+print("\n".join(references([p for p in Path("/srv").iterdir() if (p/"compose.yaml").is_file()])))
+PYREF
+)
+while IFS= read -r tag; do
+  [ -z "$tag" ] || USED["$tag"]=1
+done <<< "$REFERENCES"
 
 now=$(date +%s)
 for tag in $(docker image ls wp-dev-php --format '{{.Tag}}'); do
-  [[ "$tag" =~ ^[0-9]+\.[0-9]+(-wp[0-9.]+)?$ ]] || continue
+  [[ "$tag" =~ ^[0-9]+\.[0-9]+(-wp[0-9.]+)?(-trixie-[a-f0-9]{12,64})?$ ]] || continue
   if [ -n "${USED[$tag]:-}" ]; then
     echo "image-gc: keep wp-dev-php:${tag} (in use)"
     continue

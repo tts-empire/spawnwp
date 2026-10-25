@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "from_release": "0.5.52",
+  "managed": {
+    "Makefile": [
+      "79a39215f4f984755cc09a74ef5c1dc58482b99a546b685cb0d008f92365a98a"
+    ],
+    "php_security.py": [
+      "371c5807f0fe128e1250600ae6636472127a20e71ea7c27cbc8fe31d125328b8"
+    ],
+    "compose.yaml": [
+      "1b71fe04d8c9b1fc985bb399e905468178dd8aabb4b37a979da9128a435d9b8f"
+    ],
+    "docker/php/Dockerfile": [
+      "acf52e769222e4699441d064aafd95c3059e3fad11e2537620cdcef051944cb0"
+    ],
+    "docker/php/opcache.ini": [
+      "8f8c2cfb9f6159b0fe409affa9a1d18fd472616f9f25ac9dff042cd0dedfe72c"
+    ],
+    "docker/php/php.ini": [
+      "987fa4defe1fc1def5a850a89f084cf7eb7aeedb6db29acaf0e7771e7700e5b0"
+    ],
+    "docker/php/phpstan-wp.neon": [
+      "63991d77deab1887219a465f1528206370cd64129ab77603abf2c21638495f66"
+    ],
+    "scripts/apply-blueprint.sh": [
+      "37abc3cb6d64fadd8b3f728ee4bf4f7f45ca0da399bac46e4a072cbffda4d3a5"
+    ],
+    "scripts/apply-content-blueprint.sh": [
+      "eaa1a3c4756c937dfad4fed23ba5f4edd3c6cb052a8fc8da92d12bdadb479d09"
+    ],
+    "scripts/bootstrap.sh": [
+      "a184999a56efa4feeb67d18b78eb9d3bc24ffdacd56a9d39910b3ba7822051da"
+    ],
+    "scripts/blueprint.py": [
+      "f0a5171e24b80237d5aec1fd19456faa2d4a5a9d1d945b8f8f5cbcf20ed4bace"
+    ],
+    "scripts/blueprint-safety-notice.php": [
+      "7e7f3e0fec267e9e6fb8170b55abc3a903b2f56b2f4a6f9a3fc5316a3cc41db7"
+    ],
+    "scripts/devkit.php": [
+      "9b6782b7cd5adf8a97ba2f402655769135e20279897d69b7dbf613730e1f2493"
+    ],
+    "scripts/mail-capture.php": [
+      "d273e2246d114714f0b39b420ddcdfe5a67e68c74dc5db2e06b18b23574d826a"
+    ],
+    "scripts/destroy-project.sh": [
+      "2d9c33491e93c2a08d6fc912f9943beebe3fc2e2631e6896bdbf82ea9df3dc92"
+    ],
+    "scripts/image-gc.sh": [
+      "6735163f760996a0d8fb0b8a0e13f240c9996c2d47bcac6ae25dfbca119578de"
+    ],
+    "scripts/import-database.php": [
+      "068f8476fc8090195ea1ad0fe646a5501a6234d6a7800d84115e4e7c52597cf4"
+    ],
+    "scripts/lib-image.sh": [
+      "cc8823767c6161c619a78d56806f7e60a7aa1382e3e7a1da8ba869785d03ffbf"
+    ],
+    "scripts/lib-metrics.sh": [
+      "c0e27e666cb752b1ada809a850bba6d054e92ab8691e46fffb9273715c190f05"
+    ],
+    "scripts/lib-php-ini.sh": [
+      "f5b21e90e89ffcb760f0493cb3544cc0c7140b7bf23bad4959b4ba143f882d8e"
+    ],
+    "scripts/new-project.sh": [
+      "eaad5ac9f6854ddb5ab64a3bddc6950cf8811b1a1dabf8bc2979e347b5fd06df"
+    ],
+    "scripts/php-ini-apply.sh": [
+      "86ee6388ba82094c6e6c8e68f050682ba39f25a574ff62a10d934f987870fd9d"
+    ],
+    "scripts/refresh-image.sh": [
+      "492efa1ee0cd0b8f93e70740f0919985ab148140753a1566b69eeee531110ced"
+    ],
+    "scripts/refresh-adminer-image.sh": [
+      "b9619a45a965723c77a98258c9fb1c4e4d142ecb93ae307b6a42610a224cebe5"
+    ],
+    "scripts/site-expiry.sh": [
+      "ebee95bff0e8d13b32cb904d31518011946cdb0890c4809c9a0aa6be1ccfd826"
+    ],
+    "scripts/php-switch-progress.py": [
+      "b109c82acd4f657028517f1ee062c409784f3ae074d53f14d75d9f79f66d4ac5"
+    ],
+    "scripts/reset.sh": [
+      "393a743bfabae27d3ffcb84679cb7b350c86d00570f1b70374cecab6f1816d5c"
+    ],
+    "scripts/restore.sh": [
+      "d75b646f2d2c72d70e4a982ea1d9bb422530a741001a7df5b8cad1db46d53cdb"
+    ],
+    "scripts/snapshot.sh": [
+      "80a0a56a2bbc534483603c1cffd323949650235e2849b06218794d0ef3c2233c"
+    ],
+    "scripts/wait-for-wordpress.sh": [
+      "f5f72cde24e0b25d17fe6e4cfb0fda5c4bc1dc4e21db84d84788932407e78c0a"
+    ],
+    "mu-plugins/spawnwp-autologin.php": [
+      "fea7568cb9fa4fb5865f3146f25297ed4f3a2fbd0303b63e03ea5e570a1c96a6"
+    ],
+    "mu-plugins/spawnwp-restricted-admin.php": [
+      "e24da700098b780724f66053579697df9075a055c70a5bde35d6c4a19d84ca47"
+    ],
+    "runtime_images.py": [],
+    "runtime_migration.py": [],
+    "service_images.py": [],
+    "scripts/prepare-image.py": [],
+    "scripts/backup-runtime.py": [],
+    "docker/php/Dockerfile.legacy": [],
+    "docker/php/build-pcntl.sh": [],
+    "docker/php/docker-entrypoint.sh": [],
+    "docker/php/fpm-healthcheck": [],
+    "docker/php/fpm-legacy.conf": [],
+    "docker/php/install-legacy.sh": [],
+    "docker/php/install-tools.sh": [],
+    "docker/php/php-fpm-legacy": [],
+    "docker/php/runtime-lock.json": [],
+    "docker/php/seed-wordpress.sh": [],
+    "docker/php/sury-archive-keyring.gpg": [],
+    "docker/php/sury-packages.txt": [],
+    "docker/php/tooling-composer.json": [],
+    "docker/php/tooling-composer.lock": [],
+    "docker/php/tools-lock.json": [],
+    "docker/php/wp-config-docker.php": [],
+    "docker/php/xdebug-default.ini": [],
+    "docker/php/sury-downloads-amd64.txt": [],
+    "docker/php/UPSTREAM-NOTICES.md": [],
+    "docker/php/sury-downloads-arm64.txt": [],
+    "scripts/rollback-runtime.py": []
+  }
+}

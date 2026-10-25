@@ -1,0 +1,47 @@
+name: Runtime transitions
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/runtime-transitions.yml'
+      - 'runtime/tests/integration/runtime_transitions.py'
+permissions:
+  contents: read
+jobs:
+  transitions:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Prepare all five runtime images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          for php in 7.4 8.2 8.3 8.4 8.5; do
+            sudo python3 runtime/scripts/prepare-image.py --project runtime --version "$php" --output-ref /tmp/runtime-image-ref
+            sudo python3 - "$php" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path=Path('/tmp/transition-images.json')
+          data=json.loads(path.read_text()) if path.exists() else {}
+          data[sys.argv[1]]=Path('/tmp/runtime-image-ref').read_text().strip()
+          path.write_text(json.dumps(data))
+          PY
+          done
+      - name: Verify all 20 ordered transitions, rollback and Down behavior
+        run: |
+          image=$(sudo python3 -c 'import json; print(json.load(open("/tmp/transition-images.json"))["8.4"])')
+          sudo python3 runtime/tests/integration/runtime_smoke.py --image "$image" --php 8.4 --transition-images /tmp/transition-images.json --report "$PWD/reports/transitions.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transitions-${{ matrix.runner }}
+          path: reports/

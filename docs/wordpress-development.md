@@ -73,7 +73,7 @@ directory:
 
     ```bash
     docker compose exec -u www-data php \
-      phpstan analyse -c /usr/local/etc/phpstan-wp.neon --memory-limit=512M path/to/plugin
+      phpstan analyse -c /usr/local/etc/phpstan-wp.neon --memory-limit=320M path/to/plugin
     ```
 
 ## Email testing

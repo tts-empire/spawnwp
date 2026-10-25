@@ -15,7 +15,7 @@ class ChangelogTests(unittest.TestCase):
 
     def test_latest_release_and_module_boundary_are_documented(self) -> None:
         headings = re.findall(r"^## (\d+\.\d+\.\d+)$", self.text, flags=re.MULTILINE)
-        self.assertEqual(headings[0], "0.5.52")
+        self.assertEqual(headings[0], (ROOT / "VERSION").read_text().strip())
         self.assertIn("existing core functionality", self.text)
         self.assertIn("without payment or a subscription", self.text)
         self.assertIn("Future separately signed", self.text)

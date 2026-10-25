@@ -57,16 +57,16 @@ grep -q 'php_security.py' "$ROOT/updater/managed-files.json"
 # a refactor that drops any of these silently breaks FTPS again.
 grep -q 'libssl-dev' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q '8.4.27' "$ROOT/runtime/docker/php/Dockerfile"
-grep -q 'php2shell-2026-10-21' "$ROOT/runtime/docker/php/Dockerfile"
+grep -q 'trixie-2026-10-24' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q 'org.spawnwp.php-security-policy' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-ftp-ssl' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q -- '--with-openssl-dir' "$ROOT/runtime/docker/php/Dockerfile"
 grep -q 'pdo_mysql' "$ROOT/runtime/docker/php/Dockerfile"
-grep -Fq 'https://wordpress.org/wordpress-${WORDPRESS_VERSION}.zip' "$ROOT/runtime/docker/php/Dockerfile" || {
+grep -Fq 'https://wordpress.org/wordpress-${version}.zip' "$ROOT/runtime/docker/php/seed-wordpress.sh" || {
   echo "ERROR: pinned WordPress builds must use the long-path-safe official ZIP" >&2
   exit 1
 }
-grep -Fq 'find /usr/src/wordpress -mindepth 1 -maxdepth 1 ! -name wp-config-docker.php -exec rm -rf -- {} +' "$ROOT/runtime/docker/php/Dockerfile" || {
+grep -Fq 'find /usr/src/wordpress -mindepth 1 -maxdepth 1 ! -name wp-config-docker.php -exec rm -rf -- {} +' "$ROOT/runtime/docker/php/seed-wordpress.sh" || {
   echo "PHP image must clear the bundled core before installing an exact WordPress version" >&2
   exit 1
 }
@@ -127,7 +127,7 @@ LIB_IMAGE="$ROOT/runtime/scripts/lib-image.sh"
 grep -q 'spawnwp_image_tag'    "$LIB_IMAGE"
 grep -q 'spawnwp_context_hash' "$LIB_IMAGE"
 grep -q 'WP_IMAGE_SUFFIX' "$ROOT/runtime/compose.yaml"
-grep -q 'image: wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}' "$ROOT/runtime/compose.yaml"
+grep -q 'image: ${PHP_IMAGE_REF:-wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}}' "$ROOT/runtime/compose.yaml"
 grep -q 'WP_IMAGE_SUFFIX' "$ROOT/runtime/scripts/new-project.sh"
 grep -q 'IMAGE_TAG_RE' "$ROOT/runtime/app.py"
 grep -q '_image_tags_in_use'  "$ROOT/runtime/app.py"
@@ -178,7 +178,7 @@ if [ "$(grep -c 'listen \(\[::\]:\)\?443 ssl http2;' "$ROOT/installer/nginx.conf
   exit 1
 fi
 
-grep -q 'First use of PHP' "$ROOT/runtime/scripts/php-switch-progress.py"
+grep -q 'First use of PHP' "$ROOT/runtime/runtime_images.py"
 grep -q 'Show technical details' "$ROOT/runtime/assets/cockpit.js"
 # Manage dashboard: resilient refresh + collapse + filter (0.5.14).
 grep -q 'function filterProjects' "$ROOT/runtime/assets/cockpit.js"
@@ -309,6 +309,18 @@ grep -q 'installer/migrations/add-ram-admission-limits.py' "$ROOT/updater/build-
   echo "ERROR: the RAM admission migration is missing from the release manifest" >&2
   exit 1
 }
+python3 - "$ROOT/updater/build-release.py" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+start = source.index('"migrations": [')
+end = source.index('],', start)
+migrations = source[start:end]
+pin = migrations.index('installer/migrations/prepare-trixie-runtimes.py')
+recreate = migrations.index('installer/migrations/enable-site-cron-and-mail-capture.py')
+if pin > recreate:
+    raise SystemExit('runtime images must be pinned before the WP-Cron migration can recreate PHP')
+PY
 
 # GitHub issue #13: the edge nginx proxying to a WordPress site had no explicit
 # proxy_read_timeout/proxy_send_timeout, so it fell back to nginx's compiled-in

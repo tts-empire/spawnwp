@@ -3,7 +3,7 @@ name: ${COMPOSE_PROJECT_NAME:-wp-dev}
 services:
 
   nginx:
-    image: nginx:1.26-alpine
+    image: ${NGINX_IMAGE_REF:-nginx:1.30.6-alpine3.24@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:80"
@@ -25,7 +25,7 @@ services:
           cpus: "0.5"
           memory: 128M
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      test: ["CMD", "curl", "-fsS", "--max-time", "4", "-o", "/dev/null", "http://127.0.0.1/"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -36,12 +36,9 @@ services:
       start_period: 60s
 
   php:
-    build:
-      context: ./docker/php
-      args:
-        PHP_VERSION: ${PHP_VERSION:-8.3}
-        WORDPRESS_VERSION: ${WP_VERSION:-latest}
-        SPAWNWP_CONTEXT_HASH: ${SPAWNWP_CONTEXT_HASH:-dev}
+    # Images are prepared and verified by prepare-image.py. Compose never builds
+    # directly into an immutable site reference or implicitly pulls a missing one.
+    pull_policy: never
     # The tag carries the WordPress version because the image CONTENT does: the
     # Dockerfile bakes WORDPRESS_VERSION into /usr/src/wordpress. Keyed on PHP
     # alone, a `latest` site and one pinning WP 7.0.1 shared this single mutable
@@ -49,16 +46,18 @@ services:
     # occasionally bringing a recreated site back up on another site's core.
     # WP_IMAGE_SUFFIX lives in .env (written by new-project.sh) so that every
     # entry point — make up, php-switch, the cockpit — resolves the same tag.
-    image: wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}
+    image: ${PHP_IMAGE_REF:-wp-dev-php:${PHP_VERSION:-8.3}${WP_IMAGE_SUFFIX:-}}
     restart: unless-stopped
     extra_hosts:
       - "${DOMAIN:-dev.example.com}:host-gateway"
+      - "host.docker.internal:host-gateway"
     volumes:
       - wp_data:/var/www/html
       - ./projects/primary/wp-content:/var/www/html/wp-content
       # Per-site PHP overrides (cockpit "PHP settings"): conf.d loads alphabetically,
       # so zz- wins over the baked custom.ini without rebuilding the shared image.
       - ./docker/php/zz-site.ini:/usr/local/etc/php/conf.d/zz-site.ini:ro
+      - ./docker/php/zz-xdebug.ini:/usr/local/etc/php/conf.d/zz-xdebug.ini:ro
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${DB_NAME}
@@ -76,8 +75,8 @@ services:
         // php.ini display_errors (the Deploy "display_errors" dev toggle) rather
         // than WordPress's default-on, so a stray plugin notice never breaks the
         // page by emitting output before headers.
-        define('WP_DEBUG_LOG', true);
-        define('WP_DEBUG_DISPLAY', null);
+        if (!defined('WP_DEBUG_LOG')) { define('WP_DEBUG_LOG', true); }
+        if (!defined('WP_DEBUG_DISPLAY')) { define('WP_DEBUG_DISPLAY', null); }
         define('WP_HOME', '${WP_HOME}');
         define('WP_SITEURL', '${WP_SITEURL}');
         define('SPAWNWP_DEPLOY_HEALTHCHECK_URL', 'http://nginx/');
@@ -107,7 +106,7 @@ services:
           cpus: "1.0"
           memory: ${SPAWNWP_PHP_CONTAINER_MEMORY:-512M}
     healthcheck:
-      test: ["CMD", "php-fpm", "-t"]
+      test: ["CMD-SHELL", "if command -v fpm-healthcheck >/dev/null 2>&1; then fpm-healthcheck; else php-fpm -t; fi"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -117,7 +116,7 @@ services:
       start_period: 60s
 
   db:
-    image: mariadb:10.11
+    image: ${MARIADB_IMAGE_REF:-mariadb:10.11@sha256:5a5c675881ef3fd1c1da9b0a3bfd6ee82edbe39cd9e32e06be18034c37235e0e}
     restart: unless-stopped
     volumes:
       - db_data:/var/lib/mysql
@@ -145,7 +144,7 @@ services:
       start_period: 30s
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: ${MAILPIT_IMAGE_REF:-axllent/mailpit@sha256:37a38e48e9338cd7e89dfeb487f37b02ebfcd9cb23111bed2d345e79d37d6dd6}
     restart: unless-stopped
     environment:
       # Persistence: mail survives restart/reboot (SQLite on a volume)
@@ -177,7 +176,7 @@ services:
       retries: 3
 
   adminer:
-    image: adminer:5
+    image: ${ADMINER_IMAGE_REF:-adminer:5@sha256:87f9aeeef91638f5bc150bb6490a4fd85d071f458f38dcc8171a640e1751d29b}
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: db
@@ -204,7 +203,8 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7-alpine
+    user: redis
+    image: ${REDIS_IMAGE_REF:-redis:7.4.11-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541}
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 128mb --maxmemory-policy allkeys-lru
     networks:

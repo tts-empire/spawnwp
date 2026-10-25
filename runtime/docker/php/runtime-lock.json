@@ -1,0 +1,246 @@
+{
+  "schema": 1,
+  "os": "trixie",
+  "wordpress_source_commit": "c8b214cc10dae78c4a7c9e1d98ee104e0f027441",
+  "sury_core_version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+  "packages": {
+    "amd64": {
+      "php7.4-bcmath": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "2c481551116c9294bcb84cc7b1c00865b44cb0d8c5f5855831df092b97edbe16",
+        "Filename": "pool/main/p/php7.4/php7.4-bcmath_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-cli": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "a36d158b8b0a11125b4a65da73f409e8d64e22c9e831d502095a28f0b4b8c86d",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-common": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "2eefefa1d2852008921b5ce7491ec1a57a0bfe6409f6382deed0be6110d0f2c9",
+        "Filename": "pool/main/p/php7.4/php7.4-common_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-curl": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "4283565ec82b72af095a840affc2bdc3d1d7356d28f3a2f00808cbfb1d2828a8",
+        "Filename": "pool/main/p/php7.4/php7.4-curl_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-dev": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "46818aa559826fa7c391cedcff0cf4f7ef0a2fb95698ddd569a7d50cd5b1cc3d",
+        "Filename": "pool/main/p/php7.4/php7.4-dev_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-fpm": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "bc0fd2419b62d25891d13133749a89c313bd7490795a78e8aaa3be842b5b8659",
+        "Filename": "pool/main/p/php7.4/php7.4-fpm_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-gd": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "4bc3e44d0127526981462491f405e5ea8caa1575d48386510c27ffedccbf7751",
+        "Filename": "pool/main/p/php7.4/php7.4-gd_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-gmp": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "526e86cbd245571cc90f39c4aba343c19e630d25d7090b365e2e7504df1d0df9",
+        "Filename": "pool/main/p/php7.4/php7.4-gmp_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-imagick": {
+        "Version": "3.8.1-1+0~20260621.55+debian13~1.gbpde1d95",
+        "SHA256": "82103336eee3364b9e59f1347d49b1f63571b821599122a6b076bc5aeb11ea1f",
+        "Filename": "pool/main/p/php-imagick/php7.4-imagick_3.8.1-1+0~20260621.55+debian13~1.gbpde1d95_amd64.deb"
+      },
+      "php7.4-intl": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "4f03b84c866fcaa6a26d69b5d757c4a4ede264c1d9c71a56fd427a3e290f70af",
+        "Filename": "pool/main/p/php7.4/php7.4-intl_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-json": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "d7d77d8d9c91e0aa11688cb4b7752690ab36afb99e37b71655f586968cfaa7f2",
+        "Filename": "pool/main/p/php7.4/php7.4-json_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-mbstring": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "1f3a0491123237b5c27c765ce0096799157f504b74cb83341aa46e327612506d",
+        "Filename": "pool/main/p/php7.4/php7.4-mbstring_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-mysql": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "6642bfba4af9592b83e894ddba20b695d274c13e4272b31df8b7252fa20eec67",
+        "Filename": "pool/main/p/php7.4/php7.4-mysql_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-opcache": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "1144b4a2ed0d42ea5a96c489a045cb337dfd6786476fdc4bfeb1f1c5ff7c5bb2",
+        "Filename": "pool/main/p/php7.4/php7.4-opcache_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-redis": {
+        "Version": "6.3.0-2+0~20260711.69+debian13~1.gbpd148c3",
+        "SHA256": "795a3ee2b57d359d8922f31b85eaa7e9b58f59aca127107f3f13ce7d5ad47049",
+        "Filename": "pool/main/p/php-redis/php7.4-redis_6.3.0-2+0~20260711.69+debian13~1.gbpd148c3_amd64.deb"
+      },
+      "php7.4-soap": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "2df999c8674f2d2373c68ea0ae2aa7865dcd06be9ecdf4e3150e462eab775246",
+        "Filename": "pool/main/p/php7.4/php7.4-soap_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-sqlite3": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "db8565987a85848a9d48b151079eded641cc1e39a89c4686bdec38da3385eaf3",
+        "Filename": "pool/main/p/php7.4/php7.4-sqlite3_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-xdebug": {
+        "Version": "1:3.1.6-2+0~20260712.9+debian13~1.gbp7a343a",
+        "SHA256": "b4df10e3ba33753dd0f82ccb781861256d1414d4c2935115caec7fd542c373f4",
+        "Filename": "pool/main/x/xdebug-3-1/php7.4-xdebug_3.1.6-2+0~20260712.9+debian13~1.gbp7a343a_amd64.deb"
+      },
+      "php7.4-xml": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "3e5d95ba16eb49cbdc4459b4253e14080df2fb9b565b03047f092fc1827ed0e9",
+        "Filename": "pool/main/p/php7.4/php7.4-xml_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-zip": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "766b18ec809506afd9bd04d554a66e0da3aaae92a64cd59098c130a5523c8081",
+        "Filename": "pool/main/p/php7.4/php7.4-zip_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      },
+      "php7.4-igbinary": {
+        "Version": "3.2.16-6+0~20260709.60+debian13~1.gbp1eff65",
+        "SHA256": "c8a988b60c5161cf0ff15d95f17818a39c32a5cee5886c98abf56fa76da2fc20",
+        "Filename": "pool/main/p/php-igbinary/php7.4-igbinary_3.2.16-6+0~20260709.60+debian13~1.gbp1eff65_amd64.deb"
+      },
+      "php7.4-readline": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "79ea6ef9b504433ec842c88250f690d4c1964d205f423de624578efc0ad2a1f3",
+        "Filename": "pool/main/p/php7.4/php7.4-readline_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb"
+      }
+    },
+    "arm64": {
+      "php7.4-bcmath": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "e4dbcd42ad9f02036d8e8b94cd43500d20d063832ea218d2b242cb6970c79898",
+        "Filename": "pool/main/p/php7.4/php7.4-bcmath_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-cli": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "a49c4472b1b2aa94226daaad7e2b3552e4a3b1a1d4f937b95e03357ae88abc09",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-common": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "3ee4645b2799d20cdb893d5a559ae9d3f6d5b7a93307403359fc07e5bd006f6f",
+        "Filename": "pool/main/p/php7.4/php7.4-common_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-curl": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "4a5be91dd0b62e0b8b17a6feda5ed0fdbcc9ffc1343ae551722f91fbab65ea0e",
+        "Filename": "pool/main/p/php7.4/php7.4-curl_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-dev": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "f810f7b6c6384515ae5872509e0f5298887e19d52642a3b0cbed98aff1512894",
+        "Filename": "pool/main/p/php7.4/php7.4-dev_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-fpm": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "02b02a64edac6cb0d3d4fb88148ffa98482fe91c5aa8bb26b0e082127a634d9d",
+        "Filename": "pool/main/p/php7.4/php7.4-fpm_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-gd": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "bb91c274c7de40038de30753142338a0629361c2413817e4b5e450c0eed84353",
+        "Filename": "pool/main/p/php7.4/php7.4-gd_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-gmp": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "f74213e589966db6f34b27c37f94c2f6a23d901e4c061b4dffdc61637e8c5b2a",
+        "Filename": "pool/main/p/php7.4/php7.4-gmp_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-imagick": {
+        "Version": "3.8.1-1+0~20260621.55+debian13~1.gbpde1d95",
+        "SHA256": "65b5c6cae37938208da0ef0be7da6a61debf70c191f71e5233eeaaf04b27b1ab",
+        "Filename": "pool/main/p/php-imagick/php7.4-imagick_3.8.1-1+0~20260621.55+debian13~1.gbpde1d95_arm64.deb"
+      },
+      "php7.4-intl": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "5d739a997f63e1a8c7eb1058b31b8bf003efeacbe238f48f27d181413ac78458",
+        "Filename": "pool/main/p/php7.4/php7.4-intl_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-json": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "abb4de98ed5053e8f6921e96e72c0048e6e29c238b6c54124ec91b054b3636bb",
+        "Filename": "pool/main/p/php7.4/php7.4-json_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-mbstring": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "4c5258d974c8d7c92c90340e7ea524a25f0eeb3fc9a7d9eda34fc8e3153a0b3a",
+        "Filename": "pool/main/p/php7.4/php7.4-mbstring_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-mysql": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "f0b7a96a0e6330202db45a83b4e8c58dded6b467c75a597c90e6a08dbc14ce4c",
+        "Filename": "pool/main/p/php7.4/php7.4-mysql_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-opcache": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "de83368311145221d2d045471899eba590256828d0f45d695193b42f9ff25d93",
+        "Filename": "pool/main/p/php7.4/php7.4-opcache_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-redis": {
+        "Version": "6.3.0-2+0~20260711.69+debian13~1.gbpd148c3",
+        "SHA256": "ac06fcf810d954a42402a2857fdd32e2b9b9db67620303c15cc7f52e1ed14aae",
+        "Filename": "pool/main/p/php-redis/php7.4-redis_6.3.0-2+0~20260711.69+debian13~1.gbpd148c3_arm64.deb"
+      },
+      "php7.4-soap": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "95d3a19ce4d499812808476d90f5954a10f569d79f0b6aa2fe74abe688ccc475",
+        "Filename": "pool/main/p/php7.4/php7.4-soap_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-sqlite3": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "a42ac21c6cdcf72a3f34344752d8f4995b4b2709ff103e2fd93b3580dd2b9c25",
+        "Filename": "pool/main/p/php7.4/php7.4-sqlite3_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-xdebug": {
+        "Version": "1:3.1.6-2+0~20260712.9+debian13~1.gbp7a343a",
+        "SHA256": "928c409cf98a2111f37594ab88f3076cdc51993164948932b28716818a4c6e93",
+        "Filename": "pool/main/x/xdebug-3-1/php7.4-xdebug_3.1.6-2+0~20260712.9+debian13~1.gbp7a343a_arm64.deb"
+      },
+      "php7.4-xml": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "6abfc571835d48bf6cd4607b1c30733ce04ee056979b11d4c7d35bb57b4aff9a",
+        "Filename": "pool/main/p/php7.4/php7.4-xml_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-zip": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "f40d9acda3f3e2e244461c4e943d1d91aa9e8f34722e8cf53b018404c8cb5de5",
+        "Filename": "pool/main/p/php7.4/php7.4-zip_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      },
+      "php7.4-igbinary": {
+        "Version": "3.2.16-6+0~20260709.60+debian13~1.gbp1eff65",
+        "SHA256": "40ba5dd781291ce5e24885ff285bdf08556898eb733e28352985b4104a779cfd",
+        "Filename": "pool/main/p/php-igbinary/php7.4-igbinary_3.2.16-6+0~20260709.60+debian13~1.gbp1eff65_arm64.deb"
+      },
+      "php7.4-readline": {
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "SHA256": "9e1d76022fb483e4b21e4ac5f0864640ac2263cf04664462b9b5839052063a8f",
+        "Filename": "pool/main/p/php7.4/php7.4-readline_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_arm64.deb"
+      }
+    }
+  },
+  "images": {
+    "legacy": "debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad",
+    "8.2": "wordpress:php8.2-fpm@sha256:5eaa8d6476c800b71d6d6d1e4b26fac781b80a1204ac4d21488e0b61e3638443",
+    "8.3": "wordpress:php8.3-fpm@sha256:788d6b34cb89997483ff2a08e2e04d1df28ce284ca046cd7990b0be10828c5b9",
+    "8.4": "wordpress:php8.4-fpm@sha256:41fcfa8617e811e41516783bda46046f0945d94d547f346617bbea5e189b30bc",
+    "8.5": "wordpress:php8.5-fpm@sha256:cab80f4ea62719ac35c3c4d58d984b00761a64ac1c2efe2041e55897ee1bd0a2",
+    "nginx": "nginx:1.30.6-alpine3.24@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951",
+    "redis": "redis:7.4.11-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541",
+    "mariadb": "mariadb:10.11@sha256:5a5c675881ef3fd1c1da9b0a3bfd6ee82edbe39cd9e32e06be18034c37235e0e",
+    "mailpit": "axllent/mailpit@sha256:37a38e48e9338cd7e89dfeb487f37b02ebfcd9cb23111bed2d345e79d37d6dd6",
+    "adminer": "adminer:5@sha256:87f9aeeef91638f5bc150bb6490a4fd85d071f458f38dcc8171a640e1751d29b"
+  },
+  "sury_key_fingerprint": "15058500A0235D97F5D10063B188E2B695BD4743",
+  "sury_key_sha256": "b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c"
+}

@@ -33,6 +33,7 @@ from capacity import (
     reserve_new_project, reserve_php_resize, reserve_project_start,
 )
 from php_security import accepts_image, image_report, status as php_security_status
+from runtime_images import selected as selected_php_image, TAG_RE as RUNTIME_TAG_RE, references as image_references
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -54,7 +55,7 @@ app.include_router(ingest_router)
 # writes (whose paths carry a {project} segment, matched by regex).
 DESTRUCTIVE_PATHS = {"/api/destroy", "/api/restore", "/api/php-switch", "/api/update/apply",
                      "/api/images/delete", "/api/images/refresh", "/api/blueprint-pairings",
-                     "/api/images/refresh-adminer", "/api/adminer-update",
+                     "/api/images/refresh-adminer", "/api/adminer-update", "/api/nginx-update",
                      "/api/snapshots/delete"}
 FILE_WRITE_RE = re.compile(r"^/api/files/[^/]+/(write|upload|delete|rename|mkdir|unzip)$")
 MODULE_MUTATION_RE = re.compile(r"^/api/modules(?:/[^/]+)?(?:/(?:enable|disable|update))?$|^/api/modules/catalog/install$")
@@ -568,21 +569,11 @@ def list_projects():
 
         # Report the runtime actually executing in each web-serving container.
         # Image tags alone cannot prove the PHP patch level because Docker tags float.
-        php_security = image_report(
-            f"wp-dev-php:{env.get('PHP_VERSION', '8.3')}{env.get('WP_IMAGE_SUFFIX', '')}"
-        )
-        adminer_security = {"status": "unverified", "php_full_version": "unknown"}
+        reference = selected_php_image(env)
         running = {c.get("name") for c in containers if "Up" in c.get("status", "")}
-        if "php" in running:
-            try:
-                runtime = subprocess.run(
-                    ["docker", "compose", "exec", "-T", "php", "php", "-r", "echo PHP_VERSION;"],
-                    cwd=proj, capture_output=True, text=True, timeout=10,
-                )
-                if runtime.returncode == 0:
-                    php_security = php_security_status(runtime.stdout.strip())
-            except (OSError, subprocess.TimeoutExpired):
-                php_security = php_security_status(None)
+        php_container = next((c["container"] for c in containers if c["name"] == "php" and c["name"] in running), "")
+        php_security = image_report(reference, container=php_container)
+        adminer_security = {"status": "unverified", "php_full_version": "unknown"}
         if "adminer" in running:
             try:
                 runtime = subprocess.run(
@@ -630,7 +621,14 @@ def list_projects():
             "php_full_version": php_security.get("php_full_version", "unknown"),
             "php_security_status": php_security["status"],
             "php_image_id": php_security.get("image_id", ""),
-            "php_image_tag": env.get("PHP_VERSION", "?") + env.get("WP_IMAGE_SUFFIX", ""),
+            "php_image_tag": reference.split(":", 1)[-1],
+            "php_image_ref": reference,
+            "runtime_migration_required": (proj / ".spawnwp" / "runtime-migration-required.json").exists(),
+            "php_legacy": php_security.get("legacy", env.get("PHP_VERSION") == "7.4"),
+            "php_os_version": php_security.get("os_version", "unknown"),
+            "php_runtime_provider": php_security.get("runtime_provider", "unknown"),
+            "php_package_version": php_security.get("runtime_package_version", ""),
+            "php_cve_fixes": php_security.get("cve_fixes", {}),
             "adminer_php_full_version": adminer_security.get("php_full_version", "unknown"),
             "adminer_php_security_status": adminer_security["status"],
             "port": env.get("WEB_PORT", "?"),
@@ -844,12 +842,14 @@ def php_switch(body: PhpSwitch):
         raise HTTPException(400, "Invalid PHP version")
     guard_not_busy()
     proj = resolve_project(body.project)
+    if (proj / ".spawnwp" / "runtime-migration-required.json").exists():
+        raise HTTPException(409, "This site has customized runtime files that require migration review")
     wp_version = _read_env(proj).get("WP_VERSION", "latest") or "latest"
     suffix = run(["bash", "scripts/lib-image.sh", "suffix", wp_version], PRIMARY_PROJECT).strip()
     image = f"wp-dev-php:{body.version}{suffix}"
     if body.version == "7.4" and not accepts_image(
             image, body.accept_vulnerable_runtime, body.accepted_image_id):
-        raise HTTPException(409, "PHP 7.4 is vulnerable. Review the English LAB warning and accept the exact image before continuing.")
+        raise HTTPException(409, "PHP 7.4 is an EOL runtime. Review its verified patch status and accept the exact image for isolated LAB use.")
     args = ["python3", str(PHP_SWITCH_TOOL), "--project", str(proj), "--version", body.version]
     if body.accept_vulnerable_runtime:
         args.extend(["--accept-vulnerable", "--accepted-image-id", body.accepted_image_id])
@@ -1002,7 +1002,7 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, 
         suffix = "" if resolved["selected_wp"] == "latest" else f"-wp{resolved['selected_wp']}"
         image = f"wp-dev-php:{selected_php}{suffix}"
         if not accepts_image(image, body.accept_vulnerable_runtime, body.accepted_image_id):
-            raise HTTPException(409, "PHP 7.4 is vulnerable. Review the English LAB warning and accept the exact image before continuing.")
+            raise HTTPException(409, "PHP 7.4 is an EOL runtime. Review its verified patch status and accept the exact image for isolated LAB use.")
     guard_not_busy()
     guard_capacity()
     if is_project(PROJECTS_ROOT / name):
@@ -1027,6 +1027,7 @@ def prepare_new_project(body: NewProject) -> tuple[str, list[str], dict | None, 
         env["SPAWNWP_INSTALL_DEPLOY_PLUGIN"] = "1"
     if body.accept_vulnerable_runtime:
         env["SPAWNWP_ACCEPT_VULNERABLE_PHP"] = "1"
+        env["SPAWNWP_ACCEPTED_IMAGE_ID"] = body.accepted_image_id
     if body.deactivate_plugins:
         env["SPAWNWP_DEACTIVATE_PLUGINS"] = "1"
     command = [
@@ -2185,7 +2186,7 @@ PHP_VER_RE = re.compile(r"^[0-9]+\.[0-9]+$")
 # The image content depends on it (the Dockerfile bakes WORDPRESS_VERSION in), so
 # the tag must too — otherwise pinned and latest sites re-tag one shared name from
 # under each other and rebuild forever. See runtime/scripts/lib-image.sh.
-IMAGE_TAG_RE = re.compile(r"^([0-9]+\.[0-9]+)(?:-wp([0-9.]+))?$")
+IMAGE_TAG_RE = RUNTIME_TAG_RE
 
 
 def _config_env_get(key: str, default: str) -> str:
@@ -2230,13 +2231,10 @@ def _image_tags_in_use() -> dict[str, list[str]]:
     the image GC and the delete button removing an image out from under a running
     site, so it has to describe reality rather than intent.
     """
-    used: dict[str, list[str]] = {}
-    for proj in get_projects():
-        env = _read_env(proj)
-        ver = env.get("PHP_VERSION", "")
-        if ver:
-            used.setdefault(ver + env.get("WP_IMAGE_SUFFIX", ""), []).append(proj.name)
-    return used
+    try:
+        return image_references(get_projects())
+    except (OSError, ValueError, TypeError) as exc:
+        raise HTTPException(409, "Image references could not be verified; image deletion is disabled") from exc
 
 
 @app.get("/api/images")
@@ -2334,40 +2332,22 @@ def update_adminer(body: AdminerUpdate):
         raise HTTPException(404, "Project not found")
     guard_not_busy()
 
-    # Verify the exact pulled image immediately before replacing a site's
-    # Adminer container. The command is fixed, networkless and read-only.
+    from service_images import update
     try:
-        probe = subprocess.run(
-            ["docker", "run", "--rm", "--network", "none", "--read-only",
-             "--memory", "128m", "--cpus", "0.5", "--pids-limit", "16",
-             "--user", "65534:65534", "--cap-drop", "ALL",
-             "--security-opt", "no-new-privileges",
-             "--entrypoint", "php", "adminer:5", "-r", "echo PHP_VERSION;"],
-            capture_output=True, text=True, timeout=60,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise HTTPException(503, "Unable to verify the prepared Adminer image") from exc
-    adminer_status = php_security_status(probe.stdout.strip() if probe.returncode == 0 else None)
-    if adminer_status["status"] != "patched":
-        raise HTTPException(409, "The prepared Adminer image does not have a verified PHP security fix")
+        return update(project, "adminer")
+    except Exception as exc:
+        raise HTTPException(409, str(exc)) from exc
 
-    result = subprocess.run(
-        ["docker", "compose", "up", "-d", "--force-recreate", "--no-deps", "adminer"],
-        cwd=project, capture_output=True, text=True, timeout=180,
-    )
-    if result.returncode != 0:
-        raise HTTPException(500, result.stderr.strip() or "Unable to update Adminer")
+
+@app.post("/api/nginx-update")
+def update_nginx(body: AdminerUpdate):
+    project = resolve_project(body.project)
+    guard_not_busy()
+    from service_images import update
     try:
-        runtime = subprocess.run(
-            ["docker", "compose", "exec", "-T", "adminer", "php", "-r", "echo PHP_VERSION;"],
-            cwd=project, capture_output=True, text=True, timeout=15,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise HTTPException(503, "Adminer was recreated, but its runtime could not be verified") from exc
-    verified = php_security_status(runtime.stdout.strip() if runtime.returncode == 0 else None)
-    if verified["status"] != "patched":
-        raise HTTPException(500, "Adminer was recreated, but its PHP security status is not verified")
-    return {"project": project.name, "php_full_version": verified["php_full_version"], "status": "patched"}
+        return update(project, "nginx")
+    except Exception as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 class ImageSettings(BaseModel):

@@ -38,7 +38,9 @@ resolved config actually changed. Non-fatal per site: anything that fails for on
 site is logged and does not stop the migration from continuing to the next one.
 """
 
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +72,36 @@ def is_project(p: Path) -> bool:
 
 
 DISABLE_WP_CRON_LINE = "        define('DISABLE_WP_CRON', true);\n"
+DISABLE_WP_CRON_RE = re.compile(
+    r"define\s*\(\s*['\"]DISABLE_WP_CRON['\"]\s*,\s*(?:true|1)\s*\)", re.IGNORECASE
+)
+
+
+def has_disabled_wp_cron(container_env: list[str]) -> bool:
+    """Inspect only the PHP config extra; never log the container environment."""
+    prefix = "WORDPRESS_CONFIG_EXTRA="
+    for item in container_env:
+        if item.startswith(prefix):
+            return bool(DISABLE_WP_CRON_RE.search(item[len(prefix):]))
+    return False
+
+
+def php_container_still_disables_cron(site: Path) -> bool:
+    """Check live PHP config; on inspection error, keep the safe recreate fallback."""
+    result = subprocess.run(
+        ["docker", "compose", "ps", "-q", "php"], cwd=site,
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return True
+    containers = result.stdout.split()
+    if not containers:
+        return False
+    try:
+        inspected = json.loads(subprocess.check_output(["docker", "inspect", *containers], text=True))
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError):
+        return True
+    return any(has_disabled_wp_cron(item.get("Config", {}).get("Env") or []) for item in inspected)
 
 
 def fix_site(site: Path) -> None:
@@ -93,7 +125,8 @@ def fix_site(site: Path) -> None:
     # "this site needs no recreate": the running container's environment is a
     # separate fact from the file's current content, and wp-dev caught exactly
     # this gap in testing (file already fixed, container still stale). So the
-    # recreate step below is never gated on whether THIS edit changed anything.
+    # recreate step below checks the live PHP environment, not whether THIS edit
+    # changed anything: updater file sync may have removed the line already.
     compose_path = site / "compose.yaml"
     if compose_path.is_file():
         original = compose_path.read_text()
@@ -124,7 +157,8 @@ def fix_site(site: Path) -> None:
         ["docker", "compose", "ps", "--services", "--filter", "status=running"],
         cwd=site, capture_output=True, text=True,
     )
-    if running.returncode == 0 and "php" in running.stdout.split():
+    if (running.returncode == 0 and "php" in running.stdout.split()
+            and php_container_still_disables_cron(site)):
         recreate = subprocess.run(
             ["docker", "compose", "up", "-d", "php"],
             cwd=site, capture_output=True, text=True,

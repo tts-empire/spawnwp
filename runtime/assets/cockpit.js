@@ -1126,7 +1126,8 @@ function renderTop(p) {
         <div class="card-title" role="button" tabindex="0" aria-expanded="true" title="Collapse / expand this site" onclick="toggleCollapse('${p.name}')" onkeydown="collapseKey(event, '${p.name}')"><span class="collapse-toggle" aria-hidden="true">▾</span>${esc(p.name)}</div>
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php_full_version || p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
-        ${p.php_security_status !== 'patched' || p.adminer_php_security_status !== 'patched' ? `<div class="blueprint-warning"><strong>PHP security warning</strong><br>${p.php_security_status === 'vulnerable' ? `This site's PHP ${esc(p.php_full_version)} is vulnerable. ` : p.php_security_status !== 'patched' ? 'The site PHP patch status could not be verified. ' : ''}${p.adminer_php_security_status === 'vulnerable' ? `Adminer PHP ${esc(p.adminer_php_full_version)} is vulnerable. ` : p.adminer_php_security_status === 'unverified' ? 'Adminer PHP patch status could not be verified. ' : ''}Update the runtime before exposing this site to the Internet. For LAB use, keep it isolated and accept the risk.${p.containers.some(c => c.name === 'adminer' && (c.status || '').toLowerCase().startsWith('up')) ? `<br><button class="btn-neutral btn-sm sensitive" onclick="updateAdminer('${p.name}')">Update Adminer</button>` : ''}</div>` : ''}
+        ${p.runtime_migration_required ? '<div class="blueprint-warning">This site has customized runtime configuration. Review its migration before updating PHP.</div>' : ''}
+        ${p.php_legacy || p.php_security_status !== 'patched' || p.adminer_php_security_status !== 'patched' ? `<div class="blueprint-warning"><strong>PHP security warning</strong><br>${p.php_legacy ? 'PHP 7.4 is end-of-life; verified backports do not provide general upstream support. ' : ''}${p.php_security_status === 'vulnerable' ? `This site's PHP ${esc(p.php_full_version)} is vulnerable. ` : p.php_security_status !== 'patched' ? 'The site PHP patch status could not be verified. ' : ''}${p.adminer_php_security_status === 'vulnerable' ? `Adminer PHP ${esc(p.adminer_php_full_version)} is vulnerable. ` : p.adminer_php_security_status === 'unverified' ? 'Adminer PHP patch status could not be verified. ' : ''}Update the runtime before exposing this site to the Internet. For LAB use, keep it isolated and accept the risk.${p.containers.some(c => c.name === 'adminer' && (c.status || '').toLowerCase().startsWith('up')) ? `<br><button class="btn-neutral btn-sm sensitive" onclick="updateAdminer('${p.name}')">Update Adminer</button>` : ''}</div>` : ''}
       </div>
       <span class="card-badges">${groupChip(p)}${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
     </div>
@@ -1135,6 +1136,7 @@ function renderTop(p) {
       <button class="btn-success btn-sm sensitive" onclick="runAction('${p.name}','up')">▶ Up</button>
       <button class="btn-danger btn-sm sensitive" onclick="runAction('${p.name}','down')">■ Down</button>
       <button class="btn-neutral btn-sm sensitive" onclick="runAction('${p.name}','restart')">↺ Restart</button>
+      <button class="btn-neutral btn-sm sensitive" onclick="updateNginx('${p.name}')">Update Nginx</button>
       <button class="btn-neutral btn-sm sensitive" onclick="runAction('${p.name}','snapshot')">💾 Snapshot</button>
       <button class="btn-neutral btn-sm" onclick="showSnapshots('${p.name}')">🕘 Restore</button>
       <button class="btn-neutral btn-sm" onclick="runAction('${p.name}','disk')">📊 Disk</button>
@@ -1565,13 +1567,13 @@ async function phpSwitch(project, version, currentImageTag) {
   let acceptedImageId = '';
   let acceptVulnerableRuntime = false;
   if (version === '7.4') {
-    const suffix = String(currentImageTag || '').replace(/^\d+\.\d+/, '');
+    const suffix = String(currentImageTag || '').replace(/-trixie-[a-f0-9]+$/, '').replace(/^\d+\.\d+/, '');
     const targetTag = `${version}${suffix}`;
     try {
       const data = await fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json());
       acceptedImageId = (data.images || []).find(img => img.image_tag === targetTag)?.image_id || '';
     } catch (_) { /* The server will still require explicit acceptance. */ }
-    const warning = 'WARNING: PHP 7.4 is a vulnerable, unsupported runtime. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
+    const warning = 'WARNING: PHP 7.4 is an unsupported, end-of-life runtime. A verified backport fixes only the documented vulnerabilities. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
     if (!confirm(warning)) return;
     acceptVulnerableRuntime = true;
   }
@@ -1607,7 +1609,7 @@ function createProject(e) {
   let accept_vulnerable_runtime = false;
   let accepted_image_id = '';
   if (php_version === '7.4') {
-    const warning = 'WARNING: PHP 7.4 is a vulnerable, unsupported runtime. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
+    const warning = 'WARNING: PHP 7.4 is an unsupported, end-of-life runtime. A verified backport fixes only the documented vulnerabilities. Use it only in an isolated LAB environment that is not exposed to the Internet. You are responsible for the risk.\n\nI understand the risks and accept responsibility for using this runtime.\n\nContinue with this runtime?';
     if (!confirm(warning)) return;
     accept_vulnerable_runtime = true;
     const blueprintItem = BLUEPRINTS.find(item => item.id === blueprint);
@@ -2820,3 +2822,17 @@ window.addEventListener('beforeunload', event => {
   event.preventDefault();
   event.returnValue = '';
 });
+
+async function updateNginx(project) {
+  if (blockedIfBusy()) return;
+  if (!confirm(`Apply the verified Nginx image to ${project}? This briefly interrupts HTTP requests.`)) return;
+  try {
+    const response = await sensitiveFetch(`${BASE}/nginx-update`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({project}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Unable to update Nginx');
+    showToast('Nginx updated');
+    await loadProjects();
+  } catch (error) { showToast(error.message, true); }
+}

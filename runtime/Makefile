@@ -15,14 +15,14 @@ up:
 	else \
 		echo "PHP image $$VER not cached: the first build may take a few minutes..."; \
 	fi
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --no-build
 	@echo "Stack is up. Run 'make bootstrap' if this is the first start."
 
 # Forced rebuild of the php image (use it after editing the Dockerfile)
 rebuild:
-	$(COMPOSE) build --pull --no-cache php
-	$(COMPOSE) up -d --force-recreate php
-	@echo "php image rebuilt and restarted."
+	@set -e; VER=$$(sed -n 's/^PHP_VERSION=//p' .env); WP=$$(sed -n 's/^WP_VERSION=//p' .env); \
+	python3 scripts/prepare-image.py --project . --version "$$VER" --wordpress "$${WP:-latest}" --refresh; \
+	python3 scripts/php-switch-progress.py --project . --version "$$VER" $(if $(filter 1,$(ACCEPT_VULNERABLE)),--accept-vulnerable --accepted-image-id "$(ACCEPTED_IMAGE_ID)",)
 
 down:
 	$(COMPOSE) down
@@ -47,23 +47,7 @@ php-switch:
 ifndef VER
 	$(error VER is required. Usage: make php-switch VER=8.2)
 endif
-	@if [ "$(VER)" = "7.4" ] && [ "$(ACCEPT_VULNERABLE)" != "1" ]; then echo "PHP 7.4 is a vulnerable, unsupported runtime. Use ACCEPT_VULNERABLE=1 only for an isolated LAB not exposed to the Internet." >&2; exit 2; fi
-	@sed -i "s/^PHP_VERSION=.*/PHP_VERSION=$(VER)/" .env
-	@if [ "$(VER)" = "7.4" ]; then SERIES=6; else SERIES=7; fi; \
-	if grep -q '^WORDPRESS_SERIES=' .env; then \
-		sed -i "s/^WORDPRESS_SERIES=.*/WORDPRESS_SERIES=$$SERIES/" .env; \
-	else \
-		echo "WORDPRESS_SERIES=$$SERIES" >> .env; \
-	fi
-	@echo "Switched PHP_VERSION to $(VER)."
-	@if docker image inspect wp-dev-php:$(VER) >/dev/null 2>&1 && [ "$(VER)" != "7.4" ]; then \
-		echo "Image wp-dev-php:$(VER) already present — skipping the build (instant switch)."; \
-	else \
-		echo "First build for PHP $(VER): base pull + extension compilation, may take a few minutes..."; \
-		$(COMPOSE) build --pull php; \
-	fi
-	$(COMPOSE) up -d --force-recreate php
-	@echo "Done. PHP version is now $(VER)."
+	python3 scripts/php-switch-progress.py --project . --version "$(VER)" $(if $(filter 1,$(ACCEPT_VULNERABLE)),--accept-vulnerable --accepted-image-id "$(ACCEPTED_IMAGE_ID)",)
 
 # ── Development shell & tools ─────────────────────────────────────────────────
 
@@ -119,14 +103,14 @@ lint:
 # ── Xdebug ────────────────────────────────────────────────────────────────────
 
 xdebug-on:
-	@sed -i 's/^;zend_extension=xdebug/zend_extension=xdebug/' docker/php/xdebug.ini
-	@sed -i 's/^;xdebug\./xdebug./' docker/php/xdebug.ini
+	@sed -i 's/^;zend_extension=xdebug/zend_extension=xdebug/' docker/php/zz-xdebug.ini
+	@sed -i 's/^;xdebug\./xdebug./; s/^xdebug.mode=.*/xdebug.mode=debug/' docker/php/zz-xdebug.ini
 	$(COMPOSE) restart php
 	@echo "Xdebug enabled (port 9003)."
 
 xdebug-off:
-	@sed -i 's/^zend_extension=xdebug/;zend_extension=xdebug/' docker/php/xdebug.ini
-	@sed -i 's/^xdebug\./;xdebug./' docker/php/xdebug.ini
+	@sed -i 's/^zend_extension=xdebug/;zend_extension=xdebug/' docker/php/zz-xdebug.ini
+	@sed -i 's/^xdebug\./;xdebug./' docker/php/zz-xdebug.ini
 	$(COMPOSE) restart php
 	@echo "Xdebug disabled."
 
@@ -169,4 +153,4 @@ new-project:
 ifndef NAME
 	$(error NAME is required. Usage: make new-project NAME=demo-site)
 endif
-	@bash scripts/new-project.sh "$(NAME)" "$(or $(BLUEPRINT),development)" "$(PHP)"
+	@bash scripts/new-project.sh "$(NAME)" "$(or $(BLUEPRINT),development)" "$(or $(VER),$(PHP_VERSION))"

@@ -62,9 +62,13 @@ standard/imported blueprints. Reports are uploaded as CI artifacts.
 
 Before release promotion also complete host installation/update checks, all PHP
 transition pairs, repeated warm-deploy benchmarks (no unexplained median regression
-above 15%), the plugin transfer fixture, and 24 hours of observation on dedicated
-legacy/modern/imported clones. Those checks require staging capacity; they are not
-implied by a successful image build or unit-test run.
+above 15%), and the plugin transfer fixture. Exercise one legacy, one modern, and one
+imported clone in staging: apply the migration, check the site and its dependent
+services, verify backup/restore and rollback, then remove the clones. This is a
+targeted acceptance run; a fixed 24-hour soak is optional and should be reserved for
+changes that affect long-running jobs or integrations that the functional checks do
+not cover. After promotion, use the normal deployment monitoring and rollback
+procedure rather than blocking release on an arbitrary waiting period.
 
 ## Updating locked inputs
 

@@ -63,12 +63,14 @@ standard/imported blueprints. Reports are uploaded as CI artifacts.
 Before publication, install the signed candidate on the development Cockpit using
 the local-bundle update path. Confirm the Cockpit health check passes, the existing
 environment remains healthy with its selected images unchanged, and the runtime
-migration review status is visible. Image builds, all PHP transition pairs and the
-warm-deploy comparison are covered by the native amd64/arm64 CI workflows above.
+migration review status is visible. A legacy WP-Cron correction can recreate a
+running PHP container once; its prior image is pinned before that operation. Image
+builds, all PHP transition pairs and the warm-deploy comparison are covered by the
+native amd64/arm64 CI workflows above.
 
-The migration never switches an existing environment's PHP image automatically.
-Each site owner chooses when to prepare and apply a runtime; the site backup and
-rollback path protect that explicit change. There is no fixed staging soak or
+The migration never switches an existing environment to another PHP version
+automatically. Each site owner chooses when to prepare and apply a runtime; the site
+backup and rollback path protect that explicit change. There is no fixed staging soak or
 three-clone release gate for this runtime update. Follow normal Cockpit monitoring
 after publication and use the documented rollback path if a site reports a problem.
 

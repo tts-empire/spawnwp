@@ -170,14 +170,16 @@ def main() -> int:
                 "installer/migrations/add-ingest-nginx-location.py",
                 "installer/migrations/enable-http2.py",
                 "installer/migrations/add-site-proxy-timeouts.py",
+                "installer/migrations/add-ram-admission-limits.py",
+                # Pin each running site's exact current service images before
+                # the WP-Cron migration may recreate PHP with docker compose.
+                "installer/migrations/prepare-trixie-runtimes.py",
                 "installer/migrations/enable-site-cron-and-mail-capture.py",
                 "installer/migrations/retime-site-expiry.py",
                 "installer/migrations/add-provision-nginx-location.py",
                 "installer/migrations/repair-duplicate-project-ports.py",
                 "installer/migrations/remove-test-mcp-fixture.py",
                 "installer/migrations/add-module-include.py",
-                "installer/migrations/add-ram-admission-limits.py",
-                "installer/migrations/prepare-trixie-runtimes.py",
             ],
             "files": entries,
         }

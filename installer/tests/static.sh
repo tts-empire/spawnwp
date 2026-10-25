@@ -309,6 +309,18 @@ grep -q 'installer/migrations/add-ram-admission-limits.py' "$ROOT/updater/build-
   echo "ERROR: the RAM admission migration is missing from the release manifest" >&2
   exit 1
 }
+python3 - "$ROOT/updater/build-release.py" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+start = source.index('"migrations": [')
+end = source.index('],', start)
+migrations = source[start:end]
+pin = migrations.index('installer/migrations/prepare-trixie-runtimes.py')
+recreate = migrations.index('installer/migrations/enable-site-cron-and-mail-capture.py')
+if pin > recreate:
+    raise SystemExit('runtime images must be pinned before the WP-Cron migration can recreate PHP')
+PY
 
 # GitHub issue #13: the edge nginx proxying to a WordPress site had no explicit
 # proxy_read_timeout/proxy_send_timeout, so it fell back to nginx's compiled-in

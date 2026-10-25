@@ -63,8 +63,9 @@ standard/imported blueprints. Reports are uploaded as CI artifacts.
 Before publication, install the signed candidate on the development Cockpit using
 the local-bundle update path. Confirm the Cockpit health check passes, the existing
 environment remains healthy with its selected images unchanged, and the runtime
-migration review status is visible. A legacy WP-Cron correction can recreate a
-running PHP container once; its prior image is pinned before that operation. Image
+migration review status is visible. A legacy WP-Cron correction recreates a running
+PHP container only when its live environment still disables WP-Cron; its prior image
+is pinned before that operation. Image
 builds, all PHP transition pairs and the warm-deploy comparison are covered by the
 native amd64/arm64 CI workflows above.
 

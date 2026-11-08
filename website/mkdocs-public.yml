@@ -5,6 +5,8 @@ repo_url: ""
 repo_name: ""
 extra_css:
   - assets/brand/public.css
+extra_javascript:
+  - assets/brand/analytics-navigation.js
 theme:
   name: material
   custom_dir: mkdocs-overrides

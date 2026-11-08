@@ -14,6 +14,8 @@ into the cockpit as quickly as possible.
 curl -fsSL https://spawnwp.com/install.sh | sudo bash
 ```
 
+<button type="button" data-copy-install-command="curl -fsSL https://spawnwp.com/install.sh | sudo bash">Copy installation command</button>
+
 The installer prompts for the values it needs:
 
 | Variable | Required | Meaning |

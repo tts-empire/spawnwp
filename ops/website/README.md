@@ -86,6 +86,18 @@ triggers include pricing, free-tier, expiry, hosting, export or self-hosting cha
 
 ## Measurement
 
+The shared tracker resolves relative and absolute links before classifying setup
+actions. Public Material docs emit `spawnwp:page-changed` after instant navigation;
+the tracker records one view per pathname transition and captures setup clicks
+before the router changes the URL. Command-copy events fire only on success.
+
+Browser regression checks live in `ops/website/test-analytics.cjs`. Serve a built
+public-site preview on localhost, make Playwright available to Node, and run the
+script with `SPAWNWP_PREVIEW_URL` set to the preview URL (default port 8877).
+The test uses the production canonical origin while routing all content to the
+preview and blocking real Matomo traffic. It covers relative links, instant/back
+navigation, duplicate initialization, clipboard success/failure and mobile width.
+
 Matomo site 6 is the operational analytics source. The shared script records page views,
 **SEO Funnel** events for requirements, installation, GitHub and command-copy actions, and
 **SEO Navigation** events for movement between comparison and category pages. The event

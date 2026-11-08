@@ -1,9 +1,10 @@
 // SpawnWP web analytics — self-hosted Matomo, cookieless.
+if (!window.__spawnwpAnalytics) {
+window.__spawnwpAnalytics = true;
 // Loaded as a first-party script so the site CSP does not need 'unsafe-inline'.
 var _paq = window._paq = window._paq || [];
 // Privacy: no cookies, no consent banner required.
 _paq.push(['disableCookies']);
-_paq.push(['trackPageView']);
 _paq.push(['enableLinkTracking']);
 (function () {
   var u = "https://stats.presenzaweb.net/";
@@ -18,24 +19,52 @@ _paq.push(['enableLinkTracking']);
 // data-seo-funnel attributes keep tracking stable if a destination URL changes;
 // the href checks remain as a site-wide fallback.
 (function () {
+  var lastPath;
+  function pageView() {
+    var path = window.location.pathname;
+    if (path === lastPath) return;
+    lastPath = path;
+    _paq.push(['setCustomUrl', window.location.origin + path]);
+    _paq.push(['setDocumentTitle', document.title]);
+    _paq.push(['trackPageView']);
+  }
+  pageView();
+  document.addEventListener('spawnwp:page-changed', pageView);
   function track(category, action) {
-    _paq.push(['trackEvent', category, action, window.location.pathname]);
+    _paq.push(['trackEvent', category, action, lastPath]);
   }
 
-  document.addEventListener('click', function (event) {
+  document.addEventListener('click', async function (event) {
+    var copy = event.target.closest && event.target.closest('[data-copy-install-command]');
+    if (copy) {
+      var command = copy.getAttribute('data-copy-install-command');
+      try {
+        if (!command) return;
+        await navigator.clipboard.writeText(command);
+        document.dispatchEvent(new CustomEvent('spawnwp:command-copied'));
+        copy.textContent = 'Installation command copied';
+      } catch (_error) {
+        copy.textContent = 'Copy unavailable; select the command above';
+      }
+      return;
+    }
     var link = event.target.closest && event.target.closest('a[href]');
     if (!link) return;
-    var href = link.getAttribute('href') || '';
+    var destination;
+    try { destination = new URL(link.getAttribute('href'), window.location.href); }
+    catch (_error) { return; }
     var funnel = link.getAttribute('data-seo-funnel');
     var navigation = link.getAttribute('data-seo-navigation');
     if (funnel) track('SEO Funnel', funnel);
-    else if (href.indexOf('/docs/requirements/') === 0) track('SEO Funnel', 'visit_requirements');
-    else if (href.indexOf('/docs/installation/') === 0) track('SEO Funnel', 'visit_installation');
-    else if (href.indexOf('https://github.com/tts-empire/spawnwp') === 0) track('SEO Funnel', 'visit_github');
+    else if (destination.origin === window.location.origin) {
+      if (destination.pathname === '/docs/requirements/') track('SEO Funnel', 'visit_requirements');
+      else if (destination.pathname === '/docs/installation/' && destination.pathname !== lastPath) track('SEO Funnel', 'visit_installation');
+    } else if (destination.origin === 'https://github.com' && /^\/tts-empire\/spawnwp(?:\/|$)/.test(destination.pathname)) track('SEO Funnel', 'visit_github');
     if (navigation) track('SEO Navigation', navigation);
-  });
+  }, true);
 
   document.addEventListener('spawnwp:command-copied', function () {
     track('SEO Funnel', 'copy_install_command');
   });
 })();
+}

@@ -28,3 +28,5 @@ body {
 .md-typeset code {
   border-radius: 4px;
 }
+
+.md-typeset [data-copy-install-command]{padding:.6rem .9rem;border:1px solid currentColor;border-radius:.25rem;color:var(--md-accent-fg-color);cursor:pointer}

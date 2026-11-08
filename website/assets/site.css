@@ -112,3 +112,6 @@ footer>p{flex:1 1 240px}@media(max-width:1050px){footer{flex-wrap:wrap}}
 @media(max-width:520px){.promo-video{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:0;border-right:0}}
 .use-case-workflows{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:800px){.use-case-workflows{grid-template-columns:1fr}}
+
+/* Command examples wrap within narrow tutorial columns. */
+.code-example{padding:24px;background:var(--charcoal);border:1px solid var(--line);border-radius:8px;overflow:auto;max-width:100%}.code-example code{white-space:pre-wrap;overflow-wrap:anywhere}

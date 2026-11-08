@@ -26,6 +26,28 @@
       <li><h3>Repeat the matrix</h3><p>Create a separate site for each runtime when parallel comparison matters, or snapshot and switch PHP when sequential testing is enough.</p></li>
       <li><h3>Compare and clean up</h3><p>Record version-specific failures, keep a snapshot only when it helps reproduce the issue, then reset or destroy the environments.</p></li>
     </ol></section>
+    <section class="editorial" aria-labelledby="worked-example"><div class="editorial-heading"><div class="eyebrow">Worked example · verified November 8, 2026 · SpawnWP</div><h2 id="worked-example">A plugin that parses on PHP 8.3 and fails on PHP 8.2.</h2><p>A declared minimum PHP version is a promise worth checking. This deliberately broken plugin declares PHP 8.2, but uses a typed class constant introduced in PHP 8.3. You can reproduce the parser check without installing WordPress; then repeat it in isolated WordPress sites to test activation and behavior.</p></div>
+      <h3>1. Keep one plugin file and two isolated sites</h3><p>Create Development sites for PHP 8.2 and 8.3. Put the same file under <code>projects/primary/wp-content/plugins/compat-demo/compat-demo.php</code> in each site directory. Use test environments; this example intentionally fails on the older runtime.</p>
+      <pre class="code-example"><code>&lt;?php
+/**
+ * Plugin Name: SpawnWP Compatibility Example
+ * Requires PHP: 8.2
+ */
+final class SpawnWP_Compatibility_Example {
+    public const string LABEL = 'Compatibility demo';
+}</code></pre>
+      <h3>2. Record the runtime and lint the exact same file</h3><p>Run these commands from each site's own directory, replacing <code>your-test-site</code> with its name. The file path inside the PHP container remains the same.</p>
+      <pre class="code-example"><code>cd /srv/your-test-site
+docker compose exec -u www-data php php -v
+docker compose exec -u www-data php php -l \
+  /var/www/html/wp-content/plugins/compat-demo/compat-demo.php</code></pre>
+      <p>Our isolated PHP 8.2 parser returned a syntax error and a non-zero exit code. PHP 8.3 returned <code>No syntax errors detected</code>. The checked files are available in the <a href="https://github.com/tts-empire/spawnwp/tree/main/ops/website/fixtures">repository fixtures</a>. The error wording and line number may vary by PHP patch version.</p>
+      <h3>3. Fix the compatibility promise, then verify behavior</h3><p>For this example, remove <code>string</code> from the constant declaration:</p><pre class="code-example"><code>public const LABEL = 'Compatibility demo';</code></pre><p>The corrected file passes the parser check on both PHP 8.2 and 8.3. Alternatively, if your plugin actually requires typed constants, declare PHP 8.3 as the minimum instead of promising compatibility with 8.2.</p>
+      <h3>4. Add static checks and WordPress testing</h3><p>In a Development environment, run the compatibility scan on the same source:</p><pre class="code-example"><code>docker compose exec -u www-data php phpcs \
+  --standard=PHPCompatibilityWP --runtime-set testVersion 8.2-8.5 \
+  /var/www/html/wp-content/plugins/compat-demo</code></pre><p>A successful lint or scan does not verify WordPress hooks, roles, queries or email. Activate your real plugin, exercise its critical flows, inspect the debug log and captured Mailpit messages, and record the result for each runtime. The <a href="/docs/wordpress-development/">command-level QA reference</a> covers PHPCS, PHPStan and runtime tools.</p>
+      <div class="actions"><a class="button primary" href="/docs/installation/" data-seo-funnel="visit_installation">Set up a test lab</a><a class="button secondary" href="/use-cases/plugin-development/">Plugin testing workflow</a></div>
+    </section>
     <section class="editorial"><div class="editorial-heading"><div class="eyebrow">What to compare</div><h2>Evidence from both code and behavior.</h2></div><div class="comparison-wrap"><table class="comparison"><caption>A practical result sheet for each PHP runtime.</caption><thead><tr><th>Check</th><th>What it catches</th><th>Evidence to record</th></tr></thead><tbody>
       <tr><td>PHPCompatibilityWP</td><td>Removed syntax, functions and version-dependent APIs</td><td>Rule, file, line and target range</td></tr>
       <tr><td>PHPStan</td><td>Types, impossible branches and unsafe calls</td><td>Level/config and baseline diff</td></tr>
@@ -33,7 +55,7 @@
       <tr><td>Runtime activation</td><td>Fatal errors, deprecations and bootstrap order</td><td>PHP version, WordPress version and debug log</td></tr>
       <tr><td>Functional flows</td><td>Hooks, queries, cron, HTTP and email behavior</td><td>Expected result and observed difference</td></tr>
     </tbody></table></div></section>
-    <section class="editorial content-intro"><div><div class="eyebrow">Parallel or sequential?</div><h2>Choose isolation based on the investigation.</h2><p>Separate sites make side-by-side comparison and destructive tests easier. Switching one site's PHP runtime is faster when the database and files must remain exactly the same. Snapshot before a risky change and avoid treating a restored snapshot as an independent test baseline.</p></div><aside><strong>Need exact commands?</strong><p>The technical WordPress development guide documents PHPCS, PHPCompatibilityWP, PHPStan, Xdebug and container paths.</p><a href="/docs/wordpress-development/">Open the technical guide →</a></aside></section>
+    <section class="editorial content-intro"><div><div class="eyebrow">Parallel or sequential?</div><h2>Choose isolation based on the investigation.</h2><p>Separate sites make side-by-side comparison and destructive tests easier. Switching one site's PHP runtime is faster when the database and files must remain exactly the same. Snapshot before a risky change and avoid treating a restored snapshot as an independent test baseline.</p></div><aside><strong>Need the complete QA reference?</strong><p>The technical WordPress development guide documents PHPCS, PHPCompatibilityWP, PHPStan, Xdebug and container paths.</p><a href="/docs/wordpress-development/">Open the technical guide →</a></aside></section>
     <section class="content-cta"><div class="eyebrow">Build the matrix</div><h2>Make compatibility failures reproducible.</h2><p>Start with one clean blueprint and an explicit list of supported PHP versions.</p><div class="actions"><a class="button primary" href="/use-cases/plugin-development/">Plugin development environment</a><a class="button secondary" href="/docs/requirements/">Check requirements</a></div></section>
   </main>
   <footer><a class="brand" href="/"><span>Spawn<strong>WP</strong></span></a><p>Self-hosted tooling for disposable WordPress development environments.</p><div><a href="/guides/">Guides</a><a href="/use-cases/">Use Cases</a><a href="/docs/">Docs</a><a href="https://github.com/tts-empire/spawnwp">GitHub</a></div></footer>

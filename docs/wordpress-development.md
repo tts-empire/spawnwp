@@ -135,3 +135,9 @@ stack, and every container port binds to loopback. To work on a site's files, us
 `imap` — removed from PHP core in 8.4, so it is not installable across the versions we build.
 
 See the [CLI reference](cli-reference.md) for all `make` targets.
+
+## A remote lab across workstations
+
+If you currently work in Local and need a server-based review or compatibility target,
+compare the [LocalWP and remote SpawnWP workflows](https://spawnwp.com/alternatives/localwp/).
+The environments stay on your server, so you also take responsibility for DNS, updates and backups.

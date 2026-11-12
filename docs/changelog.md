@@ -4,6 +4,18 @@ description: Review SpawnWP release history, product changes, fixes and compatib
 
 # Changelog
 
+## 0.5.54
+
+- **Adminer 6.3.0.** New sites use a verified Adminer 6 image. System prepares subsequent
+  updates within the 6.x series; existing sites update only when you apply the image.
+- **Verified site updates.** Recognized legacy Adminer Compose declarations are migrated
+  when you apply an update. SpawnWP checks that the running image is the prepared image,
+  verifies HTTP and PHP, and restores the previous image on failure. Custom declarations
+  and image overrides require review instead of reporting a false success.
+- **Clear application versions.** Cockpit shows Adminer and PHP versions separately and
+  keeps Update Adminer available even when PHP is already patched. Stopped services stay
+  stopped; their selected image is applied at the next start.
+
 ## 0.5.53
 
 - **Debian 13 PHP images.** All five runtime branches target Trixie. PHP 7.4 uses audited

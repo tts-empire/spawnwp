@@ -1127,15 +1127,17 @@ function renderTop(p) {
         <div class="card-meta">${urlHtml} &nbsp;·&nbsp; PHP ${esc(p.php_full_version || p.php)} &nbsp;·&nbsp; Blueprint ${esc(p.blueprint.name)} ${esc(p.blueprint.version)} &nbsp;·&nbsp; Host port ${esc(p.port)} (local)</div>
         <div class="card-meta" id="db-${p.name}">DB …</div>
         ${p.runtime_migration_required ? '<div class="blueprint-warning">This site has customized runtime configuration. Review its migration before updating PHP.</div>' : ''}
-        ${p.php_legacy || p.php_security_status !== 'patched' || p.adminer_php_security_status !== 'patched' ? `<div class="blueprint-warning"><strong>PHP security warning</strong><br>${p.php_legacy ? 'PHP 7.4 is end-of-life; verified backports do not provide general upstream support. ' : ''}${p.php_security_status === 'vulnerable' ? `This site's PHP ${esc(p.php_full_version)} is vulnerable. ` : p.php_security_status !== 'patched' ? 'The site PHP patch status could not be verified. ' : ''}${p.adminer_php_security_status === 'vulnerable' ? `Adminer PHP ${esc(p.adminer_php_full_version)} is vulnerable. ` : p.adminer_php_security_status === 'unverified' ? 'Adminer PHP patch status could not be verified. ' : ''}Update the runtime before exposing this site to the Internet. For LAB use, keep it isolated and accept the risk.${p.containers.some(c => c.name === 'adminer' && (c.status || '').toLowerCase().startsWith('up')) ? `<br><button class="btn-neutral btn-sm sensitive" onclick="updateAdminer('${p.name}')">Update Adminer</button>` : ''}</div>` : ''}
+        ${p.php_legacy || p.php_security_status !== 'patched' || p.adminer_php_security_status !== 'patched' ? `<div class="blueprint-warning"><strong>PHP security warning</strong><br>${p.php_legacy ? 'PHP 7.4 is end-of-life; verified backports do not provide general upstream support. ' : ''}${p.php_security_status === 'vulnerable' ? `This site's PHP ${esc(p.php_full_version)} is vulnerable. ` : p.php_security_status !== 'patched' ? 'The site PHP patch status could not be verified. ' : ''}${p.adminer_php_security_status === 'vulnerable' ? `Adminer PHP ${esc(p.adminer_php_full_version)} is vulnerable. ` : p.adminer_php_security_status === 'unverified' ? 'Adminer PHP patch status could not be verified. ' : ''}Update the runtime before exposing this site to the Internet. For LAB use, keep it isolated and accept the risk.</div>` : ''}
       </div>
       <span class="card-badges">${groupChip(p)}${expiryBadge(p)}<span class="badge badge-${overallClass}"><span class="dot"></span>${overallLabel}</span></span>
     </div>
     ${table}
+    <p class="card-meta">Adminer ${esc(p.adminer_version || 'unknown')} · PHP ${esc(p.adminer_php_full_version || 'unknown')}</p>
     <div class="actions">
       <button class="btn-success btn-sm sensitive" onclick="runAction('${p.name}','up')">▶ Up</button>
       <button class="btn-danger btn-sm sensitive" onclick="runAction('${p.name}','down')">■ Down</button>
       <button class="btn-neutral btn-sm sensitive" onclick="runAction('${p.name}','restart')">↺ Restart</button>
+      <button class="btn-neutral btn-sm sensitive" onclick="updateAdminer('${p.name}')">Update Adminer</button>
       <button class="btn-neutral btn-sm sensitive" onclick="updateNginx('${p.name}')">Update Nginx</button>
       <button class="btn-neutral btn-sm sensitive" onclick="runAction('${p.name}','snapshot')">💾 Snapshot</button>
       <button class="btn-neutral btn-sm" onclick="showSnapshots('${p.name}')">🕘 Restore</button>
@@ -2350,14 +2352,17 @@ function destroyProject(name) {
 // ── System info: PHP image inventory ─────────────────────────────────────────
 async function loadSystemInfo() {
   try {
-    const [imagesData, disk, settings] = await Promise.all([
+    const [imagesData, disk, settings, adminer] = await Promise.all([
       fetch(`${BASE}/images`, { cache: 'no-store' }).then(r => r.json()),
       fetch(`${BASE}/disk`, { cache: 'no-store' }).then(r => r.json()),
       fetch(`${BASE}/images/settings`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${BASE}/images/adminer`, { cache: 'no-store' }).then(r => r.json()),
     ]);
     renderImages(imagesData);
     const adminerEl = document.getElementById('adminer-image-status');
-    if (adminerEl) adminerEl.textContent = 'Adminer image status is checked when a site runtime is inspected.';
+    if (adminerEl) adminerEl.textContent = adminer.status === 'prepared'
+      ? `Prepared: Adminer ${adminer.adminer_version} · PHP ${adminer.php_full_version}. Apply it separately to each site.`
+      : 'Prepare a verified Adminer 6 image before applying an update to a site.';
     renderDockerDisk(disk);
     document.getElementById('gc-days').value = settings.autodelete_days;
   } catch (e) {
@@ -2421,7 +2426,7 @@ function refreshAdminerImage() {
   if (blockedIfBusy()) return;
   if (!confirm('Pull and verify the latest Adminer image?\n\nThis prepares the shared image only. Running Adminer containers stay unchanged until updated site by site.')) return;
   streamSSE(`${BASE}/images/refresh-adminer`, {}, 'out-system', ok => {
-    if (ok) showToast('Patched Adminer image prepared');
+    if (ok) showToast('Adminer 6 image prepared and PHP verified');
     loadSystemInfo();
   });
 }
@@ -2435,7 +2440,8 @@ async function updateAdminer(project) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Unable to update Adminer');
-    showToast(`Adminer updated to PHP ${data.php_full_version}`);
+    const action = data.status === 'selected' ? 'selected for next start' : data.status === 'unchanged' ? 'already running' : 'applied';
+    showToast(`Adminer ${data.adminer_version} ${action} · PHP ${data.php_full_version} verified`);
     await loadProjects();
   } catch (error) {
     showToast(error.message, true);

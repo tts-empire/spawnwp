@@ -290,6 +290,11 @@ fi
 printf '\nPHP_IMAGE_REF=%s\n' "$IMAGE" >> .env
 export PHP_IMAGE_REF="$IMAGE"
 
+# Select a verified Adminer image before starting the site.
+ADMINER_IMAGE_REF=$(python3 -c 'from service_images import new_adminer; print(new_adminer())')
+printf '\nADMINER_IMAGE_REF=%s\n' "$ADMINER_IMAGE_REF" >> .env
+export ADMINER_IMAGE_REF
+
 # Deterministic two-phase startup. On the FIRST run the WordPress entrypoint
 # extracts the whole install into the empty volume (thousands of files): under
 # that I/O load php's healthcheck can time out. If we started everything at once,

@@ -6,6 +6,7 @@ import json
 import hashlib
 import zipfile
 import http.cookiejar
+import re
 import urllib.parse
 import os
 import shutil
@@ -137,9 +138,11 @@ echo json_encode(['version'=>PHP_VERSION,'extensions'=>get_loaded_extensions(),
         cookiejar=http.cookiejar.CookieJar()
         browser=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookiejar))
         adminurl='http://127.0.0.1:'+adminport+'/'
-        browser.open(adminurl,timeout=15).read()
+        login_html=browser.open(adminurl,timeout=15).read().decode()
+        match=re.search(r'''name=['"]token['"]\s+value=['"]([^'"]+)''',login_html)
+        if not match:raise RuntimeError('Adminer login token missing')
         credentials=urllib.parse.urlencode({'auth[driver]':'server','auth[server]':'db',
-                    'auth[username]':'wpuser','auth[password]':'smoke-only','auth[db]':'wordpress'}).encode()
+                    'auth[username]':'wpuser','auth[password]':'smoke-only','auth[db]':'wordpress','token':match[1]}).encode()
         with browser.open(adminurl,credentials,timeout=15) as response: adminhtml=response.read()
         check('Adminer authenticates to MariaDB',b'Logout' in adminhtml or b'Log out' in adminhtml)
         check('Imagick processes an image',php('php','-r',

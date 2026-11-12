@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>System · SpawnWP Cockpit</title>
   <style>html{background:#000;color-scheme:dark}html.cockpit-preload body{visibility:hidden}</style>
-  <script src="/assets/cockpit-boot.js?v=0.5.53" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
-  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.53">
+  <script src="/assets/cockpit-boot.js?v=0.5.54" onerror="document.documentElement.classList.remove('cockpit-preload')"></script>
+  <link id="cockpit-css" rel="stylesheet" href="/assets/cockpit.css?v=0.5.54">
 </head>
 <body data-page="system">
   <header>
@@ -45,7 +45,7 @@
       </table>
       <div class="system-subsection" aria-labelledby="adminer-image-title">
         <h2 class="system-subtitle" id="adminer-image-title">Adminer image</h2>
-        <p class="system-intro" id="adminer-image-status">Prepare the latest Adminer image and verify its bundled PHP patch level. Existing sites update only when an administrator applies the image to that site.</p>
+        <p class="system-intro" id="adminer-image-status">Prepare the latest Adminer 6 image and verify its Adminer version and bundled PHP patch level. Existing sites update only when an administrator applies the image to that site.</p>
         <button class="btn-neutral sensitive" type="button" onclick="refreshAdminerImage()">Prepare Adminer update</button>
       </div>
       <div class="gc-setting">
@@ -88,6 +88,6 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="/assets/cockpit.js?v=0.5.53"></script>
+  <script src="/assets/cockpit.js?v=0.5.54"></script>
 </body>
 </html>

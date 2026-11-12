@@ -585,6 +585,9 @@ def list_projects():
             except (OSError, subprocess.TimeoutExpired):
                 adminer_security = php_security_status(None)
 
+        from service_images import running_adminer
+        adminer_image = running_adminer(proj)
+
         # Mailpit web UI path, served on the cockpit subdomain (same origin as
         # this dashboard) under MAILPIT_WEBROOT — so a relative path is enough.
         webroot = env.get("MAILPIT_WEBROOT", "").strip("/")
@@ -629,6 +632,9 @@ def list_projects():
             "php_runtime_provider": php_security.get("runtime_provider", "unknown"),
             "php_package_version": php_security.get("runtime_package_version", ""),
             "php_cve_fixes": php_security.get("cve_fixes", {}),
+            "adminer_version": adminer_image["adminer_version"],
+            "adminer_image_id": adminer_image["image_id"],
+            "adminer_state": adminer_image["state"],
             "adminer_php_full_version": adminer_security.get("php_full_version", "unknown"),
             "adminer_php_security_status": adminer_security["status"],
             "port": env.get("WEB_PORT", "?"),
@@ -2310,6 +2316,12 @@ def refresh_image(body: ImageRefresh):
 
 
 ADMINER_REFRESH_TOOL = PRIMARY_PROJECT / "scripts" / "refresh-adminer-image.sh"
+
+
+@app.get("/api/images/adminer")
+def adminer_image_status():
+    from service_images import prepared_adminer
+    return prepared_adminer()
 
 
 @app.post("/api/images/refresh-adminer")

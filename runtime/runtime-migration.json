@@ -3,16 +3,20 @@
   "from_release": "0.5.52",
   "managed": {
     "Makefile": [
-      "79a39215f4f984755cc09a74ef5c1dc58482b99a546b685cb0d008f92365a98a"
+      "79a39215f4f984755cc09a74ef5c1dc58482b99a546b685cb0d008f92365a98a",
+      "7a658aeb394886a35c2a555985d188fe64a6d5d528fe91b865aabc4e4f879cee"
     ],
     "php_security.py": [
-      "371c5807f0fe128e1250600ae6636472127a20e71ea7c27cbc8fe31d125328b8"
+      "371c5807f0fe128e1250600ae6636472127a20e71ea7c27cbc8fe31d125328b8",
+      "a7a669400ed7ce75a1540086dd142b1217fad748f3b6414a58887e3d9f6f115d"
     ],
     "compose.yaml": [
-      "1b71fe04d8c9b1fc985bb399e905468178dd8aabb4b37a979da9128a435d9b8f"
+      "1b71fe04d8c9b1fc985bb399e905468178dd8aabb4b37a979da9128a435d9b8f",
+      "5cbf97d15269345da012cb5cf35513b3d8113e2b454d090b1ff86623148ed490"
     ],
     "docker/php/Dockerfile": [
-      "acf52e769222e4699441d064aafd95c3059e3fad11e2537620cdcef051944cb0"
+      "acf52e769222e4699441d064aafd95c3059e3fad11e2537620cdcef051944cb0",
+      "f91a456bb03282d5e04df39287bbe60e3af109c2e229db6f0259111d1037fc90"
     ],
     "docker/php/opcache.ini": [
       "8f8c2cfb9f6159b0fe409affa9a1d18fd472616f9f25ac9dff042cd0dedfe72c"
@@ -21,10 +25,12 @@
       "987fa4defe1fc1def5a850a89f084cf7eb7aeedb6db29acaf0e7771e7700e5b0"
     ],
     "docker/php/phpstan-wp.neon": [
-      "63991d77deab1887219a465f1528206370cd64129ab77603abf2c21638495f66"
+      "63991d77deab1887219a465f1528206370cd64129ab77603abf2c21638495f66",
+      "cf95f8f9d41a72b97974f973d0a38507b2815dda0a8b98b54f88289cbb5e83ee"
     ],
     "scripts/apply-blueprint.sh": [
-      "37abc3cb6d64fadd8b3f728ee4bf4f7f45ca0da399bac46e4a072cbffda4d3a5"
+      "37abc3cb6d64fadd8b3f728ee4bf4f7f45ca0da399bac46e4a072cbffda4d3a5",
+      "00fb06185edc7bcc04c8694171b200836e78ef57b18de376cda5fefeb347adf3"
     ],
     "scripts/apply-content-blueprint.sh": [
       "eaa1a3c4756c937dfad4fed23ba5f4edd3c6cb052a8fc8da92d12bdadb479d09"
@@ -48,13 +54,15 @@
       "2d9c33491e93c2a08d6fc912f9943beebe3fc2e2631e6896bdbf82ea9df3dc92"
     ],
     "scripts/image-gc.sh": [
-      "6735163f760996a0d8fb0b8a0e13f240c9996c2d47bcac6ae25dfbca119578de"
+      "6735163f760996a0d8fb0b8a0e13f240c9996c2d47bcac6ae25dfbca119578de",
+      "e5213d71ab6b179cafd19a77b43e641fe03a3abbd5de9f122f71a1f48ce1ad31"
     ],
     "scripts/import-database.php": [
       "068f8476fc8090195ea1ad0fe646a5501a6234d6a7800d84115e4e7c52597cf4"
     ],
     "scripts/lib-image.sh": [
-      "cc8823767c6161c619a78d56806f7e60a7aa1382e3e7a1da8ba869785d03ffbf"
+      "cc8823767c6161c619a78d56806f7e60a7aa1382e3e7a1da8ba869785d03ffbf",
+      "02f1cde4bbdb2860464a39dcde84785347b6c4d340d168d859af79182f1295c1"
     ],
     "scripts/lib-metrics.sh": [
       "c0e27e666cb752b1ada809a850bba6d054e92ab8691e46fffb9273715c190f05"
@@ -63,22 +71,26 @@
       "f5b21e90e89ffcb760f0493cb3544cc0c7140b7bf23bad4959b4ba143f882d8e"
     ],
     "scripts/new-project.sh": [
-      "eaad5ac9f6854ddb5ab64a3bddc6950cf8811b1a1dabf8bc2979e347b5fd06df"
+      "eaad5ac9f6854ddb5ab64a3bddc6950cf8811b1a1dabf8bc2979e347b5fd06df",
+      "8fd2eba209fd6b3431fadd7415d07c319d8b7c7e9accc55428b703daa842e769"
     ],
     "scripts/php-ini-apply.sh": [
       "86ee6388ba82094c6e6c8e68f050682ba39f25a574ff62a10d934f987870fd9d"
     ],
     "scripts/refresh-image.sh": [
-      "492efa1ee0cd0b8f93e70740f0919985ab148140753a1566b69eeee531110ced"
+      "492efa1ee0cd0b8f93e70740f0919985ab148140753a1566b69eeee531110ced",
+      "8efc7c23abf1355e42caa8f51f904c2e461f5cc66c763caab983e5dc483bc3cb"
     ],
     "scripts/refresh-adminer-image.sh": [
-      "b9619a45a965723c77a98258c9fb1c4e4d142ecb93ae307b6a42610a224cebe5"
+      "b9619a45a965723c77a98258c9fb1c4e4d142ecb93ae307b6a42610a224cebe5",
+      "42b35e687b63b01436259f020db98915f9d90d42bf6ac4bab5762ae52e095903"
     ],
     "scripts/site-expiry.sh": [
       "ebee95bff0e8d13b32cb904d31518011946cdb0890c4809c9a0aa6be1ccfd826"
     ],
     "scripts/php-switch-progress.py": [
-      "b109c82acd4f657028517f1ee062c409784f3ae074d53f14d75d9f79f66d4ac5"
+      "b109c82acd4f657028517f1ee062c409784f3ae074d53f14d75d9f79f66d4ac5",
+      "52c609bdfa59cc13539df7727f49c4d03e0d5af87ba6ea8f7a4a41aa680d6810"
     ],
     "scripts/reset.sh": [
       "393a743bfabae27d3ffcb84679cb7b350c86d00570f1b70374cecab6f1816d5c"
@@ -98,31 +110,83 @@
     "mu-plugins/spawnwp-restricted-admin.php": [
       "e24da700098b780724f66053579697df9075a055c70a5bde35d6c4a19d84ca47"
     ],
-    "runtime_images.py": [],
-    "runtime_migration.py": [],
-    "service_images.py": [],
-    "scripts/prepare-image.py": [],
-    "scripts/backup-runtime.py": [],
-    "docker/php/Dockerfile.legacy": [],
-    "docker/php/build-pcntl.sh": [],
-    "docker/php/docker-entrypoint.sh": [],
-    "docker/php/fpm-healthcheck": [],
-    "docker/php/fpm-legacy.conf": [],
-    "docker/php/install-legacy.sh": [],
-    "docker/php/install-tools.sh": [],
-    "docker/php/php-fpm-legacy": [],
-    "docker/php/runtime-lock.json": [],
-    "docker/php/seed-wordpress.sh": [],
-    "docker/php/sury-archive-keyring.gpg": [],
-    "docker/php/sury-packages.txt": [],
-    "docker/php/tooling-composer.json": [],
-    "docker/php/tooling-composer.lock": [],
-    "docker/php/tools-lock.json": [],
-    "docker/php/wp-config-docker.php": [],
-    "docker/php/xdebug-default.ini": [],
-    "docker/php/sury-downloads-amd64.txt": [],
-    "docker/php/UPSTREAM-NOTICES.md": [],
-    "docker/php/sury-downloads-arm64.txt": [],
-    "scripts/rollback-runtime.py": []
+    "runtime_images.py": [
+      "a52de7bcd20b57d3b7b7fb07bd04f88059deb2470a4d74e808a2ee25e605bd88"
+    ],
+    "runtime_migration.py": [
+      "e092b306af795a2eee31a0ddbcf108858d1b1e1da9412867ed9f57d4c51b2e1b"
+    ],
+    "service_images.py": [
+      "64b145be1556ce2bbd3e959d2e910972df1977f984dc306ccae751d84811bf6e"
+    ],
+    "scripts/prepare-image.py": [
+      "84f99cec4c0e89c5e7c85fcd74d638246bc019e63d6b6fe6ac72120d42360e3e"
+    ],
+    "scripts/backup-runtime.py": [
+      "37040494f6664725464198d5dd8e9f1796caef8f19cbb0128b42eb65fb90477a"
+    ],
+    "docker/php/Dockerfile.legacy": [
+      "d95924e3fcdc37bead41218777b5e71d7ff77cf0e16b60c411a8c1ecc31709c2"
+    ],
+    "docker/php/build-pcntl.sh": [
+      "e8d6b32e49884848d1dc22f794ffcdbe72e1752912652cb304e4a10cfcfe29c3"
+    ],
+    "docker/php/docker-entrypoint.sh": [
+      "e24fa6aa43bb5b3427f6069ae0e16e9b4c4a1b0a253caed8928022d076cc15b8"
+    ],
+    "docker/php/fpm-healthcheck": [
+      "4a5704548647efb36ca588beddf75534901f946ccd83272b4ac136a4377239b4"
+    ],
+    "docker/php/fpm-legacy.conf": [
+      "6730d41876cf0c89ef48a57a0bf403f8d87031090b5b0a96eda29419024ad403"
+    ],
+    "docker/php/install-legacy.sh": [
+      "78eb65914122beb54c6c5c155f0a8f09e1b137a6da6e51fa9067298714ac88d3"
+    ],
+    "docker/php/install-tools.sh": [
+      "2766ad623b7f16d9293405f959f05cb10dda4ab44729d1f74181bb057dc5527d"
+    ],
+    "docker/php/php-fpm-legacy": [
+      "4e61f0cbad3563a3e722a6ea90ef29ced3491991173a688b5eb951ca8c0d018e"
+    ],
+    "docker/php/runtime-lock.json": [
+      "cc47f379293bd83580005be81c90411342df02da5097986a6968b8960b335082"
+    ],
+    "docker/php/seed-wordpress.sh": [
+      "3bb224066de0cd610c01950f9fcefd57cb10c80fb3f55a5769e5b28c2b259f09"
+    ],
+    "docker/php/sury-archive-keyring.gpg": [
+      "b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c"
+    ],
+    "docker/php/sury-packages.txt": [
+      "397b575a45d5e5254be136ee6c7080e185d14df6cb9411f2e2450daf416411a2"
+    ],
+    "docker/php/tooling-composer.json": [
+      "8629af8cbea1cdec6ce31bbd97feb489ff88854461519c856dd181f58f36f7d5"
+    ],
+    "docker/php/tooling-composer.lock": [
+      "fe56a033e11613f85415c7f79355333475f02d48211e7cb3ae5ae0d4377edb29"
+    ],
+    "docker/php/tools-lock.json": [
+      "aabf3d3496632d44f06b34abec616e85ee997a84303c76ca570a653ddd392424"
+    ],
+    "docker/php/wp-config-docker.php": [
+      "1513f88b7252f29790f0acad201b1ef0d442f0d80e88c33e4a6d473615084162"
+    ],
+    "docker/php/xdebug-default.ini": [
+      "bad62018b62410c6aeb3f688677b8a03015abf1f29aba23a7beeac32005feaa3"
+    ],
+    "docker/php/sury-downloads-amd64.txt": [
+      "5aa8d1d376f51180fa0d516a8a713403f088b02f83fc550a25623901db58fc66"
+    ],
+    "docker/php/UPSTREAM-NOTICES.md": [
+      "d5992c91fd39327d2a7729e9c47b9c63044b72ad73893eba2e5131148938a6cc"
+    ],
+    "docker/php/sury-downloads-arm64.txt": [
+      "4f66e98c8de5bd500ef2f6959a1126051a96b2e74eb803533fbc643203c133b9"
+    ],
+    "scripts/rollback-runtime.py": [
+      "c42b674fbaf8542915af1ca30d77e409cdede85c863aff9392bdd0f41949e86e"
+    ]
   }
 }

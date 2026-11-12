@@ -86,3 +86,34 @@ Do not infer legacy patch status from PHP_VERSION alone.
 Tool downloads use tools-lock.json; Composer uses a committed lock. Build inputs
 are enumerated in scripts/lib-image.sh. Per-site INI and debugger toggles are
 excluded, so changing settings never invalidates the shared build cache.
+
+## Adminer 6 updates (SpawnWP 0.5.54)
+
+New sites select the verified Adminer 6 candidate prepared on the server, or the
+release-pinned Adminer 6.3.0 baseline. In System, **Prepare Adminer update** follows
+only the 6.x series and checks the Adminer version and the bundled PHP patch level.
+The System page shows the prepared versions. It does not change existing sites.
+
+On each site's Manage card, choose **Update Adminer**. Cockpit displays the actual
+Adminer application version separately from PHP. The action is available even when
+PHP is already patched. A stopped service receives a selection for its next start;
+it is not started by the update action.
+
+Older standard Compose files with a literal `image: adminer:5` are converted to use
+`ADMINER_IMAGE_REF` when you apply the update. Only that image declaration changes.
+Custom images, unrecognized declarations or environment/Compose overrides that prevent
+the prepared image from being selected produce an error and require manual review.
+Unrelated customized PHP configuration does not have to be replaced to update Adminer.
+
+The updater compares the actual container image ID against the prepared image for the
+server's architecture, then verifies PHP and HTTP. It saves the previous configuration
+and exact image in `.spawnwp/adminer-rollback.json`, retaining the image for 14 days.
+A failed apply automatically restores the previous image. The runtime files preserve
+these private operational records; do not publish them.
+
+For a later manual rollback, use the `environment` and `previous_ref` saved in that
+record, preserving any unrelated settings changed since the update. Set only
+`ADMINER_IMAGE_REF` to `previous_ref` in the site's `.env`, then run
+`docker compose up -d --no-deps --no-build --force-recreate adminer`. Confirm the image
+ID and HTTP availability. If Adminer was stopped, update only the selection and leave
+it stopped. This does not restore WordPress files or database data.
